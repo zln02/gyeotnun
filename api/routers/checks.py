@@ -47,7 +47,18 @@ async def create_check(
         elif image:
             raw = await image.read()
             if len(raw) > settings.MAX_UPLOAD_MB * 1024 * 1024:
-                raise ValueError(f"이미지가 너무 큽니다. {settings.MAX_UPLOAD_MB}MB 이하로 올려 주세요.")
+                masking.discard_original(raw)
+                # ★ 파일이 너무 큰 건 서버 오류가 아니다. 501 대신 200으로 안내하고
+                #   텍스트 직접 입력 경로를 제시한다.
+                return CheckCreateResponse(
+                    check_id=check_id, extracted_text="", masked=False, masked_items=[],
+                    detected_domain=None, status="failed",
+                    message=(
+                        f"사진 용량이 너무 큽니다 ({len(raw) / 1024 / 1024:.1f}MB). "
+                        f"{settings.MAX_UPLOAD_MB}MB 이하 사진으로 다시 올려 주시거나, "
+                        "'글로 붙여넣기'로 내용을 직접 입력해 주세요."
+                    ),
+                )
             try:
                 extracted = ocr.extract_from_image(raw)
             finally:
@@ -59,6 +70,18 @@ async def create_check(
             )
     except (NotImplementedError, Exception) as e:  # noqa: BLE001
         raise not_implemented(e) from e
+
+    if extracted.status == "failed":
+        # ★ 인식 실패(흐림/텍스트 없음/캡처 아님)도 서버 오류가 아니다.
+        #   ocr.extract_from_image() 가 예외 대신 이 상태로 알려 준 정상 결과다.
+        return CheckCreateResponse(
+            check_id=check_id, extracted_text="", masked=False, masked_items=[],
+            detected_domain=None, status="failed",
+            message=(
+                "사진에서 글자를 읽지 못했습니다. 밝은 곳에서 화면 전체가 나오게 "
+                "다시 찍어 주시거나, '글로 붙여넣기'로 내용을 직접 입력해 주세요."
+            ),
+        )
 
     masked = masking.mask_text(extracted.text)    # ★ DB 저장 전 비식별화
     _MEMORY_STORE[check_id] = {

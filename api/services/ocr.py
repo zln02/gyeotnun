@@ -3,19 +3,26 @@
 담당: 박진 (인식)
 
 입력 3종
-  - image : 카카오톡 캡처, 유튜브 썸네일 사진 → Google Vision OCR
+  - image : 카카오톡 캡처, 유튜브 썸네일 사진 → Claude Vision (멀티모달)으로 직접 추출
   - link  : 유튜브/블로그 URL → 제목·본문(자막) 추출
   - text  : 붙여넣은 텍스트 → 그대로 사용
 
 ★ 원본 이미지는 메모리에서만 다루고 디스크에 쓰지 않는다.
   추출 직후 masking.mask_text() 를 통과시킨 결과만 상위로 넘긴다.
+  Vision 호출 자체도 base64 인코딩한 바이트를 요청 본문에 실어 보낼 뿐,
+  어디에도 파일로 쓰지 않는다.
 """
 from __future__ import annotations
 
+import base64
+import json
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
 from config import MissingKeyError, settings
+
+log = logging.getLogger("gyeotnun.ocr")
 
 # 주제 영역 추정용 키워드 (간이 규칙 기반. 추후 분류 모델로 교체 - TODO 박진)
 # NOTE: '계좌', '입금' 같은 단어는 개인정보 문맥에서도 흔히 나와 도메인 오판을 유발한다.
@@ -35,7 +42,75 @@ DOMAIN_PRIORITY = ["policy", "health", "finance", "news"]
 class ExtractResult:
     text: str
     detected_domain: Optional[str] = None
-    status: str = "extracted"
+    status: str = "extracted"   # extracted | needs_input | failed
+
+
+# ============================================================ Claude Vision OCR
+VISION_MODEL = "claude-sonnet-5"
+VISION_MAX_TOKENS = 2048
+# 짧고 기계적인(창작이 아닌) 전사 작업이라 낮은 effort 로 충분하다.
+VISION_EFFORT = "low"
+
+VISION_SYSTEM_PROMPT = """당신은 곁눈의 이미지 읽기 도우미입니다. 카카오톡 등 메신저 대화 캡처 화면에서
+사용자가 받은 메시지의 '본문 내용'만 정확히 옮겨 적습니다. 내용을 판단하거나 요약하지 않습니다.
+
+[캡처 화면에는 여러 요소가 섞여 있습니다 - 반드시 구분하십시오]
+- 말풍선 안의 실제 메시지 본문 → 그대로 옮긴다 (가장 중요, 절대 요약하거나 지어내지 않는다)
+- 말풍선 위의 작은 글씨(발신자 이름) → 옮기지 않는다
+- 말풍선 옆의 작은 글씨(오전/오후 시:분, 읽음 표시) → 옮기지 않는다
+- 화면 맨 위 상태바(시간, 배터리, 통신사) → 옮기지 않는다
+- 앱 상단바의 대화상대 이름, 뒤로가기·검색·더보기 아이콘, 하단 입력창 placeholder → 옮기지 않는다
+- 말풍선이 여러 개면 화면에 보이는 순서(위 → 아래)대로 줄바꿈해 이어 붙인다.
+
+[출력 형식]
+JSON 하나만 출력하십시오.
+{"readable": true 또는 false, "extracted_text": "...", "reason": "..."}
+- readable: 메시지 본문을 읽어 옮길 수 있으면 true.
+  화면이 너무 흐리거나, 글자가 없거나, 메신저 캡처가 아니면 false.
+- extracted_text: 말풍선 본문만 이어 붙인 텍스트. readable 이 false 면 빈 문자열.
+- reason: readable 이 false 일 때만 이유를 한 줄로 적는다 (예: "글자가 흐려서 읽기 어렵습니다").
+  readable 이 true 면 빈 문자열로 둔다.
+"""
+
+VISION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "readable": {"type": "boolean"},
+        "extracted_text": {"type": "string"},
+        "reason": {"type": "string"},
+    },
+    "required": ["readable", "extracted_text", "reason"],
+    "additionalProperties": False,
+}
+
+# 매직 바이트로 판별한다. UploadFile.content_type 은 클라이언트가 보낸 값이라
+# 신뢰할 수 없다(확장자만 바꿔도 브라우저가 잘못된 값을 보낼 수 있다).
+_MEDIA_TYPE_SNIFFERS = [
+    (lambda b: b[:3] == b"\xff\xd8\xff", "image/jpeg"),
+    (lambda b: b[:8] == b"\x89PNG\r\n\x1a\n", "image/png"),
+    (lambda b: b[:6] in (b"GIF87a", b"GIF89a"), "image/gif"),
+    (lambda b: b[:4] == b"RIFF" and b[8:12] == b"WEBP", "image/webp"),
+]
+
+
+def _detect_media_type(image_bytes: bytes) -> Optional[str]:
+    for check, media_type in _MEDIA_TYPE_SNIFFERS:
+        if check(image_bytes):
+            return media_type
+    return None
+
+
+_client = None
+
+
+def _get_client():
+    """Anthropic 클라이언트 싱글턴. prompt_chain.py 와 같은 키(ANTHROPIC_API_KEY)를 쓴다."""
+    global _client
+    if _client is None:
+        import anthropic
+
+        _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    return _client
 
 
 def detect_domain(text: str) -> Optional[str]:
@@ -59,26 +134,64 @@ def extract_from_text(text: str) -> ExtractResult:
 
 
 def extract_from_image(image_bytes: bytes) -> ExtractResult:
-    """TODO(박진): Google Vision DOCUMENT_TEXT_DETECTION 호출.
+    """카카오톡 등 메신저 캡처에서 Claude Vision(멀티모달)으로 본문 텍스트만 뽑는다.
 
-    구현 스케치::
+    별도 OCR 서비스(Google Vision 등)를 쓰지 않는다. ANTHROPIC_API_KEY 하나로
+    처리한다(질문 생성과 같은 키). 원본 바이트는 base64 로 인코딩해 요청 본문에
+    실을 뿐 어디에도 파일로 저장하지 않고, 호출이 끝나면 호출부(routers/checks.py)가
+    즉시 파기한다.
 
-        payload = {"requests": [{
-            "image": {"content": base64.b64encode(image_bytes).decode()},
-            "features": [{"type": "DOCUMENT_TEXT_DETECTION"}],
-            "imageContext": {"languageHints": ["ko"]},
-        }]}
-        r = httpx.post(
-            f"https://vision.googleapis.com/v1/images:annotate?key={settings.GOOGLE_VISION_API_KEY}",
-            json=payload, timeout=15,
-        )
-        text = r.json()["responses"][0]["fullTextAnnotation"]["text"]
-
-    주의: 반환 직후 masking.mask_text() 를 반드시 통과시킬 것.
+    반환값 status:
+      "extracted" - 정상 인식. text 는 반드시 이후 masking.mask_text() 를 거쳐야 한다.
+      "failed"    - 이미지 형식이 지원되지 않거나, 모델이 "읽을 수 없다"고 판단했거나,
+                    응답을 JSON 으로 파싱할 수 없는 경우. 서버 오류가 아니라 정상적인
+                    결과이므로 예외를 던지지 않는다. 호출부가 "다시 찍어 주세요" 안내로
+                    바꾼다.
+    키 자체가 없거나(설정 문제) API 호출이 실패하면(네트워크/인증 등, 재시도해도
+    의미 없는 상태) 예외를 던져 501 로 변환되게 한다 - 이건 인식 실패가 아니라
+    서비스가 시도조차 못 한 경우이기 때문이다.
     """
-    if not settings.has_vision:
-        raise MissingKeyError("GOOGLE_VISION_API_KEY", owner="박진")
-    raise NotImplementedError("extract_from_image 미구현. ?mock=1 을 사용하세요.")
+    if not settings.has_llm:
+        raise MissingKeyError("ANTHROPIC_API_KEY", owner="박진")
+
+    media_type = _detect_media_type(image_bytes)
+    if media_type is None:
+        log.warning("[ocr] 지원하지 않는 이미지 형식 (jpeg/png/gif/webp 아님)")
+        return ExtractResult(text="", status="failed")
+
+    b64 = base64.b64encode(image_bytes).decode()
+    resp = _get_client().messages.create(
+        model=VISION_MODEL,
+        max_tokens=VISION_MAX_TOKENS,
+        system=VISION_SYSTEM_PROMPT,
+        output_config={"effort": VISION_EFFORT, "format": {"type": "json_schema", "schema": VISION_SCHEMA}},
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
+                {"type": "text", "text": "이 메신저 캡처에서 말풍선 본문만 옮겨 적어 주세요."},
+            ],
+        }],
+    )
+
+    if resp.stop_reason == "refusal":
+        log.warning("[ocr] 모델이 이미지 처리를 거절했습니다(refusal)")
+        return ExtractResult(text="", status="failed")
+
+    raw = "".join(b.text for b in resp.content if b.type == "text")
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        log.warning("[ocr] 응답 JSON 파싱 실패: %s", raw[:200])
+        return ExtractResult(text="", status="failed")
+
+    text = (payload.get("extracted_text") or "").strip()
+    if not payload.get("readable") or not text:
+        log.info("[ocr] 인식 실패: %s", payload.get("reason") or "본문을 찾지 못함")
+        return ExtractResult(text="", status="failed")
+
+    log.info("[ocr] 인식 성공: %d자", len(text))
+    return ExtractResult(text=text, detected_domain=detect_domain(text), status="extracted")
 
 
 def extract_from_link(url: str) -> ExtractResult:

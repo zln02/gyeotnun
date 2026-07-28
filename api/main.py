@@ -70,7 +70,9 @@ async def health():
         keys_configured={
             "anthropic": settings.has_llm,
             "naver_search": settings.has_search,
-            "google_vision": settings.has_vision,
+            # 이미지 인식(OCR)은 Claude Vision 을 쓴다 - anthropic 과 동일한 값이지만
+            # "이미지 업로드가 될까?"를 바로 확인할 수 있도록 별도 키로 남겨 둔다.
+            "vision": settings.has_vision,
         },
     )
 

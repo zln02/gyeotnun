@@ -52,6 +52,9 @@ class Settings:
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     NAVER_CLIENT_ID: str = os.getenv("NAVER_CLIENT_ID", "")
     NAVER_CLIENT_SECRET: str = os.getenv("NAVER_CLIENT_SECRET", "")
+    # 더 이상 쓰지 않는다: 이미지 인식이 Claude Vision(ANTHROPIC_API_KEY)으로
+    # 옮겨 가면서 별도 Vision 키가 필요 없어졌다(services/ocr.py). 과거 .env 에
+    # 이 값이 남아 있어도 무시된다. 필드 자체는 하위호환을 위해 남겨 둔다.
     GOOGLE_VISION_API_KEY: str = os.getenv("GOOGLE_VISION_API_KEY", "")
 
     # 데모/시연 안전장치: True 면 키가 없을 때 자동으로 mock 응답으로 폴백한다.
@@ -67,7 +70,8 @@ class Settings:
 
     @property
     def has_vision(self) -> bool:
-        return bool(self.GOOGLE_VISION_API_KEY)
+        """이미지 인식(OCR) 가능 여부. Claude Vision 을 쓰므로 has_llm 과 같다."""
+        return self.has_llm
 
 
 settings = Settings()

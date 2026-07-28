@@ -44,6 +44,9 @@ class CheckCreateResponse(BaseModel):
     masked_items: List[MaskedItem] = Field(default_factory=list)
     detected_domain: Optional[str] = Field(None, description="추정 주제 영역 (health/finance/policy/news/unknown)")
     status: Literal["extracted", "needs_input", "failed"] = "extracted"
+    message: Optional[str] = Field(
+        None, description="status 가 extracted 가 아닐 때 사용자에게 보여줄 안내 문구 (예: 재촬영/직접입력 유도)"
+    )
 
 
 # ---------------------------------------------------------------- S2: 근거 수집
