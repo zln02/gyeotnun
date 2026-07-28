@@ -1,0 +1,15 @@
+# 곁눈(Gyeotnun) API 의존성
+# 설치: pip install -r requirements.txt
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+python-multipart==0.0.20        # multipart 업로드(이미지) 처리에 필요
+SQLAlchemy==2.0.36
+psycopg2-binary==2.9.10         # PostgreSQL 드라이버 (docker-compose 용)
+httpx==0.28.1                   # 외부 API 호출 (네이버/Vision)
+anthropic==0.42.0               # Claude API (질문 생성)
+python-dotenv==1.0.1
+
+# dev
+pytest==8.3.4

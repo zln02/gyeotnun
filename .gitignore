@@ -1,0 +1,51 @@
+# ============================================================
+# 곁눈(Gyeotnun) - .gitignore
+# ★ 최우선: 실제 API 키가 담긴 .env 는 절대 커밋 금지
+# ============================================================
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# DB / 로컬 데이터
+*.db
+*.sqlite
+*.sqlite3
+pgdata/
+
+# 업로드 원본 이미지 (개인정보 - 처리 후 즉시 파기 원칙)
+api/uploads/
+uploads/
+tmp/
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 코퍼스 원본(용량) - .gitkeep 만 유지
+corpus/public_data/*
+!corpus/public_data/.gitkeep
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
