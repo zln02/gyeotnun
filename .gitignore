@@ -49,3 +49,6 @@ corpus/public_data/*
 .idea/
 .DS_Store
 Thumbs.db
+
+# 가드레일 벤치 실행 결과 (스크립트로 재생성 가능)
+api/tools/guardrail_bench_result.json
