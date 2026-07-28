@@ -38,22 +38,30 @@ async def next_question(check_id: str, body: DialogueRequest, mock: int = MockFl
     stored = _MEMORY_STORE.get(check_id)
     if not stored:
         raise not_implemented(RuntimeError(f"check_id={check_id} 를 찾을 수 없습니다."))
+
+    history = stored.setdefault("history", [])
+    if body.user_reply:
+        history.append(f"사용자 답변: {body.user_reply}")
+
     try:
         evidence = search.collect_evidence(stored["masked_text"], domain=stored.get("domain"))
         vq = prompt_chain.generate_question(
             extracted_text=stored["masked_text"],
             signals=evidence.signals,
             references=evidence.references,
-            history=stored.get("history", []),
+            history=history,
         )
     except Exception as e:  # noqa: BLE001
         raise not_implemented(e) from e
 
+    history.append(f"질문{body.turn}: {vq.question}")
+
     return DialogueResponse(
         turn=body.turn,
         question=vq.question,
-        why="",
+        why=vq.why,
         evidence_refs=vq.evidence_refs,
-        options=[],
-        is_final=body.turn >= 3,
+        options=vq.options,
+        # 마지막 턴 판단은 계약(3턴)을 따르되, 모델이 먼저 끝내자고 하면 존중한다.
+        is_final=body.turn >= 3 or vq.is_final,
     )

@@ -18,6 +18,8 @@
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -31,6 +33,16 @@ from routers import (
     training_router,
     verdict_router,
 )
+
+# 가드레일/LLM 로그를 uvicorn 출력에 함께 싣는다.
+# 재생성 사유(forbidden_word/too_long/bad_ref) 집계가 '가드레일 차단율'의 원장이므로
+# 기본 WARNING 레벨에 묻히면 안 된다. prompt_chain 의 'gyeotnun.*' 로거가 여기로 올라온다.
+_log = logging.getLogger("gyeotnun")
+_log.setLevel(logging.INFO)
+if not _log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(message)s"))
+    _log.addHandler(_handler)
 
 app = FastAPI(title=settings.APP_NAME, description=settings.APP_DESC, version=settings.VERSION)
 

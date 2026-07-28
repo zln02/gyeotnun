@@ -18,11 +18,24 @@
 """
 from __future__ import annotations
 
+import json
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Iterable, List, Sequence
 
 from config import MissingKeyError, settings
+
+log = logging.getLogger("gyeotnun.prompt_chain")
+
+# ============================================================ 0) 모델 설정
+MODEL = "claude-sonnet-5"
+# 재생성 포함 총 생성 시도 횟수. 전부 실패하면 FALLBACK_QUESTION 으로 내려간다.
+MAX_ATTEMPTS = 3
+# 질문 한 개를 만드는 짧은 작업이라 낮은 effort 로 충분하다. 시니어가 기다리는 화면이므로 지연이 곧 비용이다.
+EFFORT = "low"
+# thinking + 응답 JSON 이 함께 들어가는 상한. 넉넉히 두어 중간에 잘리지 않게 한다.
+MAX_TOKENS = 4096
 
 # ============================================================ 1) 시스템 프롬프트
 SYSTEM_PROMPT = """당신은 '곁눈'의 확인 도우미입니다. 시니어 사용자가 받은 정보를 스스로 확인하도록 돕습니다.
@@ -126,18 +139,42 @@ class ValidationError(Exception):
 
 @dataclass
 class ValidatedQuestion:
-    """검증을 통과한 질문. dropped_refs 는 '지어낸 링크'로 판단해 제거된 URL."""
+    """검증을 통과한 질문. dropped_refs 는 '지어낸 링크'로 판단해 제거된 URL.
+
+    why / options / is_final 은 generate_question 이 LLM 응답에서 채운다.
+    validate_question 만 단독으로 쓸 때는 기본값(빈 값)으로 남는다.
+    fallback 은 3회 재생성이 모두 실패해 기본 질문으로 내려갔음을 뜻한다.
+    """
 
     question: str
     evidence_refs: List[str] = field(default_factory=list)
     dropped_refs: List[str] = field(default_factory=list)
     sentence_count: int = 0
+    why: str = ""
+    options: List[dict] = field(default_factory=list)
+    is_final: bool = False
+    fallback: bool = False
 
 
 def count_sentences(text: str) -> int:
     """마침표/물음표 기준 문장 수. 종결부호가 없으면 1문장으로 본다."""
     parts = [p.strip() for p in _SENTENCE_SPLIT_RE.split(text or "") if p.strip()]
     return len(parts) if parts else 0
+
+
+def find_forbidden(text: str) -> str | None:
+    """판정으로 읽히는 표현이 있으면 그 단어를, 없으면 None 을 돌려준다.
+
+    공백 제거본에서도 검사해 '가 짜' 같은 우회를 일부 차단한다.
+    질문 본문뿐 아니라 why·보기 문구에도 같은 기준을 적용하기 위해 분리했다.
+    """
+    if not text:
+        return None
+    flat = re.sub(r"\s+", "", text)
+    for word in FORBIDDEN_PATTERNS:
+        if word in text or re.sub(r"\s+", "", word) in flat:
+            return word
+    return None
 
 
 def validate_question(
@@ -172,13 +209,12 @@ def validate_question(
     cleaned = text.strip()
 
     # ---- 1) 금지어 검사 (공백 제거본에서도 검사해 '가 짜' 우회를 일부 차단)
-    flat = re.sub(r"\s+", "", cleaned)
-    for word in FORBIDDEN_PATTERNS:
-        if word in cleaned or re.sub(r"\s+", "", word) in flat:
-            raise ValidationError(
-                "forbidden_word",
-                f"판정으로 읽히는 표현이 포함됨: '{word}'. 질문형으로 재생성이 필요합니다.",
-            )
+    word = find_forbidden(cleaned)
+    if word:
+        raise ValidationError(
+            "forbidden_word",
+            f"판정으로 읽히는 표현이 포함됨: '{word}'. 질문형으로 재생성이 필요합니다.",
+        )
 
     # ---- 2) 링크 화이트리스트 검증
     allow = set(allowed_refs or [])
@@ -214,7 +250,7 @@ def validate_question(
     )
 
 
-# ============================================================ 4) 실제 생성 (TODO)
+# ============================================================ 4) 실제 생성
 def build_messages(extracted_text: str, signals: list, references: list, history: list) -> list:
     """Claude Messages API 로 보낼 user 메시지를 조립한다.
 
@@ -237,39 +273,270 @@ def build_messages(extracted_text: str, signals: list, references: list, history
     return [{"role": "user", "content": user}]
 
 
+# 응답 스키마. structured outputs 로 강제해 "JSON 파싱 실패" 재시도를 없앤다.
+# (파싱 실패에 재시도를 쓰면 정작 판정어 재생성에 쓸 횟수가 줄어든다.)
+RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "question": {"type": "string", "description": "사용자가 스스로 확인할 질문 (두 문장 이내)"},
+        "why": {"type": "string", "description": "이 질문을 하는 이유 한 줄"},
+        "evidence_refs": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "제공된 출처 목록에 실제로 있던 URL만",
+        },
+        "options": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"id": {"type": "string"}, "label": {"type": "string"}},
+                "required": ["id", "label"],
+                "additionalProperties": False,
+            },
+            "description": "타이핑 없이 고를 수 있는 보기 2~3개",
+        },
+        "is_final": {"type": "boolean"},
+    },
+    "required": ["question", "why", "evidence_refs", "options", "is_final"],
+    "additionalProperties": False,
+}
+
+# 3회 재생성이 모두 실패했을 때 내려갈 안전한 질문.
+# 어떤 글에도 쓸 수 있고, 판정어가 없으며, 2문장이다. (테스트로 고정한다)
+FALLBACK_QUESTION = (
+    "이 글에 적힌 내용을 어느 기관에서 발표했는지 글 안에서 한번 찾아봐 주시겠어요? "
+    "기관 이름이 보이지 않는다면 그것만으로도 한 번 더 확인해 볼 신호입니다."
+)
+FALLBACK_WHY = "누가 말한 내용인지부터 확인하면 나머지 판단이 훨씬 쉬워집니다."
+FALLBACK_OPTIONS = [
+    {"id": "found", "label": "기관 이름이 적혀 있어요"},
+    {"id": "not_found", "label": "찾지 못하겠어요"},
+    {"id": "unsure", "label": "잘 모르겠어요"},
+]
+
+# ---------------------------------------------------------------- 가드레일 집계
+# 기획서의 '가드레일 차단율' 근거가 되는 수치. 프로세스 수명 동안 누적된다.
+_STATS: dict[str, int] = {
+    "calls": 0,             # generate_question 호출 수
+    "attempts": 0,          # 실제 Claude 호출 수 (재생성 포함)
+    "regenerated": 0,       # 검증 실패로 다시 생성한 횟수
+    "forbidden_word": 0,    # 사유별 내역
+    "too_long": 0,
+    "bad_ref": 0,
+    "empty": 0,
+    "api_error": 0,
+    "fallback": 0,          # 3회 모두 실패해 기본 질문으로 내려간 횟수
+}
+
+
+def guardrail_stats() -> dict:
+    """가드레일 집계 스냅샷. block_rate = 재생성 / 전체 생성 시도."""
+    s = dict(_STATS)
+    s["block_rate"] = round(s["regenerated"] / s["attempts"], 4) if s["attempts"] else 0.0
+    return s
+
+
+def reset_guardrail_stats() -> None:
+    """테스트용 초기화."""
+    for k in _STATS:
+        _STATS[k] = 0
+
+
+def _record(reason: str, attempt: int, detail: str = "") -> None:
+    """재생성 1건을 집계하고 로그로 남긴다. 이 로그가 차단율의 원장이다."""
+    _STATS["regenerated"] += 1
+    if reason in _STATS:
+        _STATS[reason] += 1
+    log.warning(
+        "[guardrail] blocked attempt=%d/%d reason=%s detail=%s",
+        attempt, MAX_ATTEMPTS, reason, detail,
+    )
+
+
+# ---------------------------------------------------------------- Claude 호출
+def _few_shot_text() -> str:
+    """few-shot 예시를 시스템 프롬프트 뒤에 붙일 텍스트로 만든다.
+
+    프롬프트 캐시는 접두사 일치라서, 매 요청 고정인 few-shot 을 system 블록에
+    함께 넣어야 캐시 구간이 최대가 된다. (요청마다 달라지는 내용은 messages 로)
+    """
+    parts = ["[좋은 답의 기준 - 아래 예시와 같은 형태로 답하십시오]"]
+    for ex in FEW_SHOT_EXAMPLES:
+        parts.append("입력:\n" + json.dumps(ex["input"], ensure_ascii=False, indent=2))
+        parts.append("출력:\n" + json.dumps(ex["output"], ensure_ascii=False, indent=2))
+    return "\n\n".join(parts)
+
+
+def _system_blocks() -> list:
+    """캐시 가능한 고정 시스템 블록. 바이트가 매 요청 같아야 캐시가 걸린다."""
+    return [
+        {
+            "type": "text",
+            "text": SYSTEM_PROMPT + "\n\n" + _few_shot_text(),
+            # ★ 프롬프트 캐싱: 이 블록까지가 캐시 접두사가 된다.
+            #   Sonnet 5 의 최소 캐시 길이는 1024토큰이라 few-shot 을 함께 넣어야 걸린다.
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+
+
+_client = None
+
+
+def _get_client():
+    """Anthropic 클라이언트 싱글턴. 커넥션 재사용 목적."""
+    global _client
+    if _client is None:
+        import anthropic
+
+        _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    return _client
+
+
+def _call_claude(messages: list) -> tuple[dict, str]:
+    """Claude 를 한 번 호출해 (파싱된 payload, 원문 JSON) 을 돌려준다."""
+    resp = _get_client().messages.create(
+        model=MODEL,
+        max_tokens=MAX_TOKENS,
+        system=_system_blocks(),
+        messages=messages,
+        # 짧은 생성이라 낮은 effort 로 충분하다. thinking 은 Sonnet 5 기본값(adaptive)을 쓴다.
+        output_config={"effort": EFFORT, "format": {"type": "json_schema", "schema": RESPONSE_SCHEMA}},
+    )
+    usage = resp.usage
+    log.info(
+        "[llm] model=%s in=%s cache_write=%s cache_read=%s out=%s",
+        resp.model, usage.input_tokens,
+        getattr(usage, "cache_creation_input_tokens", 0),
+        getattr(usage, "cache_read_input_tokens", 0),
+        usage.output_tokens,
+    )
+    if resp.stop_reason == "refusal":
+        raise RuntimeError("모델이 응답을 거절했습니다(refusal).")
+
+    raw = "".join(b.text for b in resp.content if b.type == "text")
+    return json.loads(raw), raw
+
+
+def _screen_payload(payload: dict, allowed: Sequence[str]) -> ValidatedQuestion:
+    """LLM 응답 전체를 곁눈의 원칙으로 검사한다.
+
+    ★ question 뿐 아니라 why 와 보기 문구도 같은 금지어 기준을 적용한다.
+      why 에 "가짜라서 그렇습니다" 가 새어 나가면 화면에서는 결국 판정이 된다.
+    """
+    vq = validate_question(
+        payload.get("question", ""),
+        allowed_refs=allowed,
+        evidence_refs=payload.get("evidence_refs"),
+    )
+
+    why = (payload.get("why") or "").strip()
+    word = find_forbidden(why)
+    if word:
+        raise ValidationError("forbidden_word", f"why 에 판정 표현 '{word}' 이(가) 있습니다.")
+
+    options: List[dict] = []
+    for opt in payload.get("options") or []:
+        label = (opt.get("label") or "").strip()
+        word = find_forbidden(label)
+        if word:
+            raise ValidationError("forbidden_word", f"보기 문구에 판정 표현 '{word}' 이(가) 있습니다.")
+        if opt.get("id") and label:
+            options.append({"id": opt["id"], "label": label})
+
+    vq.why = why
+    vq.options = options
+    vq.is_final = bool(payload.get("is_final"))
+    return vq
+
+
+def _fallback_question(allowed: Sequence[str]) -> ValidatedQuestion:
+    """3회 모두 실패했을 때의 안전한 기본 질문. 이 경로도 검증을 통과시킨다."""
+    _STATS["fallback"] += 1
+    log.error(
+        "[guardrail] fallback used - %d회 생성이 모두 검증을 통과하지 못했습니다. stats=%s",
+        MAX_ATTEMPTS, guardrail_stats(),
+    )
+    vq = validate_question(FALLBACK_QUESTION, allowed_refs=allowed, evidence_refs=list(allowed)[:1])
+    vq.why = FALLBACK_WHY
+    vq.options = list(FALLBACK_OPTIONS)
+    vq.fallback = True
+    return vq
+
+
 def generate_question(
     extracted_text: str,
     signals: list,
     references: list,
     history: list | None = None,
-    max_retry: int = 2,
+    max_attempts: int = MAX_ATTEMPTS,
 ) -> ValidatedQuestion:
-    """TODO(김태희): Claude API 호출 → validate_question → 실패 시 재생성 루프.
+    """Claude 로 확인 질문 1개를 만들고, 검증을 통과할 때까지 재생성한다.
 
-    구현 스케치::
+    흐름
+      1) Claude 호출 (system 은 프롬프트 캐시, 응답은 structured outputs 로 강제)
+      2) validate_question + why/보기 금지어 검사
+      3) 실패하면 무엇이 틀렸는지 알려 주고 재생성 (최대 max_attempts 회)
+      4) 전부 실패하면 FALLBACK_QUESTION 으로 내려가고 그 사실을 로그로 남긴다
 
-        import anthropic
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-        allowed = [r["url"] for r in references]
-        for attempt in range(max_retry + 1):
-            resp = client.messages.create(
-                model="claude-sonnet-4-5",
-                system=SYSTEM_PROMPT,
-                messages=build_messages(...),
-                max_tokens=500,
-            )
-            data = json.loads(resp.content[0].text)
-            try:
-                return validate_question(data["question"], allowed, data.get("evidence_refs"))
-            except ValidationError as e:
-                if e.reason == "forbidden_word" and attempt < max_retry:
-                    continue          # 판정어가 섞였다 → 재생성
-                raise
+    재생성 사유(forbidden_word / too_long / bad_ref / empty)는 _STATS 에 누적된다.
+    guardrail_stats() 로 조회한다.
 
-    키가 없으면 여기서 MissingKeyError → 라우터가 501 + 안내 메시지로 변환한다.
+    키가 없으면 MissingKeyError → 라우터가 501 + 안내 메시지로 변환한다.
     """
     if not settings.has_llm:
         raise MissingKeyError("ANTHROPIC_API_KEY", owner="김태희")
-    raise NotImplementedError(
-        "generate_question 은 아직 구현 전입니다. 현재는 ?mock=1 로 고정 질문을 사용하세요."
-    )
+
+    _STATS["calls"] += 1
+    allowed = [r.get("url") for r in references if r.get("url")]
+    messages = build_messages(extracted_text, signals, references, history or [])
+
+    for attempt in range(1, max_attempts + 1):
+        _STATS["attempts"] += 1
+        last = attempt == max_attempts
+
+        try:
+            payload, raw = _call_claude(messages)
+        except Exception as e:  # noqa: BLE001 - API/파싱 오류는 모두 재시도 대상
+            _STATS["api_error"] += 1
+            log.warning("[llm] attempt=%d/%d 호출 실패: %s", attempt, max_attempts, e)
+            if last:
+                return _fallback_question(allowed)
+            continue
+
+        try:
+            vq = _screen_payload(payload, allowed)
+        except ValidationError as e:
+            _record(e.reason, attempt, e.detail)
+            if last:
+                return _fallback_question(allowed)
+            messages = messages + [
+                {"role": "assistant", "content": raw},
+                {"role": "user", "content": (
+                    f"방금 답은 곁눈의 원칙을 어겼습니다: {e.detail}\n"
+                    "같은 내용을 원칙에 맞게 다시 JSON 으로만 출력하십시오."
+                )},
+            ]
+            continue
+
+        # 허용 목록 밖 링크가 섞였다 = 지어낸 출처다. 링크는 이미 제거됐지만 한 번 더 생성해 본다.
+        if vq.dropped_refs and not last:
+            _record("bad_ref", attempt, f"허용되지 않은 링크 {vq.dropped_refs}")
+            messages = messages + [
+                {"role": "assistant", "content": raw},
+                {"role": "user", "content": (
+                    f"{vq.dropped_refs} 은(는) 제공된 출처 목록에 없는 링크입니다. "
+                    "목록에 있는 URL만 쓰거나, 없다면 evidence_refs 를 빈 배열로 두고 다시 출력하십시오."
+                )},
+            ]
+            continue
+
+        if vq.dropped_refs:
+            # 마지막 시도였다면 링크만 제거된 상태로 내보낸다 (질문 자체는 여전히 유효하다).
+            _STATS["bad_ref"] += 1
+            log.warning("[guardrail] 마지막 시도에서 링크 제거됨: %s", vq.dropped_refs)
+
+        log.info("[guardrail] ok attempt=%d/%d stats=%s", attempt, max_attempts, guardrail_stats())
+        return vq
+
+    return _fallback_question(allowed)  # 도달하지 않지만 방어적으로 둔다
