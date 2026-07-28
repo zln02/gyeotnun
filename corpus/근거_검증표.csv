@@ -1,0 +1,17 @@
+근거_ID,주장,수치,기준연도,조사대상,기관,자료명,페이지,원문_URL,상태,본문_사용조건
+E01,65세 이상 인구 비율,20.3%,2025,대한민국 65세 이상 인구,국가데이터처,2025 고령자 통계,요약 1쪽,https://kostat.go.kr/board.es?act=view&bid=10820&list_no=438832,확인완료,65세 이상 인구 통계로만 사용
+E02,고령층 디지털정보화 수준,71.8%,2025,NIA 조사상 고령층,한국지능정보사회진흥원,2025 디지털정보격차 실태조사,PDF 110쪽,https://nia.or.kr/site/nia_kor/ex/bbs/View.do?bcIdx=29168&cbIdx=81623&pdfPage=110,확인완료,일반국민을 100으로 한 대비수준임을 명시
+E03,60대 디지털정보화 수준,79.7%,2025,60대,한국지능정보사회진흥원,2025 디지털정보격차 실태조사,PDF 110쪽,https://nia.or.kr/site/nia_kor/ex/bbs/View.do?bcIdx=29168&cbIdx=81623&pdfPage=110,확인완료,일반국민 대비 비율
+E04,70대 이상 디지털정보화 수준,53.6%,2025,70대 이상,한국지능정보사회진흥원,2025 디지털정보격차 실태조사,PDF 110쪽,https://nia.or.kr/site/nia_kor/ex/bbs/View.do?bcIdx=29168&cbIdx=81623&pdfPage=110,확인완료,70대만이 아니라 70대 이상임을 명시
+E05,고령층 인터넷 이용률,86.1%,2025,NIA 조사상 고령층,한국지능정보사회진흥원,2025 디지털정보격차 실태조사,PDF 118쪽,https://nia.or.kr/site/nia_kor/ex/bbs/View.do?bcIdx=29168&cbIdx=81623&pdfPage=118,확인완료,최근 1개월 이내 인터넷 이용 기준
+E06,70대 이상 인터넷 이용률,70.3%,2025,70대 이상,한국지능정보사회진흥원,2025 디지털정보격차 실태조사,PDF 118쪽,https://nia.or.kr/site/nia_kor/ex/bbs/View.do?bcIdx=29168&cbIdx=81623&pdfPage=118,확인완료,70대만이 아니라 70대 이상임을 명시
+E07,60대 스마트폰 이용률,93.3%,2025,60대,한국지능정보사회진흥원,2025 디지털정보격차 실태조사,PDF 119쪽,https://nia.or.kr/site/nia_kor/ex/bbs/View.do?bcIdx=29168&cbIdx=81623&pdfPage=119,확인완료,인터넷 이용 기기 항목
+E08,70대 이상 스마트폰 이용률,70.1%,2025,70대 이상,한국지능정보사회진흥원,2025 디지털정보격차 실태조사,PDF 119쪽,https://nia.or.kr/site/nia_kor/ex/bbs/View.do?bcIdx=29168&cbIdx=81623&pdfPage=119,확인완료,70대만이 아니라 70대 이상임을 명시
+E09,고령층 메신저 이용률,78.7%,2025,최근 1개월 이내 인터넷을 이용한 고령층,한국지능정보사회진흥원,2025 디지털정보격차 실태조사,PDF 122쪽,https://nia.or.kr/site/nia_kor/ex/bbs/View.do?bcIdx=29168&cbIdx=81623&pdfPage=122,확인완료,전체 고령층이 아니라 인터넷 이용자 기준
+E10,60대 메신저 이용률,81.3%,2025,최근 1개월 이내 인터넷을 이용한 60대,한국지능정보사회진흥원,2025 디지털정보격차 실태조사,PDF 123쪽,https://nia.or.kr/site/nia_kor/ex/bbs/View.do?bcIdx=29168&cbIdx=81623&pdfPage=123,확인완료,인터넷 이용자 기준
+E11,70대 이상 메신저 이용률,67.4%,2025,최근 1개월 이내 인터넷을 이용한 70대 이상,한국지능정보사회진흥원,2025 디지털정보격차 실태조사,PDF 123쪽,https://nia.or.kr/site/nia_kor/ex/bbs/View.do?bcIdx=29168&cbIdx=81623&pdfPage=123,확인완료,인터넷 이용자 기준
+E12,공식·공공기관 문서 수,1017건,2026-07-25,자체 수집 데이터,곁눈 팀,추가 수집 결과,expansion_summary.json,expansion/analysis/expansion_summary.json,확인완료,피해사례 수로 표현 금지
+E13,검색·분석용 청크 수,2065건,2026-07-25,자체 수집 데이터,곁눈 팀,추가 수집 결과,expansion_summary.json,expansion/analysis/expansion_summary.json,확인완료,문서 수와 합산 금지
+E14,65세 이상 인터넷 이용률,76.9%,미확인,미확인,미확인,기존 BX 초안,미확인,미확인,사용금지,원문·조사대상 확인 전 삭제
+E15,65세 이상 메신저 이용률,92.6%,미확인,미확인,미확인,기존 BX 초안,미확인,미확인,사용금지,원문·조사대상 확인 전 삭제
+

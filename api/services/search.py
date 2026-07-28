@@ -7,12 +7,15 @@
   ★ 여기서 모은 references 의 URL 집합이 곧 prompt_chain 의 화이트리스트가 된다.
     즉 이 모듈이 근거의 진실성을 책임진다. 링크를 임의 생성하면 안 된다.
 
-2단 검색
-  1) 로컬 코퍼스(공공데이터 577건) 대조 - 키 없이 동작, 빠르고 안정적
-  2) 네이버 검색 API - 최신 이슈 보강 (NAVER_CLIENT_ID/SECRET 필요)
+3단 검색 (근거 우선순위 순)
+  1) corpus_index (근거_검증표/평가세트/재라벨링표 CSV) - 데이터팀이 검수한 근거,
+     키 없이 동작, 가장 신뢰도 높음
+  2) 로컬 공공데이터 코퍼스(public_data/*.json, 577건 목표) - 아직 미수집 상태
+  3) 네이버 검색 API - 최신 이슈 보강 (NAVER_CLIENT_ID/SECRET 필요, 미구현)
 
 ★ 절대 하지 않는 것
   - 참/거짓 판정 반환. 이 모듈은 verdict_hint 로 '확인 필요 정도'만 돌려준다.
+  - URL·기관명 생성. references 는 corpus_index/CSV 에 실제로 있던 값만 담는다.
 """
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ from pathlib import Path
 from typing import List
 
 from config import MissingKeyError, settings
+from services import corpus_index
 
 CORPUS_DIR = Path(__file__).resolve().parents[2] / "corpus" / "public_data"
 
@@ -62,9 +66,10 @@ def detect_signals(text: str) -> List[dict]:
 
 
 def search_corpus(query: str, domain: str | None = None, limit: int = 5) -> List[dict]:
-    """로컬 공공데이터 코퍼스에서 관련 문서를 찾는다 (키 불필요).
+    """레거시: 공공데이터 577건 코퍼스(corpus/public_data/*.json)에서 찾는다 (키 불필요).
 
-    현재는 corpus/public_data/*.json 을 단순 키워드 매칭한다.
+    아직 원문이 수집되지 않아 현재는 항상 빈 리스트를 돌려준다(폴더가 비어 있음).
+    수집이 끝나면 collect_evidence() 에서 corpus_index 결과에 보조로 합쳐진다.
     TODO(김유리): 임베딩 기반 유사도 검색으로 교체 (장지석 RAG 인덱스와 공유).
     """
     if not CORPUS_DIR.exists():
@@ -120,10 +125,49 @@ def search_web(query: str, display: int = 5) -> List[dict]:
     raise NotImplementedError("search_web 미구현. ?mock=1 을 사용하세요.")
 
 
+def _dedup_refs(refs: List[dict]) -> List[dict]:
+    """URL 기준으로 중복을 없앤다. 먼저 들어온 순서(우선순위)를 지킨다."""
+    seen: set[str] = set()
+    out: List[dict] = []
+    for r in refs:
+        u = r.get("url")
+        if not u or u in seen:
+            continue
+        seen.add(u)
+        out.append(r)
+    return out
+
+
 def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
-    """근거 수집 파이프라인. 코퍼스만으로도 최소 동작하도록 설계했다."""
+    """근거 수집 파이프라인.
+
+    우선순위: corpus_index(근거_검증표/사기사례) → public_data(577건, 아직 비어 있음)
+    둘 다 못 찾으면 '못 찾았다'는 사실 자체를 신호로 남긴다 (판정하지 않는다).
+    """
     signals = detect_signals(text)
-    refs = search_corpus(text, domain=domain)
+
+    matched_evidence = corpus_index.match_evidence(text)
+    matched_scam = corpus_index.match_scam_cases(text)
+    legacy_refs = search_corpus(text, domain=domain)
+
+    # ---- 신호: 공식 공고(=근거_검증표) 존재 여부 + 발행 기관 명시 여부 (한 신호에 함께 담는다.
+    #      근거_검증표는 확인완료 행만 남겨서 기관명이 항상 채워져 있으므로 따로 쪼갤 이유가 없다)
+    for doc in matched_evidence:
+        signals.append({
+            "key": "official_source_found",
+            "label": f"공식 통계·자료와 대조했습니다: {doc.publisher} - {doc.title}",
+            "severity": "info",
+        })
+
+    # ---- 신호: 유사 사기 사례 일치 (강한 경고 신호)
+    for case in matched_scam:
+        signals.append({"key": "similar_scam_case", "label": case.signal_label(), "severity": "attention"})
+
+    refs = _dedup_refs(
+        [d.to_reference() for d in matched_evidence]
+        + [c.to_reference() for c in matched_scam]
+        + legacy_refs
+    )
 
     if not refs:
         # ★ 출처를 못 찾았을 때 '가짜'라고 하지 않는다. '못 찾았다'는 사실만 남긴다.
