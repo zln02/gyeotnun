@@ -30,7 +30,7 @@ services:
       POSTGRES_PASSWORD: gyeotnun     # 로컬 전용 값. 운영에서는 반드시 시크릿으로 주입할 것.
       POSTGRES_DB: gyeotnun
     ports:
-      - "5432:5432"
+      - "5433:5432"    # 호스트 5432가 이미 사용 중이라 5433으로 매핑 (컨테이너 내부 통신은 db:5432 그대로 사용)
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
