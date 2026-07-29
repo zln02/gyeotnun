@@ -27,24 +27,29 @@ read -r -p "   위 둘이 같습니까? 같으면 Enter, 다르면 Ctrl+C 로 �
 echo "2) nginx 를 HTTP 설정으로 기동 (이미 떠 있으면 그대로 사용)"
 mkdir -p deploy/nginx
 cp deploy/nginx/http.conf deploy/nginx/active.conf
-sudo docker compose up -d nginx
+sudo docker compose --profile prod up -d nginx
 
+# ★ certbot 서비스는 docker-compose.yml 에서 entrypoint 를 12시간 주기 renew 루프로
+#   고정해 뒀다(자동 갱신용). `docker compose run <service> <command>` 는 기본적으로
+#   command 만 덮어쓰고 entrypoint 는 그대로 두므로, --entrypoint 로 명시적으로
+#   되돌리지 않으면 우리가 넘긴 "certonly ..." 인자가 무시되고 renew 루프가 그대로
+#   실행되어 버린다(실제로 한 번 이렇게 걸려서 무한 대기에 빠진 적이 있다).
 echo "3) certbot dry-run (실제 발급 전에 검증만 먼저 해 본다 - 실패해도 rate limit에 안 걸린다)"
-sudo docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
-  --dry-run -d "$DOMAIN" $EMAIL_ARGS
+sudo docker compose run --rm --entrypoint certbot certbot certonly --webroot -w /var/www/certbot \
+  -n --agree-tos --dry-run -d "$DOMAIN" $EMAIL_ARGS < /dev/null
 
 read -r -p "   dry-run 이 성공했습니까? 실제 발급을 진행하려면 Enter, 아니면 Ctrl+C ... " _
 
 echo "4) 실제 인증서 발급"
-sudo docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
-  -d "$DOMAIN" $EMAIL_ARGS
+sudo docker compose run --rm --entrypoint certbot certbot certonly --webroot -w /var/www/certbot \
+  -n --agree-tos -d "$DOMAIN" $EMAIL_ARGS < /dev/null
 
 echo "5) HTTPS 설정으로 교체하고 nginx reload"
 cp deploy/nginx/https.conf deploy/nginx/active.conf
-sudo docker compose exec nginx nginx -s reload
+sudo docker compose --profile prod exec nginx nginx -s reload
 
 echo
 echo "완료. https://$DOMAIN 에서 확인하세요."
 echo "자동 갱신: docker-compose.yml 의 certbot 서비스가 12시간마다 'certbot renew' 를 실행합니다."
 echo "  단, renew 이후 nginx 는 자동으로 reload 되지 않으니, crontab 에 아래를 등록해 두세요:"
-echo '  0 3 * * * cd '"$(pwd)"' && docker compose exec nginx nginx -s reload'
+echo '  0 3 * * * cd '"$(pwd)"' && docker compose --profile prod exec nginx nginx -s reload'
