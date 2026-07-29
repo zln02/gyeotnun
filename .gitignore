@@ -52,3 +52,11 @@ Thumbs.db
 
 # 가드레일 벤치 실행 결과 (스크립트로 재생성 가능)
 api/tools/guardrail_bench_result.json
+
+# 배포: nginx 활성 설정(http.conf/https.conf 를 복사해 만드는 서버 로컬 산출물)과
+# Let's Encrypt 인증서·개인키. 절대 커밋하지 않는다.
+deploy/nginx/active.conf
+deploy/certbot/conf/*
+!deploy/certbot/conf/.gitkeep
+deploy/certbot/www/*
+!deploy/certbot/www/.gitkeep

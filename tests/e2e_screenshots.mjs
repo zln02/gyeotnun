@@ -1,16 +1,21 @@
 /**
  * 곁눈(Gyeotnun) 실제 API 연동 E2E 스크린샷 검증
  * 실행: cd tests && node e2e_screenshots.mjs
+ *       E2E_BASE_URL=http://localhost node e2e_screenshots.mjs   (nginx로 서빙되는 프로덕션 빌드 대상)
  *
  * 무엇을 검증하는가
- *   web/ dev 서버(5173, mock 기본 OFF)를 실제 api 컨테이너(8000)에 붙인 채로,
+ *   프론트(mock 기본 OFF)를 실제 api 컨테이너(8000)에 붙인 채로,
  *   브라우저에서 S1(이미지 업로드)→S2(로딩)→S3(질문+근거)→S4(판단+태깅)→S5(훈련)
  *   를 실제로 한 번 관통시킨다. mock=1 을 붙이지 않는다 - 화면에 뜨는 모든 값이
  *   실제 Claude Vision/Sonnet 호출과 corpus_index 대조 결과여야 의미가 있다.
+ *   E2E_BASE_URL 로 대상을 바꿀 수 있다 - vite dev 서버든, nginx가 서빙하는
+ *   프로덕션 빌드(web/dist)든 같은 스크립트로 검증한다.
  *
  * 사전 조건
  *   - docker compose 로 api(8000)+db 가 떠 있고 ANTHROPIC_API_KEY 가 설정돼 있을 것
- *   - web/ 에서 `npm run dev` 로 vite(5173) 가 떠 있을 것 (mock=1 절대 붙이지 않는다)
+ *   - 기본값(E2E_BASE_URL 미지정): web/ 에서 `npm run dev` 로 vite(5173) 가 떠 있을 것
+ *   - 프로덕션 검증: `npm run build` 후 `docker compose --profile prod up -d nginx`,
+ *     E2E_BASE_URL=http://localhost 로 실행 (mock=1 절대 붙이지 않는다)
  */
 import { chromium } from 'playwright'
 import path from 'path'
@@ -19,6 +24,7 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const OUT = path.join(__dirname, 'screenshots')
 const KAKAO_IMAGE = path.join(__dirname, '..', 'api', 'tests', 'fixtures', 'kakao_sample.jpg')
+const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:5173'
 
 const errors = []
 const browser = await chromium.launch()
@@ -46,7 +52,7 @@ async function shot(name) {
 }
 
 // ── S1: 홈 (실제 API 모드, mock 파라미터 없음) ──────────────────────────────
-await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+await page.goto(BASE_URL + '/', { waitUntil: 'networkidle' })
 await shot('home')
 
 const mockFlag = await page.locator('.mock-flag').count()

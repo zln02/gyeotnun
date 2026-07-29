@@ -255,11 +255,18 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
   (`services/prompt_chain.py`)
 - 근거 대조: `근거_검증표`/`평가세트`/`사례_재라벨링표` CSV 로컬 인덱스 대조
   (`services/corpus_index.py`, 네이버 검색 API 는 아직 미연동)
+- 오판유형 태깅: Claude 프롬프팅 기반 분류(`services/tagger.py` `tag_error_type_llm`),
+  실패 시 규칙 기반으로 자동 폴백
+- PWA: manifest 아이콘·Web Share Target·최소 service worker(`web/public/sw.js`) 적용
+- 배포: nginx 리버스 프록시 + certbot 자동 갱신 구성 완료(`deploy/`, `docker compose
+  --profile prod`). **HTTPS는 DNS(gyeotnun.duckdns.org) 전파 대기 중 - 아직 미적용.**
+  자세한 절차는 `deploy/README.md` 참고.
 
 **TODO (담당자별)**
 - 박진: 링크 본문 추출, 얼굴 블러
 - 김유리: 네이버 검색 API 연동(현재는 로컬 CSV 대조까지), 공공데이터 577건 수집 후 임베딩 검색
 - 김태희: 프롬프트 튜닝(질문 길이 등)
 - 장지석: 공공데이터 577건 수집·변환, 코퍼스→훈련카드 자동 생성
-- 조희진: PWA Share Target 활성화, 아이콘, 실기기 테스트
-- 박진영: 메모리 저장소 → DB 세션 교체, Alembic, 배포
+- 조희진: iOS 대체 경로 실기기 테스트(Share Target 은 Android Chrome 전용)
+- 박진영: 메모리 저장소 → DB 세션 교체, Alembic, DNS 확인되면 `deploy/init-letsencrypt.sh`
+  실행 + AWS 보안그룹에 80/443 인바운드 열려 있는지 확인
