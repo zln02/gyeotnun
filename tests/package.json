@@ -1,0 +1,9 @@
+{
+  "name": "gyeotnun-e2e",
+  "private": true,
+  "type": "module",
+  "description": "곁눈 실제 API 연동 E2E 스크린샷 검증 (Playwright). 프론트/백엔드 배포 산출물이 아니다.",
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
