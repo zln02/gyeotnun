@@ -19,10 +19,10 @@
     "Share Target 을 등록하면 카카오톡에서 이미지를 길게 눌러 '공유 → 곁눈' 한 번으로 끝난다.",
     "동작 조건: HTTPS + PWA 설치(홈 화면에 추가) + Android Chrome. iOS Safari 는 미지원이라",
     "iOS 는 '사진 올리기' 버튼 경로를 폴백으로 유지해야 한다.",
-    "아이콘 파일(icon-192.png / icon-512.png)을 public/ 에 추가하면 설치가 가능해진다.",
-    "아래 share_target 블록의 주석을 풀고 배포하면 활성화된다."
+    "POST 요청은 sw.js 가 fetch 이벤트로 가로채 이미지를 캐시에 저장하고 '/?share=1' 로",
+    "리다이렉트한다. Home.jsx 가 그 쿼리를 보고 캐시에서 이미지를 꺼내 S1 업로드로 이어붙인다."
   ],
-  "_share_target_disabled": {
+  "share_target": {
     "action": "/share",
     "method": "POST",
     "enctype": "multipart/form-data",

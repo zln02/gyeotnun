@@ -12,3 +12,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 )
+
+// PWA 설치 요건(manifest + service worker) 충족. HTTPS(또는 localhost)에서만 등록된다 -
+// registration 자체가 실패해도(HTTP 배포 등) 앱 동작에는 영향이 없다.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}

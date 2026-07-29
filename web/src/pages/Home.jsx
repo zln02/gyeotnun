@@ -7,8 +7,13 @@
  *  - '사진 올리기'가 가장 크고 맨 위에 있다. 실제 사용의 90%가 카톡 캡처다.
  *  - 안내 문구는 명령형이 아니라 초대형("~해 보세요")으로 쓴다.
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createCheck } from '../api.js'
+
+// Web Share Target(sw.js)이 공유받은 이미지를 담아 두는 캐시 위치.
+// manifest.json 의 share_target.action("/share")과 sw.js 가 같은 이름을 쓴다.
+const SHARE_CACHE = 'gyeotnun-share-v1'
+const SHARE_KEY = '/__shared-image'
 
 export default function Home({ onStarted, onTraining }) {
   const fileRef = useRef(null)
@@ -37,6 +42,31 @@ export default function Home({ onStarted, onTraining }) {
       setBusy(false)
     }
   }
+
+  // ★ 카카오톡 등에서 '공유 → 곁눈'으로 들어온 경우: sw.js 가 이미지를 캐시에 넣고
+  //   '/?share=1' 로 리다이렉트해 온다. 여기서 꺼내 S1 업로드 흐름 그대로 이어붙인다.
+  //   지원하지 않는 브라우저(caches 없음)나 캐시에 아무것도 없으면 조용히 넘어간다 -
+  //   이 경로가 실패해도 '사진 올리기' 버튼은 항상 그대로 동작해야 한다.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('share') !== '1') return
+    window.history.replaceState({}, '', window.location.pathname)
+    if (!('caches' in window)) return
+    ;(async () => {
+      try {
+        const cache = await caches.open(SHARE_CACHE)
+        const res = await cache.match(SHARE_KEY)
+        if (!res) return
+        const blob = await res.blob()
+        await cache.delete(SHARE_KEY)
+        const file = new File([blob], 'shared-image.jpg', { type: blob.type || 'image/jpeg' })
+        start({ image: file })
+      } catch (e) {
+        // 공유 이미지를 못 꺼내도 홈 화면은 정상 동작해야 한다.
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <>
