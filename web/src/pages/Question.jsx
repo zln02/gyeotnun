@@ -12,7 +12,7 @@
  * 3) 답변은 타이핑 없이 버튼으로. 시니어에게 자유 입력은 큰 장벽이다.
  * 4) '다음' 버튼에 화살표만 쓰지 않고 글자를 함께 쓴다.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getQuestion } from '../api.js'
 
 export default function Question({ checkId, evidence, onDone }) {
@@ -21,17 +21,25 @@ export default function Question({ checkId, evidence, onDone }) {
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // ★ 실제 API 는 응답이 겹칠 만큼 느릴 수 있다(React.StrictMode 의 개발 중 이펙트
+  //   이중 실행도 같은 상황을 만든다). 가장 최근 요청의 응답만 반영하고,
+  //   먼저 보낸 요청이 나중에 도착해도 화면을 덮어쓰지 않게 막는다.
+  const requestIdRef = useRef(0)
 
   async function load(nextTurn, reply) {
+    const myRequestId = ++requestIdRef.current
     setLoading(true)
     setError('')
     setSelected(null)
     try {
-      setData(await getQuestion(checkId, nextTurn, reply))
+      const result = await getQuestion(checkId, nextTurn, reply)
+      if (myRequestId !== requestIdRef.current) return   // 더 최신 요청이 이미 나갔다 - 이 응답은 버린다
+      setData(result)
     } catch (e) {
+      if (myRequestId !== requestIdRef.current) return
       setError(e.message)
     } finally {
-      setLoading(false)
+      if (myRequestId === requestIdRef.current) setLoading(false)
     }
   }
 
