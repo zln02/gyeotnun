@@ -44,10 +44,10 @@ export default function Question({ checkId, evidence, onDone }) {
     load(n, selected)
   }
 
-  // 질문에 딸린 출처 URL → evidence.references 의 상세 정보와 연결
+  // 질문에 딸린 출처 URL → evidence.references 의 상세 정보(기관명·자료명·발행일)와 연결
   const refs = (data?.evidence_refs || []).map((u) => {
     const found = evidence?.references?.find((r) => r.url === u)
-    return found || { url: u, title: u, publisher: '' }
+    return found || { url: u, title: u, publisher: '', published_at: '' }
   })
 
   if (loading) return <div className="loading"><div className="spinner" /><p className="lead">질문을 준비하고 있어요</p></div>
@@ -78,7 +78,16 @@ export default function Question({ checkId, evidence, onDone }) {
               <span aria-hidden="true">📄</span>
               <span>
                 {r.title}
-                {r.publisher && <><br /><small>{r.publisher}</small></>}
+                {(r.publisher || r.published_at) && (
+                  <>
+                    <br />
+                    <small>
+                      {r.publisher}
+                      {r.publisher && r.published_at && ' · '}
+                      {r.published_at}
+                    </small>
+                  </>
+                )}
               </span>
             </a>
           ))

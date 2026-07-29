@@ -17,12 +17,21 @@ const STEPS = [
   '여쭤볼 것을 정리하고 있어요',
 ]
 
+// 실제 API(공공데이터 대조 + Claude 호출)는 mock 과 달리 몇 초씩 걸릴 수 있다.
+// 이 시간을 넘기면 STEPS 순환 대신 "아직 하고 있어요" 문구로 바꿔
+// 화면이 멈춘 게 아니라는 걸 알려 준다.
+const LONG_WAIT_MS = 10000
+const LONG_WAIT_MESSAGE = '생각보다 시간이 걸리고 있어요. 실제 자료를 자세히 살펴보는 중입니다. 조금만 더 기다려 주세요.'
+
 export default function Checking({ checkId, checkData, onReady, onError }) {
   const [step, setStep] = useState(0)
   const [error, setError] = useState('')
+  const [longWait, setLongWait] = useState(false)
 
   useEffect(() => {
+    setLongWait(false)
     const t = setInterval(() => setStep((s) => (s + 1) % STEPS.length), 900)
+    const longWaitTimer = setTimeout(() => setLongWait(true), LONG_WAIT_MS)
     let cancelled = false
     ;(async () => {
       try {
@@ -33,7 +42,7 @@ export default function Checking({ checkId, checkData, onReady, onError }) {
         if (!cancelled) setError(e.message)
       }
     })()
-    return () => { cancelled = true; clearInterval(t) }
+    return () => { cancelled = true; clearInterval(t); clearTimeout(longWaitTimer) }
   }, [checkId])
 
   if (error) {
@@ -49,7 +58,7 @@ export default function Checking({ checkId, checkData, onReady, onError }) {
     <div className="loading">
       <div className="spinner" role="status" aria-live="polite" />
       <h2>확인하고 있어요</h2>
-      <p className="lead">{STEPS[step]}</p>
+      <p className="lead">{longWait ? LONG_WAIT_MESSAGE : STEPS[step]}</p>
 
       {checkData?.masked && (
         <div className="signal" style={{ textAlign: 'left', marginTop: 24 }}>

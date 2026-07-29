@@ -16,12 +16,20 @@ export default function Home({ onStarted, onTraining }) {
   const [showText, setShowText] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // status:"failed" 는 네트워크 오류가 아니라 서버가 "처리는 됐지만 못 읽었다"고
+  // 알려 준 정상 응답이다(10MB 초과, 사진 인식 실패 등). catch 가 아니라 여기서 구분한다.
+  const [failMessage, setFailMessage] = useState('')
 
   async function start(payload) {
     setBusy(true)
     setError('')
+    setFailMessage('')
     try {
       const data = await createCheck(payload)
+      if (data.status === 'failed') {
+        setFailMessage(data.message || '처리하지 못했습니다. 글로 직접 입력해 주세요.')
+        return
+      }
       onStarted(data)
     } catch (e) {
       setError(e.message)
@@ -78,6 +86,20 @@ export default function Home({ onStarted, onTraining }) {
             onClick={() => start({ text })}
           >
             확인 시작하기
+          </button>
+        </div>
+      )}
+
+      {failMessage && (
+        <div className="error-box">
+          <p>{failMessage}</p>
+          {/* ★ 10MB 초과 · 인식 실패 공통 안내: 텍스트 직접 입력 경로로 바로 넘겨준다 */}
+          <button
+            className="btn secondary"
+            style={{ marginTop: 12 }}
+            onClick={() => { setFailMessage(''); setShowText(true) }}
+          >
+            <span aria-hidden="true">⌨️</span> 글로 입력하기
           </button>
         </div>
       )}

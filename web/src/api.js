@@ -2,20 +2,21 @@
  * 곁눈(Gyeotnun) API 호출 래퍼
  * 담당: 조희진 (프론트) / 계약: 박진영
  *
- * ★ 기본값이 mock ON 이다.
- *   백엔드가 아직 없어도, API 키가 없어도, 시연 중 외부 API가 죽어도
- *   화면은 처음부터 끝까지 돈다. 이게 해커톤에서 데모를 살리는 장치다.
+ * ★ 기본값이 실제 API 다. 백엔드가 실제로 붙었으니 화면에는 진짜 데이터가 떠야 한다.
+ *   그래도 개발 편의를 위해 mock 토글은 남겨 둔다.
  *
- * 실제 백엔드에 붙일 때
- *   1) 아래 USE_MOCK 을 false 로 바꾸거나
- *   2) 주소창에 ?mock=0 을 붙이면 된다. (?mock=1 이면 강제 mock)
+ * 모드 결정 우선순위 (위가 이긴다)
+ *   1) 주소창 쿼리 ?mock=1 / ?mock=0   - 지금 이 탭만 바꿔서 확인하고 싶을 때
+ *   2) 환경변수 VITE_USE_MOCK=1        - 이 머신에서 개발할 때 기본을 mock 으로
+ *   3) 기본값 = 실제 API (false)
  */
 
 const params = new URLSearchParams(window.location.search)
+const envDefaultMock = import.meta.env.VITE_USE_MOCK === '1'
 
-// 우선순위: URL 쿼리 > 기본값(true)
-export const USE_MOCK =
-  params.get('mock') === '0' ? false : true
+export const USE_MOCK = params.has('mock')
+  ? params.get('mock') === '1'
+  : envDefaultMock
 
 const BASE = '/api/v1'
 
