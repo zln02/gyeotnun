@@ -9,12 +9,15 @@ corpus/곁눈_평가세트_30건.csv 의 '평가용_제시문구' 30건을 실�
 
 ★ 이 스크립트는 측정만 한다. 시스템 코드를 고치지 않는다.
 
-가드레일(재생성) 통계는 HTTP 응답에 안 실려 있어서, api 컨테이너의 로그를
-케이스별 시간창(timestamp window)으로 상관시켜 뽑아낸다 - 코드 수정 없이
+가드레일(재생성)·토큰 사용량 통계는 HTTP 응답에 안 실려 있어서, api 컨테이너의
+로그를 케이스별 시간창(timestamp window)으로 상관시켜 뽑아낸다 - 코드 수정 없이
 측정하기 위한 방법이다. prompt_chain.py 가 재생성마다
-"[guardrail] blocked attempt=X/Y reason=Z detail=..." 를 남기므로, 각 케이스의
-dialogue 호출 시작~끝 사이에 찍힌 줄만 그 케이스 것으로 센다(케이스를
-순차 실행하므로 시간창이 겹치지 않는다).
+"[guardrail] blocked attempt=X/Y reason=Z detail=..." 를, 호출마다
+"[llm] model=... in=... cache_write=... cache_read=... out=..." 를 남기므로,
+각 케이스의 dialogue 호출 시작~끝 사이에 찍힌 줄만 그 케이스 것으로 센다(케이스를
+순차 실행하므로 시간창이 겹치지 않는다). 응답 시간은 dialogue 호출 자체만 별도로
+재서(dialogue_elapsed_sec) evidence 수집(코퍼스 검색, LLM 미사용) 시간과 섞이지
+않게 했다.
 """
 from __future__ import annotations
 
@@ -97,8 +100,10 @@ def main() -> None:
 
             check_id = check["check_id"]
             evidence = get_evidence(check_id)
+            t_dialogue_start = now_utc()
             dialogue = get_dialogue(check_id)
-            t1 = now_utc()
+            t_dialogue_end = now_utc()
+            t1 = t_dialogue_end
 
             record.update(
                 실패=False,
@@ -112,6 +117,9 @@ def main() -> None:
                 why=dialogue.get("why"),
                 dialogue_evidence_refs_count=len(dialogue.get("evidence_refs", [])),
                 is_final=dialogue.get("is_final"),
+                t_dialogue_start=t_dialogue_start.isoformat(),
+                t_dialogue_end=t_dialogue_end.isoformat(),
+                dialogue_elapsed_sec=round((t_dialogue_end - t_dialogue_start).total_seconds(), 3),
                 t_end=t1.isoformat(),
             )
             results.append(record)
@@ -142,6 +150,8 @@ def main() -> None:
     ts_re = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.(\d+)Z\s+(.*)$")
     blocked_re = re.compile(r"\[guardrail\] blocked attempt=(\d+)/(\d+) reason=(\w+) detail=(.*)")
     fallback_re = re.compile(r"\[guardrail\] fallback used")
+    # prompt_chain._call_claude() 가 호출마다 남기는 토큰 사용량 로그 - 재생성 포함 전체 시도를 합산한다.
+    llm_re = re.compile(r"\[llm\] model=(\S+) in=(\d+) cache_write=(\d+) cache_read=(\d+) out=(\d+)")
 
     parsed_logs = []
     for line in log_lines:
@@ -164,16 +174,33 @@ def main() -> None:
 
         regenerations = []
         fell_back = False
+        llm_calls = []
         for msg in window:
             bm = blocked_re.search(msg)
             if bm:
                 regenerations.append({"attempt": bm.group(1), "reason": bm.group(3), "detail": bm.group(4)})
             if fallback_re.search(msg):
                 fell_back = True
+            lm = llm_re.search(msg)
+            if lm:
+                llm_calls.append({
+                    "model": lm.group(1),
+                    "in": int(lm.group(2)),
+                    "cache_write": int(lm.group(3)),
+                    "cache_read": int(lm.group(4)),
+                    "out": int(lm.group(5)),
+                })
 
         record["재생성_횟수"] = len(regenerations)
         record["재생성_사유"] = regenerations
         record["폴백_발생"] = fell_back
+        # ★ 재생성 포함 이 케이스에서 실제로 발생한 모든 Claude 호출의 토큰 합계 -
+        #   '토큰 비용'은 재생성까지 포함해야 실제 과금액에 가깝다.
+        record["llm_호출_횟수"] = len(llm_calls)
+        record["llm_input_tokens_합"] = sum(c["in"] for c in llm_calls)
+        record["llm_cache_write_tokens_합"] = sum(c["cache_write"] for c in llm_calls)
+        record["llm_cache_read_tokens_합"] = sum(c["cache_read"] for c in llm_calls)
+        record["llm_output_tokens_합"] = sum(c["out"] for c in llm_calls)
 
     raw_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"가드레일 정보 포함해 재저장: {raw_path}")

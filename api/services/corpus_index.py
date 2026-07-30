@@ -26,6 +26,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import logging
 import math
 import re
@@ -34,12 +35,20 @@ from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
 
+from rank_bm25 import BM25Okapi
+
 log = logging.getLogger("gyeotnun.corpus_index")
 
 CORPUS_DIR = Path(__file__).resolve().parents[2] / "corpus"
 EVIDENCE_TABLE_PATH = CORPUS_DIR / "근거_검증표.csv"
 EVAL_SET_PATH = CORPUS_DIR / "곁눈_평가세트_30건.csv"
 RELABELED_CASES_PATH = CORPUS_DIR / "사례_20-46건_재라벨링표.csv"
+
+# ★ 공식 문서(공공데이터 1,017건, 2026-07-30 전달) - corpus/README.md 참고. 용량 때문에
+#   git에 커밋하지 않는다(별도 전달). 로컬에 이 경로가 없으면 그냥 0건으로 적재된다
+#   (기존 public_data/*.json 레거시 로더와 같은 관용 - 없어도 서비스는 죽지 않는다).
+OFFICIAL_DATA_DIR = CORPUS_DIR / "public_data" / "gyeotnun_data"
+OFFICIAL_RECORDS_PATH = OFFICIAL_DATA_DIR / "records_merged.jsonl"
 
 _SYMBOLS_RE = re.compile(r'[★☆■□▶►\[\]()!?※·,."\'…\n]+')
 
@@ -130,7 +139,14 @@ class EvidenceDoc:
 
 @dataclass
 class ScamCase:
-    """알려진 사기/사칭 사례 1건. 재라벨링표(운영 참조 데이터)에서만 온다.
+    """알려진 사기/사칭 사례 1건. 두 소스에서 온다 - origin 으로 구분한다.
+
+    - origin="relabeled"           : 사례_재라벨링표.csv 30건. 사람이 위험단서·
+      오판유형까지 직접 라벨링한 고품질 데이터.
+    - origin="public_data_warning" : records_merged.jsonl 의 warning_case/
+      press_release 179건(피싱안심SOS 예·경보, KISA 피싱·사칭 보도자료, 경찰청
+      보이스피싱 현황). 공공데이터 원문 그대로라 오판유형 라벨이 없다
+      (error_types 는 항상 빈 리스트).
 
     ★ 평가세트(EVAL_CASES)는 여기 절대 섞지 않는다 - 위 모듈 docstring 참고.
     """
@@ -140,11 +156,11 @@ class ScamCase:
     source_label: str        # 참고_출처 또는 출처 (사람이 읽는 출처 설명)
     url: str
     published_at: Optional[str]
-    risk_clues: List[str] = field(default_factory=list)     # 위험단서 / 신뢰단서
-    error_types: List[str] = field(default_factory=list)     # 오판유형 (복수 라벨)
+    risk_clues: List[str] = field(default_factory=list)     # 위험단서 / 신뢰단서 / risk_types
+    error_types: List[str] = field(default_factory=list)     # 오판유형 (복수 라벨, relabeled만 있음)
     questions: List[str] = field(default_factory=list)        # 놓친확인요소
     rationale: str = ""
-    origin: str = "relabeled"   # 재라벨링표만 소스이므로 항상 "relabeled"
+    origin: str = "relabeled"   # "relabeled" | "public_data_warning"
     _blob: str = field(default="", repr=False)
 
     def signal_label(self) -> str:
@@ -182,6 +198,48 @@ class EvalCase:
     questions: List[str]
     rationale: str
     url: str
+
+
+@dataclass
+class OfficialDoc:
+    """공식 근거 문서 1건 (records_merged.jsonl, 공공데이터 1,017건).
+
+    ★ SCAM_CASES(사기 사례)와 완전히 분리된 별도 인덱스다. 곁눈이 "이런 공식 문서를
+      찾았다"와 "이런 사기 사례와 비슷하다"를 사용자에게 절대 섞어 말하지 않기
+      위해서다 - 두 개념을 같은 자료구조/신호로 합치면 나중에 실수로 뒤섞이기 쉽다.
+    """
+
+    id: str
+    title: str
+    content: str
+    source_agency: str
+    source_url: str
+    published_at: Optional[str]
+    domain: str
+    data_type: str
+
+    def to_reference(self) -> dict:
+        return {
+            "title": self.title,
+            "url": self.source_url,
+            "publisher": self.source_agency,
+            "published_at": self.published_at or None,
+            "source_type": classify_source_type(self.source_url),
+        }
+
+
+@dataclass
+class OfficialChunk:
+    """OfficialDoc 본문을 검색 단위로 재청킹한 조각 1건. BM25 색인 대상.
+
+    ★ 사용자에게는 절대 노출되지 않는다 - references 는 항상 OfficialDoc(문서) 단위로
+      묶어서 돌려준다(청크 그대로 보여주면 문장이 잘려 나온 것처럼 보인다).
+    """
+
+    chunk_id: str
+    record_id: str    # OfficialDoc.id 를 가리키는 외래키
+    text: str
+    tokens: List[str] = field(default_factory=list, repr=False)   # BM25 색인용 (기동 시 1회 계산)
 
 
 # ==================================================== 로더
@@ -266,6 +324,224 @@ def _load_relabeled_cases() -> List[ScamCase]:
     return out
 
 
+# ★ records_merged.jsonl 의 data_type 중 warning_case(155건)/press_release(24건),
+#   합쳐서 179건은 "공식 정책/통계 안내"가 아니라 "사기 사례·경보"다(피싱안심SOS
+#   예·경보, KISA 피싱·사칭 보도자료, 경찰청 보이스피싱 현황). 처음엔 이 179건도
+#   OFFICIAL_DOCS 에 그대로 들어가 있었는데, 사용자 입력이 이 문서들과 겹치면
+#   "공식 자료를 찾았습니다"(official_source_found, info)로 안내됐다 - 사기 경보문을
+#   중립적인 참고자료처럼 보여준 셈이라 신호의 의미가 어긋난다.
+#
+#   그런데 이 179건을 통째로 SCAM_CASES(키워드 겹침 매칭)로 옮겨 봤더니, 179건 중
+#   대부분(158건)이 보도자료 전문(평균 1,093자, 최대 4,868자)이라 여러 주제를 한
+#   문서가 동시에 다루는 바람에 무관한 문장과도 범용 단어로 겹쳐 정상 안내문을
+#   '의심'으로 오판시켰다(실측 확인, docs/evaluation/eval_30_report.md). 짧은
+#   21건(39~94자, 재라벨링표 30건과 비슷한 스케일)만 그 문제가 없었다(아래
+#   _SCAM_PATTERN_MAX_CHARS 주석 참고). 그래서 최종적으로 나눴다:
+#     - 짧은 21건(<=200자) → SCAM_CASES 로 옮긴다(_load_public_data_warning_cases).
+#       개별 사건 하나를 짧게 알리는 경보문이라 '유사 사기 사례'로 매칭하기에 적합하다.
+#     - 긴 158건(>200자) → OFFICIAL_DOCS 에 그대로 남긴다. 여러 사기 유형을 종합
+#       설명하는 보도자료라 "공식 자료"로 부르는 게 오히려 정확하고, OFFICIAL_DOCS는
+#       BM25 청크 검색이라 문서 길이에 특별히 취약하지 않다(§match_official_docs).
+#   즉 같은 문서가 두 인덱스에 동시에 들어가지는 않는다("공식 문서와 사기 사례를
+#   같은 인덱스에 넣지 마라" 원칙은 유지) - data_type 만이 아니라 길이까지 함께
+#   기준으로 어느 인덱스가 맞는지 가른다.
+_SCAM_PATTERN_DATA_TYPES = {"warning_case", "press_release"}
+
+# ★ 길이 상한 - 실측으로 발견한 문제(docs/evaluation/eval_30_report.md 재측정 참고):
+#   재라벨링표 30건은 평균 77자(최대 104자)짜리 짧은 단일 시나리오 문장인데, 179건
+#   원문은 평균 1,093자(중앙값 1,033자)짜리 보도자료 전문이다. 179건의 길이 분포
+#   자체에 자연스러운 틈이 있다 - 39~94자짜리가 21건 있고, 그다음은 바로 610자로
+#   뛴다(94~610자 구간은 0건). 200자를 상한으로 두면(94자와 610자 사이 아무 값이나
+#   동일하게 동작) 그 21건만 남아 재라벨링표(30건)와 비슷한 스케일(51건)이 되고,
+#   실측으로 확인한 대로 임계값 5.0을 그대로 써도 정상 오판 0건이 유지된다
+#   (§match_scam_cases 근거 참고).
+_SCAM_PATTERN_MAX_CHARS = 200
+
+
+def _load_official_docs() -> List[OfficialDoc]:
+    """records_merged.jsonl(1줄 1건)을 읽는다. 파일이 없으면(아직 전달 전 로컬 등) 0건으로
+    조용히 넘어간다 - 이 코퍼스는 별도 전달본이라 항상 있으리라는 보장이 없다.
+
+    ★ data_type 이 warning_case/press_release 이면서 길이가 짧은(<=200자) 문서는
+      여기서 제외한다 - 위 _SCAM_PATTERN_DATA_TYPES/_SCAM_PATTERN_MAX_CHARS 주석
+      참고, SCAM_CASES 쪽에서 읽는다. 같은 data_type 이라도 긴 문서는 그대로
+      OFFICIAL_DOCS 에 남는다.
+    """
+    docs: List[OfficialDoc] = []
+    if not OFFICIAL_RECORDS_PATH.exists():
+        return docs
+    with OFFICIAL_RECORDS_PATH.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            _is_scam_pattern = (row.get("data_type") or "").strip() in _SCAM_PATTERN_DATA_TYPES
+            _is_short = len((row.get("content") or "").strip()) <= _SCAM_PATTERN_MAX_CHARS
+            if _is_scam_pattern and _is_short:
+                continue
+            url = (row.get("source_url") or "").strip()
+            title = (row.get("title") or "").strip()
+            # ★ url이 없거나 http로 시작하지 않는 문서는 근거로 쓰지 않는다 (누를 수 없는
+            #   링크는 근거가 아니다 - 이 파일 맨 위 docstring의 원칙을 그대로 따른다)
+            if not title or not url.startswith(("http://", "https://")):
+                continue
+            docs.append(OfficialDoc(
+                id=(row.get("id") or "").strip(),
+                title=title,
+                content=(row.get("content") or "").strip(),
+                source_agency=(row.get("source_agency") or "").strip(),
+                source_url=url,
+                published_at=(row.get("published_at") or "").strip() or None,
+                domain=(row.get("domain") or "").strip(),
+                data_type=(row.get("data_type") or "").strip(),
+            ))
+    return docs
+
+
+def _load_public_data_warning_cases() -> List[ScamCase]:
+    """records_merged.jsonl 중 warning_case/press_release 로, 길이 상한 이하인 것만
+    ScamCase 로 읽는다(위 _SCAM_PATTERN_MAX_CHARS 주석 참고 - 179건 중 21건만 남는다).
+
+    ★ 재라벨링표(30건)와 품질이 다르다 - 재라벨링표는 사람이 위험단서·오판유형까지
+      직접 라벨링했지만, 이 데이터는 공공데이터 원문 그대로다(오판유형 라벨 없음).
+      origin="public_data_warning" 으로 명확히 구분한다 - tagger.py 의 few-shot
+      선택 로직(`origin != "relabeled"`)이 이미 origin 으로 필터링하므로, 오판유형
+      라벨이 없는 이 건들은 자동으로 few-shot 예시에서 제외된다(추가 코드 불필요).
+    """
+    out: List[ScamCase] = []
+    if not OFFICIAL_RECORDS_PATH.exists():
+        return out
+    with OFFICIAL_RECORDS_PATH.open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if (row.get("data_type") or "").strip() not in _SCAM_PATTERN_DATA_TYPES:
+                continue
+            url = (row.get("source_url") or "").strip()
+            title = (row.get("title") or "").strip()
+            text = (row.get("content") or "").strip()
+            if not title or not url.startswith(("http://", "https://")):
+                continue
+            if len(text) > _SCAM_PATTERN_MAX_CHARS:
+                continue
+            risk_types = [r for r in (row.get("risk_types") or []) if r]
+            agency = (row.get("source_agency") or "").strip()
+            blob = _clean(" ".join([title, text, *risk_types]))
+            out.append(ScamCase(
+                id=(row.get("id") or "").strip(),
+                text=text or title,
+                source_label=f"{agency} - {title}"[:80] if agency else title[:80],
+                url=url,
+                published_at=(row.get("published_at") or "").strip() or None,
+                risk_clues=risk_types,
+                error_types=[],       # 사람이 라벨링하지 않았다 - 항상 빈 리스트
+                questions=[],
+                rationale="",
+                origin="public_data_warning",
+                _blob=blob,
+            ))
+    return out
+
+
+# 데이터팀이 전달한 chunks_merged.jsonl 은 999/1,017 문서만 커버한다(너무 짧은 경보문
+# 18건이 청크 생성 기준에서 빠짐 - corpus/README.md 참고). 그 파일을 그대로 쓰지 않고
+# records_merged.jsonl(1,017건 전체)을 원본으로 직접 재청킹해서 전체를 커버한다.
+# 목표 청크 크기는 실측으로 정했다: 전달받은 chunks_merged.jsonl 의 평균 청크 길이가
+# 585.8자였고, 이 상수(900)로 잘랐을 때 평균이 577.8자로 가장 가까웠다(빈도 분포상
+# 문단 경계에서 못 채우고 남는 조각들 때문에 목표값보다 항상 조금 낮게 나온다).
+_CHUNK_TARGET_CHARS = 900
+
+
+def _split_into_chunks(text: str, target: int = _CHUNK_TARGET_CHARS) -> List[str]:
+    """문단(줄바꿈) 경계를 최대한 지키면서 target 근처 길이로 텍스트를 쪼갠다.
+
+    문장 단위가 아니라 문단 단위로 자르는 이유: 공식 문서 원문(보도자료·안내문)은
+    문단이 이미 의미 단위로 나뉘어 있어, 문단 경계를 지키는 것만으로도 문장이
+    중간에 잘리는 것을 대부분 막는다 - 별도 문장 분리기(sentencizer)를 붙이는
+    비용을 정당화할 만큼 효과 차이가 크지 않다.
+    """
+    text = (text or "").strip()
+    if not text:
+        return []
+    if len(text) <= target:
+        return [text]
+    paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
+    chunks: List[str] = []
+    buf = ""
+    for p in paragraphs:
+        candidate = f"{buf}\n{p}" if buf else p
+        if len(candidate) <= target:
+            buf = candidate
+            continue
+        if buf:
+            chunks.append(buf)
+            buf = ""
+        # 문단 자체가 target보다 길면(예: 표를 통째로 텍스트로 뽑은 PDF 구간) 어쩔 수
+        # 없이 강제로 잘라서 담는다 - 문단 하나를 통째로 청크 하나로 만들면 너무 커진다.
+        while len(p) > target:
+            chunks.append(p[:target])
+            p = p[target:]
+        buf = p
+    if buf:
+        chunks.append(buf)
+    return chunks
+
+
+def _rechunk_official_docs(docs: List[OfficialDoc]) -> List[OfficialChunk]:
+    """OfficialDoc.content 를 검색 단위(OfficialChunk)로 재청킹한다.
+
+    제목을 모든 청크 앞에 붙인다 - 원문이 "담당부서/날짜/조회수" 같은 상용구로
+    시작하는 경우가 많아(records_merged.jsonl 실측), 제목이 없으면 첫 청크의 핵심
+    주제어가 희석된다.
+    """
+    chunks: List[OfficialChunk] = []
+    for doc in docs:
+        pieces = _split_into_chunks(doc.content) or [""]
+        for i, piece in enumerate(pieces):
+            text = f"{doc.title}\n{piece}".strip()
+            if not text:
+                continue
+            chunks.append(OfficialChunk(chunk_id=f"{doc.id}-{i:04d}", record_id=doc.id, text=text))
+    return chunks
+
+
+# ---- BM25(공식 문서) 전용 추가 불용어. records_merged.jsonl 실측으로 발견한 문제:
+#   복지로(bokjiro.go.kr) 문서 상당수가 본문에 "사이트: 복지로http://www.bokjiro.go.kr"
+#   같은 정형 필드를 갖는데, 이 정확한 형태("복지로"라는 토큰)는 코퍼스 전체 1,903개
+#   청크 중 딱 2개에만 등장한다(df=2, 나머지 문서는 대표문의처가 NH농협/근로복지공단 등
+#   다른 기관이라 "복지로"라는 단어 자체가 없다). 반면 실제 사용자는 "복지로에서
+#   확인하세요"처럼 이 포털 이름을 문서 주제와 무관하게 아주 흔하게 언급한다(평가세트
+#   N01/N02/N10 실측 - "복지로 노후준비서비스...", "복지로 원문에서..."). df가 낮으니
+#   BM25 idf가 높게(6.6점대) 잡히고, 그 결과 완전히 무관한 문서 2건이 "복지로"라는
+#   말 한마디로 최상위 매칭에 튀어 오르는 오매칭이 실측으로 확인됐다. match_scam_cases()
+#   의 STOPWORDS 와는 별개로 이 코퍼스에서만 드러난 문제라 여기 따로 추가한다.
+_OFFICIAL_EXTRA_STOPWORDS = {"복지로", "복지"}
+
+
+def _bm25_tokenize(text: str) -> List[str]:
+    """BM25 입력 토큰화.
+
+    ★ 형태소 분석기(mecab/konlpy 등)를 새로 붙이는 대신, match_scam_cases() 에서 이미
+      실측으로 검증한 조사 제거 로직(extract_keywords)과 STOPWORDS 를 그대로 재사용한다.
+      이유: (1) 이 코퍼스 규모(문서 1,017건, 청크 2천 건 안팎)에서는 형태소 분석기를
+      새로 설치·운영하는 비용(네이티브 의존성, 사전 관리) 대비 검색 정밀도 이득이 크지
+      않다. (2) 조사 제거만으로도 한국어 부분일치 문제의 상당 부분이 해결됨을 이미
+      SCAM_CASES 매칭에서 확인했다. (3) BM25 자체가 문서빈도 기반 가중치(IDF)를 내부적으로
+      계산하므로, STOPWORDS 필터는 그 위에 얹는 보조 잡음 제거일 뿐 핵심 변별력은 BM25가
+      맡는다 - 형태소 분석기 없이도 안전하다.
+    """
+    return [k for k in extract_keywords(text) if k not in STOPWORDS and k not in _OFFICIAL_EXTRA_STOPWORDS]
+
+
 # ==================================================== 기동 시 적재 (모듈 임포트 시 1회)
 # ★ 출처 파일명을 로그로 남긴다 - "이 CSV가 매칭 코퍼스에 들어갔는지"를 코드를 다시
 #   읽지 않고도 기동 로그만으로 바로 확인할 수 있게 하기 위해서다(평가세트를 실수로
@@ -279,10 +555,13 @@ log.info(
     len(EVAL_CASES), EVAL_SET_PATH.name,
 )
 
-SCAM_CASES: List[ScamCase] = _load_relabeled_cases()
+_RELABELED_CASES: List[ScamCase] = _load_relabeled_cases()
+_PUBLIC_DATA_WARNING_CASES: List[ScamCase] = _load_public_data_warning_cases()
+SCAM_CASES: List[ScamCase] = _RELABELED_CASES + _PUBLIC_DATA_WARNING_CASES
 log.info(
-    "[corpus] SCAM_CASES %s건 적재 (출처: %s만 - 평가세트 CSV는 제외)",
-    len(SCAM_CASES), RELABELED_CASES_PATH.name,
+    "[corpus] SCAM_CASES %s건 적재 (출처: %s %s건 + records_merged.jsonl "
+    "warning_case/press_release %s건 - 평가세트 CSV는 제외)",
+    len(SCAM_CASES), RELABELED_CASES_PATH.name, len(_RELABELED_CASES), len(_PUBLIC_DATA_WARNING_CASES),
 )
 
 
@@ -300,6 +579,27 @@ def _doc_freq(blobs: List[str]) -> dict:
 _SCAM_DOC_FREQ: dict = _doc_freq([c._blob for c in SCAM_CASES])
 _SCAM_N_DOCS: int = len(SCAM_CASES)
 
+# ---- 공식 문서(공공데이터 1,017건) - SCAM_CASES 와 완전히 분리된 별도 인덱스.
+#      로컬에 별도 전달본이 없으면(corpus/README.md 참고) OFFICIAL_DOCS 는 그냥 0건이다.
+OFFICIAL_DOCS: List[OfficialDoc] = _load_official_docs()
+log.info("[corpus] OFFICIAL_DOCS %s건 적재 (출처: %s)", len(OFFICIAL_DOCS), OFFICIAL_RECORDS_PATH.name)
+
+_OFFICIAL_DOCS_BY_ID: dict = {d.id: d for d in OFFICIAL_DOCS}
+
+_OFFICIAL_CHUNKS: List[OfficialChunk] = _rechunk_official_docs(OFFICIAL_DOCS)
+if _OFFICIAL_CHUNKS:
+    for _c in _OFFICIAL_CHUNKS:
+        _c.tokens = _bm25_tokenize(_c.text)
+    _OFFICIAL_BM25: Optional[BM25Okapi] = BM25Okapi([c.tokens for c in _OFFICIAL_CHUNKS])
+    _avg_chunk_len = sum(len(c.text) for c in _OFFICIAL_CHUNKS) / len(_OFFICIAL_CHUNKS)
+else:
+    _OFFICIAL_BM25 = None
+    _avg_chunk_len = 0
+log.info(
+    "[corpus] OFFICIAL_CHUNKS %s개 재청킹 (원본 %s건 전체 커버, 평균 %.0f자, BM25 색인 완료)",
+    len(_OFFICIAL_CHUNKS), len(OFFICIAL_DOCS), _avg_chunk_len,
+)
+
 
 def summary() -> dict:
     """기동 로그/헬스체크용 적재 현황."""
@@ -307,6 +607,10 @@ def summary() -> dict:
         "evidence_docs": len(EVIDENCE),
         "eval_cases": len(EVAL_CASES),
         "scam_cases": len(SCAM_CASES),
+        "scam_cases_relabeled": len(_RELABELED_CASES),
+        "scam_cases_public_data_warning": len(_PUBLIC_DATA_WARNING_CASES),
+        "official_docs": len(OFFICIAL_DOCS),
+        "official_chunks": len(_OFFICIAL_CHUNKS),
     }
 
 
@@ -352,6 +656,11 @@ def match_scam_cases(text: str, limit: int = 2, min_score: float = 5.0) -> List[
       부터 시작했다(단어 2개 이상 조합). 4.43과 6.1 사이가 비어 있어 5.0 을 그 사이에
       놓으면 이 데이터셋 기준 '정상' 오매칭 10건을 전부 걸러내면서 사칭/경계의 진짜 일치는
       대부분 그대로 잡는다. 코퍼스가 커지면 이 값도 같은 방식(재측정)으로 다시 잡아야 한다.
+    ★ 코퍼스 확장(30→51건, 공공데이터 경보 21건 추가) 후 재검증: 처음엔 179건을 전부
+      더했다가 정상 10건 중 9건이 오판되는 걸 실측으로 발견했다(긴 보도자료 158건이
+      원인 - _SCAM_PATTERN_MAX_CHARS 주석 참고). 그 158건을 빼고 짧은 21건만 남긴
+      51건 기준으로 다시 돌려 보니 점수 분포가 원래(30건) 계산과 사실상 같았다(정상
+      최고점 4.95, 여전히 5.0 아래) - 그래서 임계값은 그대로 5.0을 유지한다.
     """
     kws = [k for k in extract_keywords(text) if k not in STOPWORDS]
     if not kws:
@@ -365,11 +674,67 @@ def match_scam_cases(text: str, limit: int = 2, min_score: float = 5.0) -> List[
         if score >= min_score:
             scored.append((score, matched, case))
     scored.sort(key=lambda x: -x[0])
-    # ★ 매칭 근거를 로그로 남긴다 - 어떤 단어 때문에 어떤 사례와 연결됐는지 나중에
-    #   오매칭을 추적할 수 있어야 한다는 요구사항(재측정 시 오매칭 재발 여부 확인용).
+    # ★ 매칭 근거를 로그로 남긴다 - 어떤 단어 때문에 어떤 사례와 연결됐는지, 어느
+    #   소스(origin)에서 왔는지 나중에 추적할 수 있어야 한다는 요구사항(재측정 시
+    #   오매칭 재발 여부 확인용). relabeled(사람 라벨링) 인지 public_data_warning
+    #   (원문 그대로) 인지가 매칭 결과의 신뢰도 해석에 영향을 준다.
     for score, matched, case in scored[:limit]:
         log.info(
-            "[match_scam] case=%s score=%.2f 매칭단어=%s",
-            case.id, score, matched,
+            "[match_scam] case=%s origin=%s score=%.2f 매칭단어=%s",
+            case.id, case.origin, score, matched,
         )
     return [c for _, _, c in scored[:limit]]
+
+
+# ★ 임계값(12.0)의 근거 - SCAM_CASES 때와 달리 '정상 오매칭 최고점'과 '진짜 매칭
+#   최저점' 사이에 깨끗한 빈 구간이 없었다(코퍼스가 1,017건으로 훨씬 크고 주제가
+#   다양해서 어떤 문장이든 대충 겹치는 문서가 하나쯤은 나온다). 그래서 실측 노이즈
+#   바닥을 기준으로 잡았다:
+#     - 완전히 무관한 문장("오늘 날씨가 좋네요", "저녁에 뭐 먹을지 고민이에요" 등)의
+#       최고 점수는 4.9~10.6 사이였다.
+#     - 평가세트 30건 중 실제로 그 프로그램이 존재하는 케이스(N03~N07: 농어가목돈마련
+#       저축, 주거상향 지원사업 등)는 19~31점대로 확실히 높게 나왔다.
+#     - 10~15점대는 회색지대다(N08/N09처럼 진짜 맞는데 약하게 나오는 경우와, 순수
+#       잡음이 우연히 겹치는 경우가 섞여 있다).
+#   12.0은 노이즈 바닥(최대 10.6)보다는 위, 확실한 진짜 매칭 시작점(14.79)보다는
+#   아래에 놓은 값이다 - 약한 진짜 매칭 일부(예: N01/N02/N08/N10, 10점대)를 놓치는
+#   대가로 순수 잡음 매칭을 대부분 걸러낸다. SCAM_CASES 때처럼 완벽한 분리는 아니다 -
+#   이 한계를 docs/evaluation/eval_30_report.md 재측정 결과에 그대로 적었다.
+_OFFICIAL_MIN_SCORE = 12.0
+
+
+def match_official_docs(text: str, limit: int = 2, min_score: float = _OFFICIAL_MIN_SCORE) -> List[OfficialDoc]:
+    """공식 문서(OFFICIAL_DOCS, 공공데이터 1,017건)를 BM25로 검색한다.
+
+    ★ SCAM_CASES 매칭과는 완전히 다른 인덱스·점수 체계다 - 절대 섞지 않는다.
+    ★ 검색은 청크 단위(OfficialChunk, 재청킹된 ~1,900개)로 하고, 같은 문서에 속한
+      여러 청크가 매칭되면 그 문서의 최고 점수만 남겨 references 는 문서 단위로
+      묶는다 - 사용자에게 청크(문서 조각)를 그대로 보여주지 않는다.
+    ★ 임계값은 위 _OFFICIAL_MIN_SCORE 주석 참고 - 코퍼스가 바뀌면 다시 실측해야 한다.
+    """
+    if _OFFICIAL_BM25 is None:
+        return []
+    tokens = _bm25_tokenize(text)
+    if not tokens:
+        return []
+    scores = _OFFICIAL_BM25.get_scores(tokens)
+    best_per_doc: dict = {}
+    for chunk, score in zip(_OFFICIAL_CHUNKS, scores):
+        if score <= 0:
+            continue
+        prev = best_per_doc.get(chunk.record_id)
+        if prev is None or score > prev:
+            best_per_doc[chunk.record_id] = score
+    scored = [(score, record_id) for record_id, score in best_per_doc.items() if score >= min_score]
+    scored.sort(key=lambda x: -x[0])
+    result: List[OfficialDoc] = []
+    for score, record_id in scored[:limit]:
+        doc = _OFFICIAL_DOCS_BY_ID.get(record_id)
+        if doc is None:
+            continue
+        # ★ 매칭 근거 로그 - 어떤 문서가 어떤 점수로 매칭됐는지 추적할 수 있어야 한다
+        #   (match_scam_cases 의 매칭단어 로그와 같은 취지, BM25는 개별 청크 점수만
+        #   나오므로 doc 단위로 집계한 점수를 남긴다).
+        log.info("[match_official] doc=%s score=%.2f domain=%s", doc.id, score, doc.domain)
+        result.append(doc)
+    return result

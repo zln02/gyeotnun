@@ -10,6 +10,7 @@ psycopg2-binary==2.9.10         # PostgreSQL 드라이버 (docker-compose 용)
 httpx==0.28.1                   # 외부 API 호출 (네이버/Vision)
 anthropic==0.120.0              # Claude API (질문 생성). 0.42 는 output_config/adaptive thinking 미지원
 python-dotenv==1.0.1
+rank-bm25==0.2.2                # 공식 문서(OFFICIAL_DOCS) 검색 - BM25Okapi
 
 # dev
 pytest==8.3.4

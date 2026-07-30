@@ -7,11 +7,13 @@
   ★ 여기서 모은 references 의 URL 집합이 곧 prompt_chain 의 화이트리스트가 된다.
     즉 이 모듈이 근거의 진실성을 책임진다. 링크를 임의 생성하면 안 된다.
 
-3단 검색 (근거 우선순위 순)
-  1) corpus_index (근거_검증표/재라벨링표 CSV) - 데이터팀이 검수한 근거,
-     키 없이 동작, 가장 신뢰도 높음
-  2) 로컬 공공데이터 코퍼스(public_data/*.json, 577건 목표) - 아직 미수집 상태
-  3) 네이버 검색 API - 최신 이슈 보강 (NAVER_CLIENT_ID/SECRET 필요, 미구현)
+검색 우선순위
+  1) corpus_index.OFFICIAL_DOCS - 공공데이터 1,017건, BM25 검색 (2026-07-30 확장)
+  2) corpus_index.EVIDENCE - 근거_검증표.csv 11건, 수작업 검증 통계
+  3) 로컬 공공데이터 레거시 코퍼스(public_data/*.json) - 사실상 미사용(빈 폴더)
+  4) 네이버 검색 API - 최신 이슈 보강 (NAVER_CLIENT_ID/SECRET 필요, 미구현)
+  (별도) corpus_index.SCAM_CASES - 사기 사례 대조. 위 공식 문서 검색과는 완전히
+  분리된 신호(similar_scam_case)로, 같은 인덱스/신호에 절대 섞지 않는다.
 
 ★★ 3단계 확인 결과 판정 기준 (collect_evidence 참고, 신호 조합으로 판단한다) ★★
   확인됨(needs_check)        : 공식 출처에서 동일 내용을 찾았고, 사기 패턴 일치나
@@ -162,17 +164,33 @@ def _dedup_refs(refs: List[dict]) -> List[dict]:
 def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
     """근거 수집 파이프라인.
 
-    우선순위: corpus_index(근거_검증표/사기사례) → public_data(577건, 아직 비어 있음)
-    둘 다 못 찾으면 '못 찾았다'는 사실 자체를 신호로 남긴다 (판정하지 않는다).
+    우선순위: corpus_index 공식 문서(OFFICIAL_DOCS, 공공데이터 1,017건, BM25 검색)
+    → corpus_index 근거_검증표(EVIDENCE, 11건 수작업 검증 통계) → public_data 레거시
+    (577건, 아직 비어 있음). 셋 다 못 찾으면 '못 찾았다'는 사실 자체를 신호로 남긴다
+    (판정하지 않는다).
+
+    ★ 사기 사례(SCAM_CASES) 매칭은 공식 문서 매칭과 완전히 별개의 신호(similar_scam_case)
+      다 - "공식 자료를 찾았다"와 "사기 사례와 비슷하다"를 절대 같은 신호로 섞지 않는다.
     """
     signals = detect_signals(text)
 
+    # ---- 공식 문서를 먼저 검색한다 (corpus_index.OFFICIAL_DOCS, BM25 - 청크 단위로
+    #      검색하고 문서 단위로 묶여서 돌아온다. match_official_docs() 참고)
+    matched_official = corpus_index.match_official_docs(text)
     matched_evidence = corpus_index.match_evidence(text)
     matched_scam = corpus_index.match_scam_cases(text)
     legacy_refs = search_corpus(text, domain=domain)
 
-    # ---- 신호: 공식 공고(=근거_검증표) 존재 여부 + 발행 기관 명시 여부 (한 신호에 함께 담는다.
-    #      근거_검증표는 확인완료 행만 남겨서 기관명이 항상 채워져 있으므로 따로 쪼갤 이유가 없다)
+    # ---- 신호: 공식 문서/통계 매칭. matched_official 과 matched_evidence 는 인덱스는
+    #      다르지만 사용자 입장에서는 둘 다 "공식 자료를 찾았다"는 같은 의미라
+    #      같은 신호 키(official_source_found)를 쓴다 - 어느 코퍼스에서 왔는지는
+    #      내부 구현일 뿐, 사용자에게 중요한 건 '공식 자료인지 여부'다.
+    for doc in matched_official:
+        signals.append({
+            "key": "official_source_found",
+            "label": f"공식 자료와 대조했습니다: {doc.source_agency} - {doc.title}",
+            "severity": "info",
+        })
     for doc in matched_evidence:
         signals.append({
             "key": "official_source_found",
@@ -180,12 +198,15 @@ def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
             "severity": "info",
         })
 
-    # ---- 신호: 유사 사기 사례 일치 (강한 경고 신호)
+    # ---- 신호: 유사 사기 사례 일치 (강한 경고 신호) - 위 official_source_found 와
+    #      명확히 다른 키를 쓴다. 같은 텍스트가 공식 문서와도, 사기 사례와도 동시에
+    #      매칭될 수 있다(예: 실제 제도명을 사칭한 문자) - 그때도 두 신호를 각각 보여준다.
     for case in matched_scam:
         signals.append({"key": "similar_scam_case", "label": case.signal_label(), "severity": "attention"})
 
     refs = _dedup_refs(
-        [d.to_reference() for d in matched_evidence]
+        [d.to_reference() for d in matched_official]
+        + [d.to_reference() for d in matched_evidence]
         + [c.to_reference() for c in matched_scam]
         + legacy_refs
     )

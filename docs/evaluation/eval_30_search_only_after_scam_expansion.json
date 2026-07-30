@@ -1,0 +1,334 @@
+[
+  {
+    "case_id": "N01",
+    "유형": "정상",
+    "기대판단": "정상",
+    "verdict_hint": "no_source_found",
+    "references_count": 0,
+    "signals": [
+      "no_official_source"
+    ]
+  },
+  {
+    "case_id": "N02",
+    "유형": "정상",
+    "기대판단": "정상",
+    "verdict_hint": "no_source_found",
+    "references_count": 0,
+    "signals": [
+      "no_official_source"
+    ]
+  },
+  {
+    "case_id": "N03",
+    "유형": "정상",
+    "기대판단": "정상",
+    "verdict_hint": "needs_check",
+    "references_count": 1,
+    "signals": [
+      "source_missing",
+      "official_source_found"
+    ]
+  },
+  {
+    "case_id": "N04",
+    "유형": "정상",
+    "기대판단": "정상",
+    "verdict_hint": "needs_check",
+    "references_count": 2,
+    "signals": [
+      "official_source_found",
+      "official_source_found"
+    ]
+  },
+  {
+    "case_id": "N05",
+    "유형": "정상",
+    "기대판단": "정상",
+    "verdict_hint": "needs_check",
+    "references_count": 1,
+    "signals": [
+      "official_source_found"
+    ]
+  },
+  {
+    "case_id": "N06",
+    "유형": "정상",
+    "기대판단": "정상",
+    "verdict_hint": "needs_check",
+    "references_count": 1,
+    "signals": [
+      "source_missing",
+      "official_source_found"
+    ]
+  },
+  {
+    "case_id": "N07",
+    "유형": "정상",
+    "기대판단": "정상",
+    "verdict_hint": "needs_check",
+    "references_count": 1,
+    "signals": [
+      "official_source_found"
+    ]
+  },
+  {
+    "case_id": "N08",
+    "유형": "정상",
+    "기대판단": "정상",
+    "verdict_hint": "no_source_found",
+    "references_count": 0,
+    "signals": [
+      "no_official_source"
+    ]
+  },
+  {
+    "case_id": "N09",
+    "유형": "정상",
+    "기대판단": "정상",
+    "verdict_hint": "needs_check",
+    "references_count": 1,
+    "signals": [
+      "official_source_found"
+    ]
+  },
+  {
+    "case_id": "N10",
+    "유형": "정상",
+    "기대판단": "정상",
+    "verdict_hint": "needs_check",
+    "references_count": 1,
+    "signals": [
+      "official_source_found",
+      "official_source_found"
+    ]
+  },
+  {
+    "case_id": "S01",
+    "유형": "사칭",
+    "기대판단": "의심",
+    "verdict_hint": "partially_matched",
+    "references_count": 3,
+    "signals": [
+      "contact_in_image",
+      "official_source_found",
+      "similar_scam_case",
+      "similar_scam_case"
+    ]
+  },
+  {
+    "case_id": "S02",
+    "유형": "사칭",
+    "기대판단": "의심",
+    "verdict_hint": "partially_matched",
+    "references_count": 2,
+    "signals": [
+      "contact_in_image",
+      "official_source_found",
+      "similar_scam_case"
+    ]
+  },
+  {
+    "case_id": "S03",
+    "유형": "사칭",
+    "기대판단": "의심",
+    "verdict_hint": "no_source_found",
+    "references_count": 0,
+    "signals": [
+      "no_official_source"
+    ]
+  },
+  {
+    "case_id": "S04",
+    "유형": "사칭",
+    "기대판단": "의심",
+    "verdict_hint": "partially_matched",
+    "references_count": 3,
+    "signals": [
+      "official_source_found",
+      "similar_scam_case",
+      "similar_scam_case"
+    ]
+  },
+  {
+    "case_id": "S05",
+    "유형": "사칭",
+    "기대판단": "의심",
+    "verdict_hint": "no_source_found",
+    "references_count": 0,
+    "signals": [
+      "urgency_pressure",
+      "no_official_source"
+    ]
+  },
+  {
+    "case_id": "S06",
+    "유형": "사칭",
+    "기대판단": "의심",
+    "verdict_hint": "partially_matched",
+    "references_count": 3,
+    "signals": [
+      "official_source_found",
+      "similar_scam_case",
+      "similar_scam_case"
+    ]
+  },
+  {
+    "case_id": "S07",
+    "유형": "사칭",
+    "기대판단": "의심",
+    "verdict_hint": "no_source_found",
+    "references_count": 0,
+    "signals": [
+      "contact_in_image",
+      "no_official_source"
+    ]
+  },
+  {
+    "case_id": "S08",
+    "유형": "사칭",
+    "기대판단": "의심",
+    "verdict_hint": "no_source_found",
+    "references_count": 0,
+    "signals": [
+      "no_official_source"
+    ]
+  },
+  {
+    "case_id": "S09",
+    "유형": "사칭",
+    "기대판단": "의심",
+    "verdict_hint": "partially_matched",
+    "references_count": 4,
+    "signals": [
+      "source_missing",
+      "official_source_found",
+      "official_source_found",
+      "similar_scam_case",
+      "similar_scam_case"
+    ]
+  },
+  {
+    "case_id": "S10",
+    "유형": "사칭",
+    "기대판단": "의심",
+    "verdict_hint": "partially_matched",
+    "references_count": 2,
+    "signals": [
+      "contact_in_image",
+      "similar_scam_case",
+      "similar_scam_case"
+    ]
+  },
+  {
+    "case_id": "B01",
+    "유형": "경계",
+    "기대판단": "확인불가",
+    "verdict_hint": "partially_matched",
+    "references_count": 4,
+    "signals": [
+      "official_source_found",
+      "official_source_found",
+      "similar_scam_case",
+      "similar_scam_case"
+    ]
+  },
+  {
+    "case_id": "B02",
+    "유형": "경계",
+    "기대판단": "확인불가",
+    "verdict_hint": "no_source_found",
+    "references_count": 0,
+    "signals": [
+      "no_official_source"
+    ]
+  },
+  {
+    "case_id": "B03",
+    "유형": "경계",
+    "기대판단": "확인불가",
+    "verdict_hint": "partially_matched",
+    "references_count": 1,
+    "signals": [
+      "similar_scam_case"
+    ]
+  },
+  {
+    "case_id": "B04",
+    "유형": "경계",
+    "기대판단": "확인불가",
+    "verdict_hint": "needs_check",
+    "references_count": 2,
+    "signals": [
+      "official_source_found",
+      "official_source_found"
+    ]
+  },
+  {
+    "case_id": "B05",
+    "유형": "경계",
+    "기대판단": "확인불가",
+    "verdict_hint": "partially_matched",
+    "references_count": 3,
+    "signals": [
+      "official_source_found",
+      "official_source_found",
+      "similar_scam_case"
+    ]
+  },
+  {
+    "case_id": "B06",
+    "유형": "경계",
+    "기대판단": "확인불가",
+    "verdict_hint": "partially_matched",
+    "references_count": 2,
+    "signals": [
+      "urgency_pressure",
+      "similar_scam_case",
+      "similar_scam_case"
+    ]
+  },
+  {
+    "case_id": "B07",
+    "유형": "경계",
+    "기대판단": "확인불가",
+    "verdict_hint": "needs_check",
+    "references_count": 1,
+    "signals": [
+      "official_source_found"
+    ]
+  },
+  {
+    "case_id": "B08",
+    "유형": "경계",
+    "기대판단": "확인불가",
+    "verdict_hint": "partially_matched",
+    "references_count": 1,
+    "signals": [
+      "similar_scam_case"
+    ]
+  },
+  {
+    "case_id": "B09",
+    "유형": "경계",
+    "기대판단": "확인불가",
+    "verdict_hint": "partially_matched",
+    "references_count": 4,
+    "signals": [
+      "official_source_found",
+      "official_source_found",
+      "similar_scam_case",
+      "similar_scam_case"
+    ]
+  },
+  {
+    "case_id": "B10",
+    "유형": "경계",
+    "기대판단": "확인불가",
+    "verdict_hint": "partially_matched",
+    "references_count": 1,
+    "signals": [
+      "similar_scam_case"
+    ]
+  }
+]
