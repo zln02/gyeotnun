@@ -5,24 +5,56 @@
     "기대판단": "정상",
     "입력채널": "링크",
     "제시문구": "복지로 노후준비서비스 안내 페이지입니다. 지원 내용과 문의처를 확인하세요.",
-    "t_start": "2026-07-30T15:03:15.014035+00:00",
+    "t_start": "2026-07-30T14:43:06.556821+00:00",
     "실패": false,
-    "check_id": "chk_c69cb646a3",
+    "check_id": "chk_82942e3784",
     "masked": false,
-    "verdict_hint": "no_source_found",
-    "references": [],
-    "references_count": 0,
-    "signals": [
-      "no_official_source"
+    "verdict_hint": "partially_matched",
+    "references": [
+      {
+        "title": "공식/대한민국 정책브리핑(KTV)·국민지원금 사칭 스미싱 주의",
+        "url": "https://www.korea.kr/news/policyNewsView.do?newsId=148892926",
+        "publisher": "korea.kr",
+        "published_at": "2021-09-09",
+        "source_type": "unknown"
+      },
+      {
+        "title": "공식/한국인터넷진흥원(KISA) 보호나라",
+        "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=71909",
+        "publisher": "boho.or.kr",
+        "published_at": "2025-11-28",
+        "source_type": "gov"
+      }
     ],
-    "question": "이 안내 페이지 안에 문의할 수 있는 전화번호나 기관 이름이 적혀 있나요? 있다면 그 번호로 직접 전화해서 사실인지 물어보실 수 있어요.",
-    "why": "공식 자료에서 같은 내용을 찾지 못했기 때문에, 글에 적힌 연락처로 직접 확인해보는 것이 좋은 방법입니다.",
-    "dialogue_evidence_refs_count": 0,
+    "references_count": 2,
+    "signals": [
+      "similar_scam_case",
+      "similar_scam_case"
+    ],
+    "question": "이 글에 적힌 내용을 어느 기관에서 발표했는지 글 안에서 한번 찾아봐 주시겠어요? 기관 이름이 보이지 않는다면 그것만으로도 한 번 더 확인해 볼 신호입니다.",
+    "why": "누가 말한 내용인지부터 확인하면 나머지 판단이 훨씬 쉬워집니다.",
+    "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:03:21.145759+00:00",
-    "재생성_횟수": 0,
-    "재생성_사유": [],
-    "폴백_발생": false
+    "t_end": "2026-07-30T14:43:22.839943+00:00",
+    "재생성_횟수": 3,
+    "재생성_사유": [
+      {
+        "attempt": "1",
+        "reason": "too_long",
+        "detail": "3문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
+      },
+      {
+        "attempt": "2",
+        "reason": "too_long",
+        "detail": "3문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
+      },
+      {
+        "attempt": "3",
+        "reason": "too_long",
+        "detail": "3문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
+      }
+    ],
+    "폴백_발생": true
   },
   {
     "case_id": "N02",
@@ -30,23 +62,37 @@
     "기대판단": "정상",
     "입력채널": "사진",
     "제시문구": "장애인일자리지원 사업의 대상과 신청 방법은 복지로 원문에서 확인할 수 있습니다.",
-    "t_start": "2026-07-30T15:03:21.645962+00:00",
+    "t_start": "2026-07-30T14:43:23.340091+00:00",
     "실패": false,
-    "check_id": "chk_3a17e85764",
+    "check_id": "chk_36adc1f712",
     "masked": false,
-    "verdict_hint": "no_source_found",
-    "references": [],
-    "references_count": 0,
-    "signals": [
-      "no_official_source"
+    "verdict_hint": "partially_matched",
+    "references": [
+      {
+        "title": "공식/한국인터넷진흥원(KISA) 보호나라",
+        "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=71909",
+        "publisher": "boho.or.kr",
+        "published_at": "2025-11-28",
+        "source_type": "gov"
+      }
     ],
-    "question": "글에서 말한 '복지로' 사이트에 직접 들어가서, 이 장애인일자리지원 사업 내용이 실제로 있는지 검색해 보실 수 있을까요?",
-    "why": "공식 자료에서 같은 내용을 아직 찾지 못했기 때문에, 원문 출처를 직접 확인해 보는 것이 도움이 됩니다.",
-    "dialogue_evidence_refs_count": 0,
+    "references_count": 1,
+    "signals": [
+      "similar_scam_case"
+    ],
+    "question": "이 글에서 '복지로'라고 적힌 부분이, 실제로 복지로 공식 누리집 주소로 연결되나요? 글에 있는 링크 주소를 한번 확인해 봐주세요.",
+    "why": "기관 이름과 실제 주소가 같은지 확인하면, 이 글을 판단하는 데 도움이 됩니다.",
+    "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:03:28.041552+00:00",
-    "재생성_횟수": 0,
-    "재생성_사유": [],
+    "t_end": "2026-07-30T14:43:32.333427+00:00",
+    "재생성_횟수": 1,
+    "재생성_사유": [
+      {
+        "attempt": "1",
+        "reason": "forbidden_word",
+        "detail": "why 에 판정 표현 '가짜' 이(가) 있습니다."
+      }
+    ],
     "폴백_발생": false
   },
   {
@@ -55,9 +101,9 @@
     "기대판단": "정상",
     "입력채널": "링크",
     "제시문구": "농어가목돈마련저축 저축장려금 지급 안내입니다.",
-    "t_start": "2026-07-30T15:03:28.541717+00:00",
+    "t_start": "2026-07-30T14:43:32.833564+00:00",
     "실패": false,
-    "check_id": "chk_3ec9c49ed1",
+    "check_id": "chk_d8dbc7f924",
     "masked": false,
     "verdict_hint": "no_source_found",
     "references": [],
@@ -66,11 +112,11 @@
       "source_missing",
       "no_official_source"
     ],
-    "question": "이 글 어디에 이 저축장려금을 발표한 기관 이름(예: 농협, 지자체, 정부부처)이 적혀 있는지 한번 찾아봐 주세요. 기관 이름이 안 보이시나요?",
-    "why": "발표한 기관을 알아야 나중에 직접 전화나 홈페이지로 사실을 확인할 수 있습니다.",
+    "question": "이 글 어디에 이 소식을 발표한 기관 이름(예: 농협, 지자체, 정부부처)이 적혀 있는지 한번 찾아봐 주세요. 발표한 곳 이름이 보이시나요?",
+    "why": "누가 발표했는지 알면 진짜 정보인지 확인하기가 훨씬 쉬워집니다.",
     "dialogue_evidence_refs_count": 0,
     "is_final": false,
-    "t_end": "2026-07-30T15:03:33.357480+00:00",
+    "t_end": "2026-07-30T14:43:37.006606+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -81,9 +127,9 @@
     "기대판단": "정상",
     "입력채널": "음성",
     "제시문구": "주거취약계층 주거상향 지원사업은 공식 복지서비스입니다. 상세 조건을 확인해 주세요.",
-    "t_start": "2026-07-30T15:03:33.857630+00:00",
+    "t_start": "2026-07-30T14:43:37.506760+00:00",
     "실패": false,
-    "check_id": "chk_57f29f56f3",
+    "check_id": "chk_f72605dbc7",
     "masked": false,
     "verdict_hint": "no_source_found",
     "references": [],
@@ -91,11 +137,11 @@
     "signals": [
       "no_official_source"
     ],
-    "question": "이 글에 나온 '주거상향 지원사업'을 인터넷에서 검색해서, 정부나 지자체 공식 누리집(홈페이지)에 같은 이름의 사업이 있는지 한번 찾아봐 주시겠어요?",
-    "why": "공식 자료에서 같은 내용을 아직 찾지 못했기 때문에, 직접 검색해서 진짜 공식 사업인지 확인해 보는 것이 좋습니다.",
+    "question": "이 지원사업 이름을 인터넷 검색창에 그대로 넣어보시면, 정부나 지자체 홈페이지가 나오는지 한번 봐주시겠어요?",
+    "why": "공식 자료에서는 이 사업 내용을 아직 찾지 못했는데, 실제 담당 기관 홈페이지가 있는지부터 확인하면 도움이 됩니다.",
     "dialogue_evidence_refs_count": 0,
     "is_final": false,
-    "t_end": "2026-07-30T15:03:39.263859+00:00",
+    "t_end": "2026-07-30T14:43:42.815148+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -106,21 +152,29 @@
     "기대판단": "정상",
     "입력채널": "사진",
     "제시문구": "개발제한구역 거주민 생활비용보조사업 안내입니다. 대상과 신청 기한을 확인하세요.",
-    "t_start": "2026-07-30T15:03:39.763991+00:00",
+    "t_start": "2026-07-30T14:43:43.315292+00:00",
     "실패": false,
-    "check_id": "chk_5aa1c9a511",
+    "check_id": "chk_df1b90b066",
     "masked": false,
-    "verdict_hint": "no_source_found",
-    "references": [],
-    "references_count": 0,
-    "signals": [
-      "no_official_source"
+    "verdict_hint": "partially_matched",
+    "references": [
+      {
+        "title": "공식/한국인터넷진흥원(KISA) 보호나라",
+        "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=71909",
+        "publisher": "boho.or.kr",
+        "published_at": "2025-11-28",
+        "source_type": "gov"
+      }
     ],
-    "question": "이 글을 보낸 곳이 어느 기관인지 적혀 있나요? 그 기관 이름을 인터넷에 검색해서 공식 홈페이지가 나오는지 한번 확인해 봐주세요.",
-    "why": "공식 자료에서 같은 내용을 찾지 못했기 때문에, 글을 보낸 기관이 실제로 있는지부터 확인하면 도움이 됩니다.",
-    "dialogue_evidence_refs_count": 0,
+    "references_count": 1,
+    "signals": [
+      "similar_scam_case"
+    ],
+    "question": "이 글에 안내된 신청 기관이나 담당 부서 이름이 정확히 적혀 있나요? 있다면 그 기관의 공식 홈페이지나 전화번호로 직접 확인해 보실 수 있을까요?",
+    "why": "기관 이름과 연락처를 스스로 확인하면 이 안내가 실제 공식 절차인지 가늠하는 데 도움이 됩니다.",
+    "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:03:45.443387+00:00",
+    "t_end": "2026-07-30T14:43:54.339844+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -131,9 +185,9 @@
     "기대판단": "정상",
     "입력채널": "링크",
     "제시문구": "독립유공자 제수비 지급 복지서비스 안내입니다.",
-    "t_start": "2026-07-30T15:03:45.943522+00:00",
+    "t_start": "2026-07-30T14:43:54.839985+00:00",
     "실패": false,
-    "check_id": "chk_56591a1986",
+    "check_id": "chk_ce02ed4376",
     "masked": false,
     "verdict_hint": "no_source_found",
     "references": [],
@@ -142,11 +196,11 @@
       "source_missing",
       "no_official_source"
     ],
-    "question": "이 글 어디에 이 안내를 보낸 기관 이름(예: 국가보훈부, 주민센터 등)이 적혀 있나요? 한번 글을 다시 살펴봐 주세요.",
-    "why": "공식 자료에서 같은 내용을 찾지 못했기 때문에, 먼저 글에 발표 기관이 명확히 있는지 확인하는 것이 중요합니다.",
+    "question": "이 글에 '독립유공자 제수비'를 준다고 한 곳이 어느 기관인지 적혀 있나요? 보훈 관련 업무는 국가보훈부에서 하니, 글 안에 그 이름이 있는지 살펴봐 주세요.",
+    "why": "발표 기관이 적혀있지 않고 공식 자료에서도 같은 내용을 찾지 못해, 출처부터 확인하는 것이 중요합니다.",
     "dialogue_evidence_refs_count": 0,
     "is_final": false,
-    "t_end": "2026-07-30T15:03:50.876042+00:00",
+    "t_end": "2026-07-30T14:43:59.863676+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -157,9 +211,9 @@
     "기대판단": "정상",
     "입력채널": "음성",
     "제시문구": "산재근로자 사회심리재활지원의 공식 안내와 문의처를 확인하세요.",
-    "t_start": "2026-07-30T15:03:51.376662+00:00",
+    "t_start": "2026-07-30T14:44:00.363849+00:00",
     "실패": false,
-    "check_id": "chk_9b739db9bf",
+    "check_id": "chk_6bee87363c",
     "masked": false,
     "verdict_hint": "no_source_found",
     "references": [],
@@ -167,11 +221,11 @@
     "signals": [
       "no_official_source"
     ],
-    "question": "이 글에 나온 '산재근로자 사회심리재활지원'을 안내하는 기관 이름이나 전화번호가 적혀 있나요? 근로복지공단 홈페이지에서 같은 이름의 사업을 직접 검색해 보시면 좋을 것 같아요.",
-    "why": "제공된 자료에서는 이 내용과 똑같은 공식 안내문을 찾지 못했어서, 발신 기관을 직접 확인해보는 것이 도움이 됩니다.",
+    "question": "이 글에서 안내하는 문의처(전화번호나 기관명)가 근로복지공단과 같은 공식 기관 이름으로 되어 있나요? 먼저 글 안에서 연락처와 기관 이름을 찾아봐 주세요.",
+    "why": "공식 자료에서 같은 내용을 찾지 못했기 때문에, 글에 적힌 연락처가 실제 공식 기관 것인지부터 확인하는 것이 중요합니다.",
     "dialogue_evidence_refs_count": 0,
     "is_final": false,
-    "t_end": "2026-07-30T15:03:56.752394+00:00",
+    "t_end": "2026-07-30T14:44:05.535345+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -182,9 +236,9 @@
     "기대판단": "정상",
     "입력채널": "사진",
     "제시문구": "노인복지민간단체지원 사업의 공식 서비스 설명입니다.",
-    "t_start": "2026-07-30T15:03:57.252535+00:00",
+    "t_start": "2026-07-30T14:44:06.035471+00:00",
     "실패": false,
-    "check_id": "chk_ee75d4d785",
+    "check_id": "chk_22a6c79813",
     "masked": false,
     "verdict_hint": "no_source_found",
     "references": [],
@@ -192,11 +246,11 @@
     "signals": [
       "no_official_source"
     ],
-    "question": "이 글을 어디서 받으셨는지, 그리고 발표한 기관 이름이 정확히 적혀 있는지 한번 찾아봐 주세요.",
-    "why": "공식 자료에서 같은 내용을 찾지 못했기 때문에, 먼저 어느 기관이 발표했는지 확인하는 것이 도움이 됩니다.",
+    "question": "이 글에 나온 '노인복지민간단체지원 사업'을 인터넷에서 검색하면 정부나 지자체 공식 홈페이지가 나오는지 한번 찾아봐 주세요. 어느 기관에서 하는 사업인지 이름이 적혀 있는지도 봐주세요.",
+    "why": "공식 자료에서 같은 내용을 찾지 못했기 때문에, 사업을 운영하는 기관이 실제로 있는지부터 확인하는 것이 도움이 됩니다.",
     "dialogue_evidence_refs_count": 0,
     "is_final": false,
-    "t_end": "2026-07-30T15:04:01.598499+00:00",
+    "t_end": "2026-07-30T14:44:11.921257+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -207,9 +261,9 @@
     "기대판단": "정상",
     "입력채널": "링크",
     "제시문구": "실종아동 등 보호 및 지원에 관한 복지서비스 공식 안내입니다.",
-    "t_start": "2026-07-30T15:04:02.098646+00:00",
+    "t_start": "2026-07-30T14:44:12.421394+00:00",
     "실패": false,
-    "check_id": "chk_f399b30f77",
+    "check_id": "chk_7493a3ae63",
     "masked": false,
     "verdict_hint": "no_source_found",
     "references": [],
@@ -217,11 +271,11 @@
     "signals": [
       "no_official_source"
     ],
-    "question": "이 글에 '실종아동 등 보호 및 지원에 관한 복지서비스'라고 적혀 있는데, 어느 기관에서 보낸 안내인지 글 안에 적혀 있나요?",
-    "why": "공식 자료에서 같은 내용을 찾지 못했기 때문에, 보낸 기관이 어디인지부터 확인해 보는 것이 좋습니다.",
+    "question": "이 글에 이 안내를 보낸 기관 이름과 전화번호가 적혀 있나요? 있다면 그 기관이 실제로 존재하는 곳인지 검색해서 확인해 보세요.",
+    "why": "공식 자료에서 같은 내용을 찾지 못했기 때문에, 글 자체에 있는 발신 정보부터 확인하는 것이 도움이 됩니다.",
     "dialogue_evidence_refs_count": 0,
     "is_final": false,
-    "t_end": "2026-07-30T15:04:06.721984+00:00",
+    "t_end": "2026-07-30T14:44:17.714735+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -232,11 +286,11 @@
     "기대판단": "정상",
     "입력채널": "음성",
     "제시문구": "시간제보육 지원의 대상과 이용 방법은 복지로 공식 원문에서 확인할 수 있습니다.",
-    "t_start": "2026-07-30T15:04:07.222125+00:00",
+    "t_start": "2026-07-30T14:44:18.214897+00:00",
     "실패": false,
-    "check_id": "chk_baf2eff8c6",
+    "check_id": "chk_93e864e713",
     "masked": false,
-    "verdict_hint": "needs_check",
+    "verdict_hint": "partially_matched",
     "references": [
       {
         "title": "2025 디지털정보격차 실태조사",
@@ -244,18 +298,34 @@
         "publisher": "한국지능정보사회진흥원",
         "published_at": "2025",
         "source_type": "gov"
+      },
+      {
+        "title": "공식/한국인터넷진흥원(KISA) 보호나라",
+        "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=71909",
+        "publisher": "boho.or.kr",
+        "published_at": "2025-11-28",
+        "source_type": "gov"
+      },
+      {
+        "title": "공식/서울특별시·희망회복자금 선정대상 문자 클릭 주의",
+        "url": "https://mediahub.seoul.go.kr/archives/2003302",
+        "publisher": "mediahub.seoul.go.kr",
+        "published_at": "2021-11-26",
+        "source_type": "gov"
       }
     ],
-    "references_count": 1,
+    "references_count": 3,
     "signals": [
       "official_source_found",
-      "official_source_found"
+      "official_source_found",
+      "similar_scam_case",
+      "similar_scam_case"
     ],
-    "question": "이 글에서 말하는 '시간제보육 지원'의 대상과 신청 방법이 실제 복지로 홈페이지 원문과 같은 내용인지 한번 찾아봐 주세요. 글에는 '복지로 공식 원문'이라고만 적혀 있고 정확한 주소는 없는데, 직접 검색해서 비교해보실 수 있을까요?",
-    "why": "글에 나온 출처 이름과 실제로 참고할 수 있는 자료가 다르면, 원래 기관 홈페이지에서 직접 확인하는 것이 가장 정확합니다.",
+    "question": "이 글에서 '복지로 공식 원문'이라는 말이 실제 링크나 사이트 주소와 함께 적혀 있나요? 글 안에서 그 주소를 한번 찾아봐 주세요.",
+    "why": "글이 진짜 공식 자료를 가리키는지 확인하려면, 말로만 하지 말고 실제 주소가 있는지 먼저 보는 게 중요합니다.",
     "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:04:13.750552+00:00",
+    "t_end": "2026-07-30T14:44:23.120011+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -266,9 +336,9 @@
     "기대판단": "의심",
     "입력채널": "문자",
     "제시문구": "정부 생활안정지원금 대상자로 선정되었습니다. 오늘 안에 링크를 눌러 주민번호와 계좌번호를 입력하세요.",
-    "t_start": "2026-07-30T15:04:14.250736+00:00",
+    "t_start": "2026-07-30T14:44:23.620157+00:00",
     "실패": false,
-    "check_id": "chk_adf01b7047",
+    "check_id": "chk_e5461b7698",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
@@ -293,11 +363,11 @@
       "similar_scam_case",
       "similar_scam_case"
     ],
-    "question": "이 글에 있는 링크 주소가 정부 공식 누리집 주소(예: go.kr로 끝나는 주소)와 같은지 한번 확인해 보시겠어요?",
-    "why": "링크 주소가 정부 공식 주소와 다르면, 계좌번호나 주민번호를 입력하기 전에 다시 생각해볼 신호가 됩니다.",
+    "question": "이 글에서 '오늘 안에', '주민번호와 계좌번호 입력'을 요구하고 있는데, 이런 정보를 요구하는 곳이 어디인지 문자나 링크 안에 정확한 기관 이름이 적혀 있나요?",
+    "why": "진짜 정부 지원금은 링크로 주민번호나 계좌번호를 바로 입력하라고 요구하지 않는 경우가 많아서, 요구하는 방식부터 확인하면 좋습니다.",
     "dialogue_evidence_refs_count": 2,
     "is_final": false,
-    "t_end": "2026-07-30T15:04:19.115310+00:00",
+    "t_end": "2026-07-30T14:44:28.837268+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -308,9 +378,9 @@
     "기대판단": "의심",
     "입력채널": "음성",
     "제시문구": "시청 복지과입니다. 지원금 환급을 위해 안전계좌로 수수료를 먼저 보내세요.",
-    "t_start": "2026-07-30T15:04:19.615445+00:00",
+    "t_start": "2026-07-30T14:44:29.337494+00:00",
     "실패": false,
-    "check_id": "chk_9b4da982bb",
+    "check_id": "chk_0a4e638df9",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
@@ -327,11 +397,11 @@
       "contact_in_image",
       "similar_scam_case"
     ],
-    "question": "시청 복지과에서 정말 '먼저 돈을 보내라'고 안내하는지, 글에 적힌 번호 말고 시청 대표번호로 직접 전화해서 확인해 보셨나요?",
-    "why": "공공기관은 환급이나 지원금을 준다면서 먼저 돈을 보내라고 요구하지 않기 때문에, 진짜 기관인지 직접 확인하는 것이 중요합니다.",
+    "question": "시청 복지과에서 정말 '수수료를 먼저 계좌로 보내라'고 요구할까요? 시청 대표번호로 직접 전화해서 이 안내가 맞는지 확인해 보시겠어요?",
+    "why": "공공기관은 환급을 이유로 먼저 돈을 요구하지 않으니, 실제 시청에 직접 확인하면 판단에 도움이 됩니다.",
     "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:04:25.152453+00:00",
+    "t_end": "2026-07-30T14:44:35.824046+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -342,9 +412,9 @@
     "기대판단": "의심",
     "입력채널": "링크",
     "제시문구": "정부24 미수령 환급금 확인 gov24-refund-event.com",
-    "t_start": "2026-07-30T15:04:25.652601+00:00",
+    "t_start": "2026-07-30T14:44:36.324181+00:00",
     "실패": false,
-    "check_id": "chk_1a471d6075",
+    "check_id": "chk_9d62bf3345",
     "masked": false,
     "verdict_hint": "no_source_found",
     "references": [],
@@ -356,13 +426,13 @@
     "why": "누가 말한 내용인지부터 확인하면 나머지 판단이 훨씬 쉬워집니다.",
     "dialogue_evidence_refs_count": 0,
     "is_final": false,
-    "t_end": "2026-07-30T15:04:37.302536+00:00",
+    "t_end": "2026-07-30T14:44:47.582079+00:00",
     "재생성_횟수": 3,
     "재생성_사유": [
       {
         "attempt": "1",
         "reason": "too_long",
-        "detail": "4문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
+        "detail": "3문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
       },
       {
         "attempt": "2",
@@ -383,9 +453,9 @@
     "기대판단": "의심",
     "입력채널": "사진",
     "제시문구": "국민연금 추가 지급 대상. 신분증 사진을 카카오톡으로 보내면 즉시 접수됩니다.",
-    "t_start": "2026-07-30T15:04:37.802715+00:00",
+    "t_start": "2026-07-30T14:44:48.082217+00:00",
     "실패": false,
-    "check_id": "chk_06b68fb30e",
+    "check_id": "chk_c1de0ce80f",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
@@ -397,10 +467,10 @@
         "source_type": "gov"
       },
       {
-        "title": "공식/금융위원회·통장협박 등 신·변종 보이스피싱 피해구제 절차",
-        "url": "https://www.fsc.go.kr/po010107/81640",
-        "publisher": "fsc.go.kr",
-        "published_at": "2024-02-01",
+        "title": "공식/한국인터넷진흥원(KISA) 보호나라",
+        "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=71909",
+        "publisher": "boho.or.kr",
+        "published_at": "2025-11-28",
         "source_type": "gov"
       }
     ],
@@ -409,11 +479,11 @@
       "similar_scam_case",
       "similar_scam_case"
     ],
-    "question": "이 글에서 국민연금공단의 공식 전화번호나 홈페이지 주소가 적혀 있나요? 그리고 신분증 사진을 카카오톡 같은 곳으로 보내달라고 한 적이 실제로 있었는지 한번 생각해봐 주세요.",
-    "why": "진짜 기관은 카카오톡으로 신분증 사진을 요구하지 않으니, 이 부분만 확인해도 큰 도움이 됩니다.",
+    "question": "이 글에서 신분증 사진을 카카오톡으로 보내라고 한 곳이, 국민연금공단의 공식 채널(홈페이지나 공식 앱)이 맞는지 한번 확인해 보시겠어요?",
+    "why": "공공기관은 보통 개인 카카오톡으로 신분증 사진을 받지 않기 때문에, 보낸 곳이 공식 채널인지 확인하면 판단에 도움이 됩니다.",
     "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:04:43.004754+00:00",
+    "t_end": "2026-07-30T14:44:57.370978+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -424,9 +494,9 @@
     "기대판단": "의심",
     "입력채널": "문자",
     "제시문구": "보건복지부 긴급 난방비 50만원 지급. 30분 안에 신청하지 않으면 소멸됩니다.",
-    "t_start": "2026-07-30T15:04:43.504912+00:00",
+    "t_start": "2026-07-30T14:44:57.871100+00:00",
     "실패": false,
-    "check_id": "chk_2bbe0c381a",
+    "check_id": "chk_a008853176",
     "masked": false,
     "verdict_hint": "no_source_found",
     "references": [],
@@ -435,11 +505,11 @@
       "urgency_pressure",
       "no_official_source"
     ],
-    "question": "이 글에 나온 '보건복지부'를 검색창에 직접 쳐서, 진짜 보건복지부 홈페이지에 같은 내용이 있는지 한번 찾아봐 주시겠어요?",
-    "why": "공식 기관 이름이 적혀 있어도 실제 그 기관 발표인지 직접 확인해보는 것이 중요합니다.",
+    "question": "이 글에서 '30분 안에 신청'이라고 서두르게 하는데, 실제로 보건복지부 홈페이지나 전화(129)에서 같은 안내를 찾을 수 있는지 확인해 보셨나요?",
+    "why": "시간을 재촉하는 글은 먼저 공식 기관에서 같은 내용을 확인하는 것이 안전합니다.",
     "dialogue_evidence_refs_count": 0,
     "is_final": false,
-    "t_end": "2026-07-30T15:04:48.061363+00:00",
+    "t_end": "2026-07-30T14:45:04.334583+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -450,9 +520,9 @@
     "기대판단": "의심",
     "입력채널": "음성",
     "제시문구": "경찰청입니다. 사건에 연루됐으니 통화를 끊지 말고 앱을 설치하세요.",
-    "t_start": "2026-07-30T15:04:48.561507+00:00",
+    "t_start": "2026-07-30T14:45:04.834732+00:00",
     "실패": false,
-    "check_id": "chk_2272d0ca4d",
+    "check_id": "chk_996693f883",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
@@ -476,19 +546,13 @@
       "similar_scam_case",
       "similar_scam_case"
     ],
-    "question": "전화를 건 사람이 정말 경찰인지, 지금 전화를 끊고 경찰서 대표번호로 직접 걸어서 확인해 보셨나요?",
-    "why": "공식 기관은 전화를 끊고 다시 확인해도 문제가 없는지 스스로 점검해 보시면 도움이 됩니다.",
+    "question": "전화를 건 사람이 경찰이라면, 전화를 끊고 진짜 경찰서 대표번호로 다시 걸어서 확인할 수 있을까요? 앱 설치는 잠시 미뤄두고 먼저 확인해보는 건 어떨까요?",
+    "why": "진짜 경찰이나 기관은 전화를 끊지 못하게 하거나 앱 설치를 요구하지 않는 경우가 많아서, 직접 확인해보는 것이 도움이 됩니다.",
     "dialogue_evidence_refs_count": 2,
     "is_final": false,
-    "t_end": "2026-07-30T15:04:58.891359+00:00",
-    "재생성_횟수": 1,
-    "재생성_사유": [
-      {
-        "attempt": "1",
-        "reason": "forbidden_word",
-        "detail": "why 에 판정 표현 '사기' 이(가) 있습니다."
-      }
-    ],
+    "t_end": "2026-07-30T14:45:10.883392+00:00",
+    "재생성_횟수": 0,
+    "재생성_사유": [],
     "폴백_발생": false
   },
   {
@@ -497,9 +561,9 @@
     "기대판단": "의심",
     "입력채널": "사진",
     "제시문구": "한국사회보장정보원 특별지원금 당첨. 인증비 3만원 입금 후 지급됩니다.",
-    "t_start": "2026-07-30T15:04:59.391498+00:00",
+    "t_start": "2026-07-30T14:45:11.383557+00:00",
     "실패": false,
-    "check_id": "chk_9752741d5f",
+    "check_id": "chk_07215bb9a9",
     "masked": false,
     "verdict_hint": "no_source_found",
     "references": [],
@@ -508,11 +572,11 @@
       "contact_in_image",
       "no_official_source"
     ],
-    "question": "돈을 받기 전에 먼저 돈을 보내라고 하는 부분이 있는데, 이런 경우가 이상하다고 느껴지지 않으세요? 정말 지원금이라면 돈을 받는데 인증비를 먼저 내야 할 이유가 있을지 한번 생각해봐 주세요.",
-    "why": "진짜 지원금은 받는 사람이 먼저 돈을 낼 필요가 없는 경우가 많아서, 이 순서가 맞는지 확인하는 것이 중요합니다.",
+    "question": "돈을 받기 전에 먼저 돈을 보내라고 하는 부분이 있는데, 이런 경우가 흔한 일인지 주변 가족이나 관공서에 한번 물어보실 수 있을까요?",
+    "why": "진짜 지원금은 받기 전에 먼저 돈을 요구하지 않는 경우가 많아서, 이 부분을 확인해보는 것이 도움이 됩니다.",
     "dialogue_evidence_refs_count": 0,
     "is_final": false,
-    "t_end": "2026-07-30T15:05:04.572796+00:00",
+    "t_end": "2026-07-30T14:45:17.333447+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -523,40 +587,38 @@
     "기대판단": "의심",
     "입력채널": "링크",
     "제시문구": "건강보험료 환급 신청 nhis-refund24.com",
-    "t_start": "2026-07-30T15:05:05.072948+00:00",
+    "t_start": "2026-07-30T14:45:17.833624+00:00",
     "실패": false,
-    "check_id": "chk_978d912f25",
+    "check_id": "chk_763f28f5aa",
     "masked": false,
-    "verdict_hint": "no_source_found",
-    "references": [],
-    "references_count": 0,
-    "signals": [
-      "no_official_source"
+    "verdict_hint": "partially_matched",
+    "references": [
+      {
+        "title": "공식/한국인터넷진흥원(KISA) 보호나라",
+        "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=71909",
+        "publisher": "boho.or.kr",
+        "published_at": "2025-11-28",
+        "source_type": "gov"
+      }
     ],
-    "question": "이 글에 적힌 내용을 어느 기관에서 발표했는지 글 안에서 한번 찾아봐 주시겠어요? 기관 이름이 보이지 않는다면 그것만으로도 한 번 더 확인해 볼 신호입니다.",
-    "why": "누가 말한 내용인지부터 확인하면 나머지 판단이 훨씬 쉬워집니다.",
-    "dialogue_evidence_refs_count": 0,
+    "references_count": 1,
+    "signals": [
+      "similar_scam_case"
+    ],
+    "question": "이 글의 주소 nhis-refund24.com이 국민건강보험공단 공식 주소와 같은지 비교해봐 주시겠어요?",
+    "why": "공식 주소와 다르면 확인에 도움이 됩니다.",
+    "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:05:17.394236+00:00",
-    "재생성_횟수": 3,
+    "t_end": "2026-07-30T14:45:27.709440+00:00",
+    "재생성_횟수": 1,
     "재생성_사유": [
       {
         "attempt": "1",
         "reason": "too_long",
         "detail": "4문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
-      },
-      {
-        "attempt": "2",
-        "reason": "too_long",
-        "detail": "3문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
-      },
-      {
-        "attempt": "3",
-        "reason": "too_long",
-        "detail": "3문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
       }
     ],
-    "폴백_발생": true
+    "폴백_발생": false
   },
   {
     "case_id": "S09",
@@ -564,24 +626,24 @@
     "기대판단": "의심",
     "입력채널": "문자",
     "제시문구": "기초연금 미수령분 지급을 위해 휴대폰 인증번호를 회신하세요.",
-    "t_start": "2026-07-30T15:05:17.894379+00:00",
+    "t_start": "2026-07-30T14:45:28.209585+00:00",
     "실패": false,
-    "check_id": "chk_dae400c492",
+    "check_id": "chk_e3bbae8c31",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
-      {
-        "title": "공식/한국인터넷진흥원(KISA)·SNS·소셜커머스 등 계정정보 탈취 스미싱 주의 권고",
-        "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=71555&pageIndex=1",
-        "publisher": "boho.or.kr",
-        "published_at": "2024-09-19",
-        "source_type": "gov"
-      },
       {
         "title": "공식/한국인터넷진흥원(KISA) 보호나라",
         "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=72060&pageIndex=1&searchCnd=&searchWrd=",
         "publisher": "boho.or.kr",
         "published_at": "2026-05-21",
+        "source_type": "gov"
+      },
+      {
+        "title": "공식/한국인터넷진흥원(KISA)·SNS·소셜커머스 등 계정정보 탈취 스미싱 주의 권고",
+        "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=71555&pageIndex=1",
+        "publisher": "boho.or.kr",
+        "published_at": "2024-09-19",
         "source_type": "gov"
       }
     ],
@@ -591,11 +653,11 @@
       "similar_scam_case",
       "similar_scam_case"
     ],
-    "question": "이 글에서 인증번호를 요청한 곳이 정부 기관이라는 이름이나 전화번호가 적혀 있나요? 먼저 어디서 보낸 문자인지 확인해봐 주세요.",
-    "why": "진짜 기관인지 아닌지는 보낸 곳이 명확히 밝혀져 있는지부터 살펴보는 것이 첫 걸음입니다.",
-    "dialogue_evidence_refs_count": 1,
+    "question": "이 글에 휴대폰 인증번호를 받으려는 이유와 보낸 기관 이름이 정확히 적혀 있나요? 문자 전체를 다시 한번 살펴봐 주세요.",
+    "why": "진짜 기초연금 안내라면 인증번호를 문자로 회신하라고 하지 않기 때문에, 기관 이름과 요청 방식부터 확인하는 것이 중요합니다.",
+    "dialogue_evidence_refs_count": 2,
     "is_final": false,
-    "t_end": "2026-07-30T15:05:24.194810+00:00",
+    "t_end": "2026-07-30T14:45:33.814213+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -606,24 +668,24 @@
     "기대판단": "의심",
     "입력채널": "음성",
     "제시문구": "금융감독원 보호조치입니다. 예금을 모두 지정 계좌로 옮겨야 합니다.",
-    "t_start": "2026-07-30T15:05:24.694982+00:00",
+    "t_start": "2026-07-30T14:45:34.314372+00:00",
     "실패": false,
-    "check_id": "chk_210d250288",
+    "check_id": "chk_25a8c4b655",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
+      {
+        "title": "공식/서울특별시·희망회복자금 선정대상 문자 클릭 주의",
+        "url": "https://mediahub.seoul.go.kr/archives/2003302",
+        "publisher": "mediahub.seoul.go.kr",
+        "published_at": "2021-11-26",
+        "source_type": "gov"
+      },
       {
         "title": "공식/금융위원회",
         "url": "https://www.fsc.go.kr/no040101?cnId=1610",
         "publisher": "fsc.go.kr",
         "published_at": "2023-03-09",
-        "source_type": "gov"
-      },
-      {
-        "title": "공식/금융위원회·통장협박 등 신·변종 보이스피싱 피해구제 절차",
-        "url": "https://www.fsc.go.kr/po010107/81640",
-        "publisher": "fsc.go.kr",
-        "published_at": "2024-02-01",
         "source_type": "gov"
       }
     ],
@@ -633,11 +695,11 @@
       "similar_scam_case",
       "similar_scam_case"
     ],
-    "question": "금융감독원이 실제로 예금을 다른 계좌로 옮기라고 전화나 문자로 요청할까요? 공식 홈페이지에서 이런 안내가 있는지 먼저 찾아봐 주세요.",
-    "why": "공공기관은 전화로 계좌 이체를 요구하지 않는 경우가 많아서, 이 부분부터 확인하면 도움이 됩니다.",
-    "dialogue_evidence_refs_count": 2,
+    "question": "금융감독원이 실제로 개인에게 '계좌를 옮기라'고 전화나 문자로 요구할까요? 금융위원회 공식 사이트에서 이런 안내가 있는지 한번 확인해 봐 주세요.",
+    "why": "공공기관은 보통 전화나 문자로 계좌 이동을 요구하지 않기 때문에, 실제 안내가 있는지부터 확인하면 도움이 됩니다.",
+    "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:05:30.080625+00:00",
+    "t_end": "2026-07-30T14:45:39.415981+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -648,9 +710,9 @@
     "기대판단": "확인불가",
     "입력채널": "문자",
     "제시문구": "노후준비서비스 무료 상담 안내입니다. 자세한 내용은 복지로에서 확인하세요. 단축 링크가 함께 제공됨.",
-    "t_start": "2026-07-30T15:05:30.580790+00:00",
+    "t_start": "2026-07-30T14:45:39.916120+00:00",
     "실패": false,
-    "check_id": "chk_eed4e70b49",
+    "check_id": "chk_42b84ef417",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
@@ -674,17 +736,22 @@
       "similar_scam_case",
       "similar_scam_case"
     ],
-    "question": "글에 있는 '복지로' 주소가 단축 링크 말고, 원래 주소로도 함께 적혀 있나요?",
-    "why": "단축 링크는 어디로 연결되는지 미리 알기 어렵기 때문입니다.",
-    "dialogue_evidence_refs_count": 1,
+    "question": "글에 있는 링크가 짧게 줄인 주소인가요, 아니면 복지로 공식 주소가 그대로 보이나요?",
+    "why": "링크 모양을 보면 확인에 도움이 됩니다.",
+    "dialogue_evidence_refs_count": 2,
     "is_final": false,
-    "t_end": "2026-07-30T15:05:40.356118+00:00",
-    "재생성_횟수": 1,
+    "t_end": "2026-07-30T14:45:54.247802+00:00",
+    "재생성_횟수": 2,
     "재생성_사유": [
       {
         "attempt": "1",
         "reason": "too_long",
-        "detail": "5문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
+        "detail": "3문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
+      },
+      {
+        "attempt": "2",
+        "reason": "too_long",
+        "detail": "3문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
       }
     ],
     "폴백_발생": false
@@ -695,21 +762,37 @@
     "기대판단": "확인불가",
     "입력채널": "사진",
     "제시문구": "주거상향 지원 신청 기간이 연장되었습니다. 주민센터에 문의하세요. 발행기관과 날짜가 잘림.",
-    "t_start": "2026-07-30T15:05:40.856245+00:00",
+    "t_start": "2026-07-30T14:45:54.747936+00:00",
     "실패": false,
-    "check_id": "chk_890a274ec6",
+    "check_id": "chk_a58b1358f0",
     "masked": false,
-    "verdict_hint": "no_source_found",
-    "references": [],
-    "references_count": 0,
-    "signals": [
-      "no_official_source"
+    "verdict_hint": "partially_matched",
+    "references": [
+      {
+        "title": "공식/대한민국 정책브리핑(KTV)·국민지원금 사칭 스미싱 주의",
+        "url": "https://www.korea.kr/news/policyNewsView.do?newsId=148892926",
+        "publisher": "korea.kr",
+        "published_at": "2021-09-09",
+        "source_type": "unknown"
+      },
+      {
+        "title": "공식/한국인터넷진흥원(KISA) 보호나라",
+        "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=71909",
+        "publisher": "boho.or.kr",
+        "published_at": "2025-11-28",
+        "source_type": "gov"
+      }
     ],
-    "question": "이 글에는 어느 기관에서 언제 발표했는지 나와 있지 않아요. 글을 처음 받은 곳(문자, 카톡, 게시판)에서 발행 기관 이름을 다시 한번 찾아봐 주시겠어요?",
-    "why": "발행 기관과 날짜가 없으면 진짜 공지인지 확인하기 어려우니, 출처부터 찾아보는 것이 좋습니다.",
-    "dialogue_evidence_refs_count": 0,
+    "references_count": 2,
+    "signals": [
+      "similar_scam_case",
+      "similar_scam_case"
+    ],
+    "question": "이 글에는 어느 기관에서 언제 발표했는지 나와 있나요? 발행기관 이름과 날짜를 찾아봐 주세요.",
+    "why": "기관과 날짜가 빠진 안내문은 진짜인지 확인하기 어려우니, 먼저 그 정보가 있는지부터 살펴보면 좋습니다.",
+    "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:05:46.207129+00:00",
+    "t_end": "2026-07-30T14:46:00.418252+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -720,29 +803,37 @@
     "기대판단": "확인불가",
     "입력채널": "음성",
     "제시문구": "복지 담당자라고 하는 사람이 지원 대상일 수 있으니 주민센터에 방문해 확인하라고 안내함.",
-    "t_start": "2026-07-30T15:05:46.707281+00:00",
+    "t_start": "2026-07-30T14:46:00.918405+00:00",
     "실패": false,
-    "check_id": "chk_59ac23f0c8",
+    "check_id": "chk_828c482f2a",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
       {
         "title": "공식/한국인터넷진흥원(KISA) 보호나라",
-        "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205021&nttId=72036&pageIndex=1",
+        "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=71909",
         "publisher": "boho.or.kr",
-        "published_at": "2026-04-28",
+        "published_at": "2025-11-28",
+        "source_type": "gov"
+      },
+      {
+        "title": "공식/금융위원회",
+        "url": "https://www.fsc.go.kr/no040101?cnId=1610",
+        "publisher": "fsc.go.kr",
+        "published_at": "2023-03-09",
         "source_type": "gov"
       }
     ],
-    "references_count": 1,
+    "references_count": 2,
     "signals": [
+      "similar_scam_case",
       "similar_scam_case"
     ],
-    "question": "그 사람이 말한 전화번호나 소속이 아니라, 사용자분이 직접 찾은 주민센터 대표번호로 다시 전화해서 확인해 보실 수 있을까요?",
-    "why": "연락처를 상대방이 알려준 대로 쓰면, 진짜 기관이 아닌 곳으로 연결될 수 있어서 직접 찾은 번호로 확인하는 것이 안전합니다.",
+    "question": "그 사람이 전화나 문자로 준 번호가 아니라, 사용자님이 직접 114나 인터넷에서 찾은 주민센터 번호로 전화해서 그런 안내를 한 담당자가 있는지 물어보실 수 있을까요?",
+    "why": "연락처를 상대방이 알려준 것인지, 직접 찾은 것인지에 따라 진위를 확인하는 방법이 달라지기 때문입니다.",
     "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:05:53.412834+00:00",
+    "t_end": "2026-07-30T14:46:07.109783+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -753,21 +844,29 @@
     "기대판단": "확인불가",
     "입력채널": "링크",
     "제시문구": "블로그에 2024년 기초연금 신청 조건이 정리되어 있고 공식 링크도 포함되어 있음.",
-    "t_start": "2026-07-30T15:05:53.912957+00:00",
+    "t_start": "2026-07-30T14:46:07.609955+00:00",
     "실패": false,
-    "check_id": "chk_99c24e643f",
+    "check_id": "chk_1850cb3d21",
     "masked": false,
-    "verdict_hint": "no_source_found",
-    "references": [],
-    "references_count": 0,
-    "signals": [
-      "no_official_source"
+    "verdict_hint": "partially_matched",
+    "references": [
+      {
+        "title": "공식/한국인터넷진흥원(KISA) 보호나라",
+        "url": "https://www.boho.or.kr/kr/bbs/view.do?bbsId=B0000133&menuNo=205020&nttId=71909",
+        "publisher": "boho.or.kr",
+        "published_at": "2025-11-28",
+        "source_type": "gov"
+      }
     ],
-    "question": "블로그 글 속 '공식 링크'를 눌러보면 주소 끝이 go.kr로 되어 있나요?",
-    "why": "공식 자료에서 같은 내용을 찾지 못했기 때문에, 링크 주소부터 확인해보면 좋습니다.",
-    "dialogue_evidence_refs_count": 0,
+    "references_count": 1,
+    "signals": [
+      "similar_scam_case"
+    ],
+    "question": "블로그 글에 있는 '공식 링크'를 눌러보면 정부 주소(go.kr)로 연결되나요?",
+    "why": "실제 정부 사이트인지 주소부터 확인하면 판단에 도움이 됩니다.",
+    "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:06:02.736676+00:00",
+    "t_end": "2026-07-30T14:46:17.157234+00:00",
     "재생성_횟수": 1,
     "재생성_사유": [
       {
@@ -784,9 +883,9 @@
     "기대판단": "확인불가",
     "입력채널": "문자",
     "제시문구": "건강보험공단 검진 안내입니다. 링크 없이 공식 대표번호로 문의하라고 적혀 있음.",
-    "t_start": "2026-07-30T15:06:03.236836+00:00",
+    "t_start": "2026-07-30T14:46:17.657379+00:00",
     "실패": false,
-    "check_id": "chk_2077b5b20f",
+    "check_id": "chk_9cbefb3dea",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
@@ -802,11 +901,11 @@
     "signals": [
       "similar_scam_case"
     ],
-    "question": "이 글에 적힌 전화번호가 국민건강보험공단 공식 대표번호(1577-1000)와 같은지 한번 비교해 봐 주세요. 글에 적힌 번호를 직접 누르지 마시고, 번호만 눈으로 확인해 보시면 됩니다.",
-    "why": "공식 기관을 사칭할 때는 전화번호나 발신 방식을 조금 다르게 쓰는 경우가 많아서, 번호부터 비교해보는 것이 안전합니다.",
+    "question": "이 글에서 알려준 전화번호 말고, 건강보험공단 카드 뒷면이나 공식 홈페이지에 적힌 대표번호로 직접 전화해서 검진 안내가 맞는지 확인해 보실 수 있을까요?",
+    "why": "글에 적힌 번호로 바로 거는 것보다, 따로 찾은 공식 번호로 확인하면 더 안전합니다.",
     "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:06:08.821653+00:00",
+    "t_end": "2026-07-30T14:46:23.498772+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -817,9 +916,9 @@
     "기대판단": "확인불가",
     "입력채널": "사진",
     "제시문구": "복지관 게시판의 에너지 지원금 포스터. 기관 로고는 있으나 신청 마감일이 지나 있음.",
-    "t_start": "2026-07-30T15:06:09.321839+00:00",
+    "t_start": "2026-07-30T14:46:23.998931+00:00",
     "실패": false,
-    "check_id": "chk_da1ce17a19",
+    "check_id": "chk_7db2d4cd99",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
@@ -845,10 +944,10 @@
       "similar_scam_case"
     ],
     "question": "포스터에 적힌 신청 마감일이 오늘보다 지난 날짜인가요? 날짜를 한번 확인해봐 주세요.",
-    "why": "마감일이 이미 지났다면, 왜 아직도 게시판에 붙어있는지 복지관에 직접 물어보는 게 도움이 됩니다.",
+    "why": "마감일이 이미 지났다면 그 포스터가 최신 정보인지부터 확인할 필요가 있습니다.",
     "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:06:13.706693+00:00",
+    "t_end": "2026-07-30T14:46:29.534919+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -859,9 +958,9 @@
     "기대판단": "확인불가",
     "입력채널": "음성",
     "제시문구": "은행 직원이 정부지원 대출상품을 설명하고 지점 방문 상담을 권함.",
-    "t_start": "2026-07-30T15:06:14.206879+00:00",
+    "t_start": "2026-07-30T14:46:30.035087+00:00",
     "실패": false,
-    "check_id": "chk_8238b44541",
+    "check_id": "chk_2fe9b66a17",
     "masked": false,
     "verdict_hint": "no_source_found",
     "references": [],
@@ -869,11 +968,11 @@
     "signals": [
       "no_official_source"
     ],
-    "question": "이 대출상품이 '정부지원'이라면 상품 이름이나 관련 정부기관 이름이 안내문에 적혀 있나요? 은행 이름 말고 정부기관 이름을 찾아봐 주세요.",
-    "why": "정부지원 상품은 보통 정확한 상품명과 담당 기관이 함께 안내되는데, 공식 자료에서 같은 내용을 찾지 못했습니다.",
+    "question": "이 대출상품 이름을 정확히 적어서, 은행 이름과 함께 인터넷에 검색해 보셨나요? 정부지원 상품이라면 보통 정부나 은행 공식 홈페이지에 안내가 나와 있습니다.",
+    "why": "공식 자료에서 같은 상품을 찾지 못했기 때문에, 이름과 은행을 함께 확인하면 실제 존재하는 상품인지 알 수 있습니다.",
     "dialogue_evidence_refs_count": 0,
     "is_final": false,
-    "t_end": "2026-07-30T15:06:19.454766+00:00",
+    "t_end": "2026-07-30T14:46:36.065576+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -884,9 +983,9 @@
     "기대판단": "확인불가",
     "입력채널": "링크",
     "제시문구": "유튜브 영상이 공공지원금 신청법을 설명하며 설명란에 복지로 링크를 제공함.",
-    "t_start": "2026-07-30T15:06:19.954909+00:00",
+    "t_start": "2026-07-30T14:46:36.565751+00:00",
     "실패": false,
-    "check_id": "chk_c43baa15d0",
+    "check_id": "chk_ea35f81101",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
@@ -906,7 +1005,7 @@
     "why": "누가 말한 내용인지부터 확인하면 나머지 판단이 훨씬 쉬워집니다.",
     "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:06:34.795608+00:00",
+    "t_end": "2026-07-30T14:46:50.456356+00:00",
     "재생성_횟수": 3,
     "재생성_사유": [
       {
@@ -917,7 +1016,7 @@
       {
         "attempt": "2",
         "reason": "too_long",
-        "detail": "4문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
+        "detail": "5문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
       },
       {
         "attempt": "3",
@@ -933,9 +1032,9 @@
     "기대판단": "확인불가",
     "입력채널": "문자",
     "제시문구": "동주민센터 행사 안내. 참가비는 없지만 이름과 전화번호를 문자로 회신하라고 함.",
-    "t_start": "2026-07-30T15:06:35.295764+00:00",
+    "t_start": "2026-07-30T14:46:50.956495+00:00",
     "실패": false,
-    "check_id": "chk_f1458b2d2b",
+    "check_id": "chk_dcc4d52ae9",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
@@ -945,17 +1044,25 @@
         "publisher": "korea.kr",
         "published_at": "2021-09-09",
         "source_type": "unknown"
+      },
+      {
+        "title": "공식/국세청·국세청 사칭 문자 메시지 주의 필요",
+        "url": "https://s.nts.go.kr/webtv/na/ntt/selectNttInfo.do?mi=&nttSn=1342128",
+        "publisher": "s.nts.go.kr",
+        "published_at": "2025-04-21",
+        "source_type": "gov"
       }
     ],
-    "references_count": 1,
+    "references_count": 2,
     "signals": [
+      "similar_scam_case",
       "similar_scam_case"
     ],
-    "question": "이 문자를 보낸 번호가 실제 동주민센터의 공식 전화번호와 같은지 확인해 보셨나요? 주민센터에 직접 전화해서 이런 행사 안내를 보냈는지 물어봐도 좋습니다.",
-    "why": "이름과 전화번호를 회신하라는 방식은 기관을 사칭한 문자에서 자주 쓰이는 방법이라 확인이 필요합니다.",
-    "dialogue_evidence_refs_count": 1,
+    "question": "이 문자를 보낸 번호로 직접 전화하지 마시고, 동주민센터 대표 전화번호를 찾아서 그 행사가 진짜 있는지 물어봐 주실 수 있을까요?",
+    "why": "기관을 사칭해서 이름과 전화번호 같은 개인정보를 먼저 받아가는 수법이 실제로 있었기 때문에, 공식 대표번호로 직접 확인하는 것이 안전합니다.",
+    "dialogue_evidence_refs_count": 2,
     "is_final": false,
-    "t_end": "2026-07-30T15:06:41.365275+00:00",
+    "t_end": "2026-07-30T14:46:57.140197+00:00",
     "재생성_횟수": 0,
     "재생성_사유": [],
     "폴백_발생": false
@@ -966,9 +1073,9 @@
     "기대판단": "확인불가",
     "입력채널": "사진",
     "제시문구": "정부24 화면을 촬영한 사진에 환급금 대상이라고 표시되어 있으나 주소창이 보이지 않음.",
-    "t_start": "2026-07-30T15:06:41.865404+00:00",
+    "t_start": "2026-07-30T14:46:57.640333+00:00",
     "실패": false,
-    "check_id": "chk_9231e0e16e",
+    "check_id": "chk_d0335776a9",
     "masked": false,
     "verdict_hint": "partially_matched",
     "references": [
@@ -985,19 +1092,14 @@
       "similar_scam_case"
     ],
     "question": "사진 속 화면 맨 위쪽에 인터넷 주소창이 보이시나요?",
-    "why": "진짜 정부 사이트인지 확인하는 가장 쉬운 방법은 주소를 보는 것입니다.",
+    "why": "실제 정부24 화면인지 확인하려면 주소창이 있는지부터 보는 게 도움이 됩니다.",
     "dialogue_evidence_refs_count": 1,
     "is_final": false,
-    "t_end": "2026-07-30T15:06:56.202072+00:00",
-    "재생성_횟수": 2,
+    "t_end": "2026-07-30T14:47:07.262686+00:00",
+    "재생성_횟수": 1,
     "재생성_사유": [
       {
         "attempt": "1",
-        "reason": "too_long",
-        "detail": "3문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
-      },
-      {
-        "attempt": "2",
         "reason": "too_long",
         "detail": "3문장입니다. 한 번에 한 가지만, 2문장 이내로 재생성이 필요합니다."
       }

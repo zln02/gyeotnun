@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import math
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -41,6 +42,14 @@ EVAL_SET_PATH = CORPUS_DIR / "곁눈_평가세트_30건.csv"
 RELABELED_CASES_PATH = CORPUS_DIR / "사례_20-46건_재라벨링표.csv"
 
 _SYMBOLS_RE = re.compile(r'[★☆■□▶►\[\]()!?※·,."\'…\n]+')
+
+# ---- 불용어: 어떤 공공 안내문/사기 사례 설명에도 흔히 등장해 변별력이 없는 단어.
+#   이 단어들만 겹쳐서는 match_scam_cases() 가 매칭시키지 않는다(정상 안내문까지
+#   사기 사례로 오매칭되는 문제의 원인이었다 - docs/evaluation/eval_30_report_before_stopword_fix.md §3).
+#   상수로 분리해 둔다 - 오매칭 사례가 더 발견되면 여기에만 추가하면 된다.
+STOPWORDS = {
+    "안내", "지원", "내용", "확인", "신청", "정보", "서비스", "대상", "관련",
+}
 
 # 한국어 조사. 사용자가 붙여넣는 문장엔 조사가 그대로 붙어 있어 부분일치가 잘 안 걸린다.
 # 길이가 긴 조사부터 검사해야 짧은 조사가 먼저 걸려 잘못 잘리는 일을 막는다.
@@ -277,6 +286,21 @@ log.info(
 )
 
 
+def _doc_freq(blobs: List[str]) -> dict:
+    """키워드별로 몇 개 문서(blob)에 등장하는지 센다. match_scam_cases() 의 가중치 계산용."""
+    freq: dict[str, int] = {}
+    for blob in blobs:
+        for kw in set(extract_keywords(blob)):
+            freq[kw] = freq.get(kw, 0) + 1
+    return freq
+
+
+# SCAM_CASES 안에서 흔한 단어(예: 여러 사례에 공통으로 등장하는 "계좌", "요구")일수록
+# 가중치를 낮추기 위한 문서빈도표. 코퍼스가 바뀔 때만 다시 계산하면 되므로 기동 시 1회.
+_SCAM_DOC_FREQ: dict = _doc_freq([c._blob for c in SCAM_CASES])
+_SCAM_N_DOCS: int = len(SCAM_CASES)
+
+
 def summary() -> dict:
     """기동 로그/헬스체크용 적재 현황."""
     return {
@@ -301,15 +325,51 @@ def match_evidence(text: str, limit: int = 2, min_score: int = 1) -> List[Eviden
     return [d for _, d in scored[:limit]]
 
 
-def match_scam_cases(text: str, limit: int = 2, min_score: int = 2) -> List[ScamCase]:
-    """알려진 사기 사례와 대조한다. '유사 사기'는 강한 경고 신호라 2건 이상 일치를 요구한다."""
-    kws = extract_keywords(text)
+def _keyword_weight(keyword: str) -> float:
+    """희귀한 단어일수록 점수를 높게 준다(idf류 가중치).
+
+    df(문서빈도)가 낮을수록(=SCAM_CASES 안에서 드물게 등장할수록) 그 단어가 우연히
+    겹칠 확률이 낮다는 뜻이라 변별력이 높다고 본다. +1 스무딩을 쓰는 이유는 코퍼스가
+    30건 안팎으로 작아서 df=0(전혀 안 나오는 단어)이거나 전체 문서 수 자체가 작을 때도
+    나눗셈이 안정적으로 동작하게 하기 위해서다.
+    """
+    df = _SCAM_DOC_FREQ.get(keyword, 0)
+    return math.log((_SCAM_N_DOCS + 1) / (df + 1)) + 1.0
+
+
+def match_scam_cases(text: str, limit: int = 2, min_score: float = 5.0) -> List[ScamCase]:
+    """알려진 사기 사례와 대조한다.
+
+    ★ 오매칭 방지 (docs/evaluation/eval_30_report_before_stopword_fix.md §3에서 실측으로 발견된 문제):
+      예전엔 STOPWORDS 없이 '단어 일치 개수 >= 2'로만 판단해서, "안내/지원/내용"처럼
+      어떤 공공 안내문에도 흔한 단어 2개만 겹쳐도 정상 안내문이 사기 사례로 오매칭됐다.
+      지금은 (1) STOPWORDS 를 채점에서 아예 빼고, (2) 남은 키워드는 코퍼스 내 희귀도로
+      가중치를 매겨(_keyword_weight) 합산한다 - 흔한 단어 여러 개보다 희귀한 단어
+      하나가 더 강한 신호가 되게 하기 위해서다.
+    ★ 임계값(min_score=5.0)의 근거: 평가세트 30건 전체로 실측한 결과(코드가 아니라 데이터로
+      정했다), '정상' 10건이 우연히 얻는 최고 점수는 4.43(단어 1개, 예: '복지'/'사업'
+      같은 일반명사)이었고, 실제 사기/경계 사례가 진짜로 맞는 경우는 대부분 6점대 이상
+      부터 시작했다(단어 2개 이상 조합). 4.43과 6.1 사이가 비어 있어 5.0 을 그 사이에
+      놓으면 이 데이터셋 기준 '정상' 오매칭 10건을 전부 걸러내면서 사칭/경계의 진짜 일치는
+      대부분 그대로 잡는다. 코퍼스가 커지면 이 값도 같은 방식(재측정)으로 다시 잡아야 한다.
+    """
+    kws = [k for k in extract_keywords(text) if k not in STOPWORDS]
     if not kws:
         return []
     scored = []
     for case in SCAM_CASES:
-        score = sum(1 for k in kws if k in case._blob)
+        matched = [k for k in kws if k in case._blob]
+        if not matched:
+            continue
+        score = sum(_keyword_weight(k) for k in matched)
         if score >= min_score:
-            scored.append((score, case))
+            scored.append((score, matched, case))
     scored.sort(key=lambda x: -x[0])
-    return [c for _, c in scored[:limit]]
+    # ★ 매칭 근거를 로그로 남긴다 - 어떤 단어 때문에 어떤 사례와 연결됐는지 나중에
+    #   오매칭을 추적할 수 있어야 한다는 요구사항(재측정 시 오매칭 재발 여부 확인용).
+    for score, matched, case in scored[:limit]:
+        log.info(
+            "[match_scam] case=%s score=%.2f 매칭단어=%s",
+            case.id, score, matched,
+        )
+    return [c for _, _, c in scored[:limit]]
