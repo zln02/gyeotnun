@@ -5,25 +5,35 @@
 데이터팀이 corpus/ 에 올려 둔 3개 CSV를 기동 시(모듈 임포트 시) 메모리에 적재해
 검색 가능한 형태로 만든다.
 
-  EVIDENCE   ← 근거_검증표.csv        기관·자료명·페이지·URL이 확인된 공식 통계
-  SCAM_CASES ← 곁눈_평가세트_30건.csv(사칭/경계만) + 사례_..._재라벨링표.csv
-               실제/합성 피싱 사례. 오판유형(복수 라벨) 그대로 보존한다.
-  EVAL_CASES ← 곁눈_평가세트_30건.csv 전체 30건(정상 포함). 평가/회귀용 원본 보존.
+  EVIDENCE   ← 근거_검증표.csv                 기관·자료명·페이지·URL이 확인된 공식 통계
+  SCAM_CASES ← 사례_20-46건_재라벨링표.csv      실제/합성 피싱 사례. 오판유형(복수 라벨) 보존.
+  EVAL_CASES ← 곁눈_평가세트_30건.csv 전체 30건(정상 포함). 평가/회귀 전용 원본 보존.
 
 ★ 절대 하지 않는 것
   - url이 없거나 http 로 시작하지 않는 행은 인덱스에서 제외한다. (누를 수 없는 링크는 근거가 아니다)
   - 상태가 '사용금지'인 행은 제외한다. (근거_검증표의 E14/E15 - 원문 미확인)
   - 기관명·URL을 새로 만들지 않는다. publisher/source_type 은 CSV 값 또는
     URL 도메인에서 기계적으로 뽑아낸 값만 쓴다 (추측하지 않는다).
+  - ★★ 평가 데이터는 참조 코퍼스에 포함하지 않는다 ★★
+    EVAL_CASES(곁눈_평가세트_30건.csv)는 SCAM_CASES(실제 매칭에 쓰이는 코퍼스)에
+    절대 섞지 않는다. 예전에는 평가세트의 사칭/경계 20행을 SCAM_CASES 에 그대로
+    편입시켰는데, 그러면 이 CSV로 평가를 돌릴 때 각 케이스가 평가셋 안의 자기
+    자신/형제 케이스와 매칭되는 자기참조(self-reference) 오염이 생겨 측정이
+    무의미해진다(docs/evaluation/eval_30_report.md §6-2 에서 실측으로 확인됨).
+    평가/회귀 목적이면 EVAL_CASES 를 그대로 읽되, 매칭 코퍼스(SCAM_CASES/EVIDENCE)에는
+    절대 합치지 않는다.
 """
 from __future__ import annotations
 
 import csv
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
+
+log = logging.getLogger("gyeotnun.corpus_index")
 
 CORPUS_DIR = Path(__file__).resolve().parents[2] / "corpus"
 EVIDENCE_TABLE_PATH = CORPUS_DIR / "근거_검증표.csv"
@@ -111,7 +121,10 @@ class EvidenceDoc:
 
 @dataclass
 class ScamCase:
-    """알려진 사기/사칭 사례 1건. 평가세트(사칭/경계) 또는 재라벨링표에서 온다."""
+    """알려진 사기/사칭 사례 1건. 재라벨링표(운영 참조 데이터)에서만 온다.
+
+    ★ 평가세트(EVAL_CASES)는 여기 절대 섞지 않는다 - 위 모듈 docstring 참고.
+    """
 
     id: str
     text: str              # 사례 원문/제시문구
@@ -119,10 +132,10 @@ class ScamCase:
     url: str
     published_at: Optional[str]
     risk_clues: List[str] = field(default_factory=list)     # 위험단서 / 신뢰단서
-    error_types: List[str] = field(default_factory=list)     # 오판유형 (복수 라벨, 재라벨링표만)
-    questions: List[str] = field(default_factory=list)        # 필요한_확인질문 / 놓친확인요소
+    error_types: List[str] = field(default_factory=list)     # 오판유형 (복수 라벨)
+    questions: List[str] = field(default_factory=list)        # 놓친확인요소
     rationale: str = ""
-    origin: str = ""         # "eval_set" | "relabeled"
+    origin: str = "relabeled"   # 재라벨링표만 소스이므로 항상 "relabeled"
     _blob: str = field(default="", repr=False)
 
     def signal_label(self) -> str:
@@ -223,22 +236,6 @@ def _load_eval_cases() -> List[EvalCase]:
     return cases
 
 
-def _scam_cases_from_eval(eval_cases: List[EvalCase]) -> List[ScamCase]:
-    """평가세트에서 '사칭'/'경계'만 사기 사례 인덱스로 편입한다. '정상'은 제외."""
-    out: List[ScamCase] = []
-    for c in eval_cases:
-        if c.category not in ("사칭", "경계"):
-            continue
-        blob = _clean(" ".join([c.text, *c.risk_clues]))
-        out.append(ScamCase(
-            id=c.id, text=c.text, source_label=f"{c.category} 사례 - {c.rationale}"[:80],
-            url=c.url, published_at=None, risk_clues=c.risk_clues,
-            error_types=[], questions=c.questions, rationale=c.rationale,
-            origin="eval_set", _blob=blob,
-        ))
-    return out
-
-
 def _load_relabeled_cases() -> List[ScamCase]:
     out: List[ScamCase] = []
     for row in _read_csv(RELABELED_CASES_PATH):
@@ -261,9 +258,23 @@ def _load_relabeled_cases() -> List[ScamCase]:
 
 
 # ==================================================== 기동 시 적재 (모듈 임포트 시 1회)
+# ★ 출처 파일명을 로그로 남긴다 - "이 CSV가 매칭 코퍼스에 들어갔는지"를 코드를 다시
+#   읽지 않고도 기동 로그만으로 바로 확인할 수 있게 하기 위해서다(평가세트를 실수로
+#   다시 섞어 넣는 것을 조기에 알아채기 위한 안전장치).
 EVIDENCE: List[EvidenceDoc] = _load_evidence()
+log.info("[corpus] EVIDENCE %s건 적재 (출처: %s)", len(EVIDENCE), EVIDENCE_TABLE_PATH.name)
+
 EVAL_CASES: List[EvalCase] = _load_eval_cases()
-SCAM_CASES: List[ScamCase] = _scam_cases_from_eval(EVAL_CASES) + _load_relabeled_cases()
+log.info(
+    "[corpus] EVAL_CASES %s건 적재 (출처: %s, 평가/회귀 전용 - 매칭 코퍼스에 포함 안 함)",
+    len(EVAL_CASES), EVAL_SET_PATH.name,
+)
+
+SCAM_CASES: List[ScamCase] = _load_relabeled_cases()
+log.info(
+    "[corpus] SCAM_CASES %s건 적재 (출처: %s만 - 평가세트 CSV는 제외)",
+    len(SCAM_CASES), RELABELED_CASES_PATH.name,
+)
 
 
 def summary() -> dict:
@@ -272,8 +283,6 @@ def summary() -> dict:
         "evidence_docs": len(EVIDENCE),
         "eval_cases": len(EVAL_CASES),
         "scam_cases": len(SCAM_CASES),
-        "scam_cases_from_eval_set": sum(1 for c in SCAM_CASES if c.origin == "eval_set"),
-        "scam_cases_from_relabeled": sum(1 for c in SCAM_CASES if c.origin == "relabeled"),
     }
 
 

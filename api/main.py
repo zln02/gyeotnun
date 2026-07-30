@@ -20,6 +20,20 @@ from __future__ import annotations
 
 import logging
 
+# ★ 이 로깅 설정은 반드시 아래 `from routers import ...` 보다 먼저 와야 한다.
+#   routers → services.search → services.corpus_index 로 이어지는 임포트 체인이
+#   모듈 임포트 시점(코퍼스 적재 시점)에 곧바로 log.info() 를 찍는데, 핸들러를 이
+#   임포트보다 뒤에 붙이면 그 시점엔 아직 핸들러가 없어 로그가 조용히 사라진다
+#   (Python logging 은 호출 시점의 핸들러로 즉시 처리하며 나중을 위해 버퍼링하지 않는다).
+#   가드레일/LLM 로그(prompt_chain 의 'gyeotnun.*')와 코퍼스 적재 로그
+#   (corpus_index 의 'gyeotnun.corpus_index') 모두 이 핸들러 하나로 받는다.
+_log = logging.getLogger("gyeotnun")
+_log.setLevel(logging.INFO)
+if not _log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(message)s"))
+    _log.addHandler(_handler)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -33,16 +47,6 @@ from routers import (
     training_router,
     verdict_router,
 )
-
-# 가드레일/LLM 로그를 uvicorn 출력에 함께 싣는다.
-# 재생성 사유(forbidden_word/too_long/bad_ref) 집계가 '가드레일 차단율'의 원장이므로
-# 기본 WARNING 레벨에 묻히면 안 된다. prompt_chain 의 'gyeotnun.*' 로거가 여기로 올라온다.
-_log = logging.getLogger("gyeotnun")
-_log.setLevel(logging.INFO)
-if not _log.handlers:
-    _handler = logging.StreamHandler()
-    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(message)s"))
-    _log.addHandler(_handler)
 
 app = FastAPI(title=settings.APP_NAME, description=settings.APP_DESC, version=settings.VERSION)
 
