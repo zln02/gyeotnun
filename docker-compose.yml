@@ -12,7 +12,11 @@ services:
     build: ./api
     container_name: gyeotnun-api
     ports:
-      - "8000:8000"
+      # ★ 127.0.0.1 로만 바인딩한다. 0.0.0.0 이면 nginx 를 우회해 인터넷에서
+      #   직접 :8000 으로 API 를 두드릴 수 있게 된다. 로컬 개발(vite 프록시,
+      #   curl localhost:8000)과 nginx(같은 호스트에서 http://api:8000 으로
+      #   도커 내부 네트워크를 통해 붙는다 - 이 포트 매핑과 무관)는 영향 없다.
+      - "127.0.0.1:8000:8000"
     env_file:
       - .env                      # ★ 먼저 `cp .env.example .env` 를 실행할 것 (파일이 없으면 compose 가 멈춘다)
     environment:
