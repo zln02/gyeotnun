@@ -282,8 +282,7 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 - 김태희: 프롬프트 튜닝(질문 길이 등)
 - 장지석: 공공데이터 577건 수집·변환, 코퍼스→훈련카드 자동 생성
 - 조희진: iOS 대체 경로 실기기 테스트(Share Target 은 Android Chrome 전용)
-- 박진영: 메모리 저장소 → DB 세션 교체, Alembic, 인증서 갱신 후 nginx reload
-  crontab 등록(`deploy/README.md` 참고)
+- 박진영: 메모리 저장소 → DB 세션 교체, Alembic
 
 ---
 
@@ -304,8 +303,8 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
   db는 호스트 포트 자체가 없다(기본 비밀번호를 인터넷에 노출하지 않기 위함).
 - 인증서는 `deploy/init-letsencrypt.sh` 로 최초 발급했다(만료: 2026-10-27).
   `certbot` 컨테이너가 12시간마다 자동 갱신을 시도한다(실제 갱신은 만료 30일
-  이내에만 일어난다). **단, 갱신 후 nginx reload 는 자동이 아니다** — crontab
-  등록 필요(`deploy/README.md` 참고, 현재 TODO).
+  이내에만 일어난다). nginx reload 는 자동이 아니라 crontab 에 매일 새벽 3시
+  등록해 뒀다(`deploy/README.md` 참고).
 - PWA 설치 조건(manifest·아이콘·service worker·HTTPS)을 Chrome DevTools의
   `Page.getInstallabilityErrors` 로 실측 확인했다(빈 배열 = 조건 충족). Android
   Chrome에서 "홈 화면에 추가"가 뜬다. iOS Safari는 Web Share Target을 지원하지

@@ -60,11 +60,16 @@ Rate Limit(동일 도메인 1주일 5회)에 걸리니 dry-run 이 성공한 뒤
 
 `certbot` 서비스가 12시간마다 `certbot renew` 를 시도한다(만료 30일 이내에만 실제
 갱신). 갱신 후 nginx 가 새 인증서를 읽으려면 reload 가 필요한데, 이건 자동화돼 있지
-않으므로 crontab 에 등록해 둔다:
+않아 crontab 에 등록해 뒀다(`crontab -l` 로 확인 가능, **등록 완료**):
 
 ```
-0 3 * * * cd /home/ubuntu/gyeotnun && docker compose --profile prod exec nginx nginx -s reload
+0 3 * * * cd /home/ubuntu/gyeotnun && sudo docker compose --profile prod exec nginx nginx -s reload >> /home/ubuntu/gyeotnun/deploy/nginx-reload.log 2>&1
 ```
+
+★ `sudo` 가 붙어 있다. 이 서버에서는 `ubuntu` 계정이 `docker` 그룹에 속해 있어도
+(과거 로그인 세션 기준) 매 cron 실행마다 그룹 재적용이 보장되지 않아, 확실하게
+동작하는 `sudo`(NOPASSWD 설정됨) 를 그대로 썼다. 로그는
+`deploy/nginx-reload.log` 에 쌓인다(.gitignore 대상).
 
 ## 파일 구조
 

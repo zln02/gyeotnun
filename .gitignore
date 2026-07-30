@@ -60,3 +60,6 @@ deploy/certbot/conf/*
 !deploy/certbot/conf/.gitkeep
 deploy/certbot/www/*
 !deploy/certbot/www/.gitkeep
+
+# nginx reload crontab 로그 (서버 로컬 산출물)
+deploy/nginx-reload.log
