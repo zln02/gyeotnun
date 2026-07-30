@@ -15,6 +15,79 @@
 import { useEffect, useRef, useState } from 'react'
 import { getQuestion } from '../api.js'
 
+/**
+ * 확인 결과 배지 (S3 상단, 질문보다 먼저 보여준다)
+ * ★ verdict_hint 하나만 그대로 옮기지 않는다. search.py 의 official_source_found /
+ *   contact_in_image 신호는 severity="info"(문제 신호 아님)라서, 공식 자료를 찾았을
+ *   뿐인데도 partially_matched 가 찍히는 경우가 있다. severity="attention" 신호가
+ *   실제로 있을 때만 '의심'으로 올리고, 그 외엔 verdict_hint 의 no_source_found 여부로
+ *   '확인 불가' 를 가른다 - verdict_hint 와 signals 를 함께 봐야 정확하다.
+ */
+const VERDICT_TIERS = {
+  confirmed: {
+    label: '확인됨',
+    icon: '✅',
+    desc: '공식 자료에서 확인됐습니다.',
+    className: 'tier-ok',
+  },
+  suspicious: {
+    label: '의심',
+    icon: '⚠️',
+    desc: '확인할 점이 남아 있습니다.',
+    className: 'tier-warn',
+  },
+  unknown: {
+    label: '확인 불가',
+    icon: '❓',
+    desc: '공식 자료에서 확인하지 못했습니다.',
+    className: 'tier-unknown',
+  },
+}
+
+function verdictTier(evidence) {
+  if (evidence?.verdict_hint === 'no_source_found') return 'unknown'
+  const hasAttentionSignal = (evidence?.signals || []).some((s) => s.severity === 'attention')
+  return hasAttentionSignal ? 'suspicious' : 'confirmed'
+}
+
+// 배지 아래 한 줄 근거 요약 - 실제 references/signals 에서만 뽑는다(지어내지 않는다)
+function evidenceSummary(evidence, tier) {
+  const refs = evidence?.references || []
+  if (tier === 'unknown') {
+    return '공식 자료에서 같은 이름의 공고나 안내를 찾지 못했습니다.'
+  }
+  const publishers = [...new Set(refs.map((r) => r.publisher).filter(Boolean))].slice(0, 2).join('·')
+  if (tier === 'suspicious') {
+    // ★ similar_scam_case 신호의 원문 label 은 "...사기 수법과 비슷합니다"처럼
+    //   금지어를 그대로 담고 있다. 괄호 안 실제 상세정보(특징/오판유형)는 그대로 살리고
+    //   표현만 순화한다 - 데이터를 지어내지 않으면서 단정적 단어만 피한다.
+    const scamSignal = (evidence?.signals || []).find((s) => s.key === 'similar_scam_case')
+    if (scamSignal) {
+      const detail = scamSignal.label.match(/\(([^)]+)\)/)?.[1]
+      return detail
+        ? `이전에 확인된 사례와 비슷한 점이 있습니다 (${detail}).`
+        : '이전에 확인된 사례와 비슷한 점이 있습니다.'
+    }
+    return publishers ? `${publishers} 자료와 다른 점이 있어 확인이 필요합니다.` : '확인할 점이 남아 있습니다.'
+  }
+  return publishers ? `${publishers}에서 같은 내용을 확인했습니다.` : '공식 자료에서 같은 내용을 확인했습니다.'
+}
+
+function VerdictBadge({ evidence }) {
+  const tier = verdictTier(evidence)
+  const t = VERDICT_TIERS[tier]
+  return (
+    <div className={`verdict-badge ${t.className}`}>
+      <div className="verdict-head">
+        <span className="verdict-icon" aria-hidden="true">{t.icon}</span>
+        <span className="verdict-label">{t.label}</span>
+      </div>
+      <p className="verdict-desc">{t.desc}</p>
+      <p className="verdict-summary">{evidenceSummary(evidence, tier)}</p>
+    </div>
+  )
+}
+
 export default function Question({ checkId, evidence, onDone }) {
   const [turn, setTurn] = useState(1)
   const [data, setData] = useState(null)
@@ -58,11 +131,27 @@ export default function Question({ checkId, evidence, onDone }) {
     return found || { url: u, title: u, publisher: '', published_at: '' }
   })
 
-  if (loading) return <div className="loading"><div className="spinner" /><p className="lead">질문을 준비하고 있어요</p></div>
-  if (error) return <div className="error-box">{error}</div>
+  // ★ 결과(배지)를 먼저, 질문은 그 다음 - 로딩/에러 중에도 배지는 계속 보여준다
+  if (loading) {
+    return (
+      <>
+        {evidence && <VerdictBadge evidence={evidence} />}
+        <div className="loading"><div className="spinner" /><p className="lead">질문을 준비하고 있어요</p></div>
+      </>
+    )
+  }
+  if (error) {
+    return (
+      <>
+        {evidence && <VerdictBadge evidence={evidence} />}
+        <div className="error-box">{error}</div>
+      </>
+    )
+  }
 
   return (
     <>
+      {evidence && <VerdictBadge evidence={evidence} />}
       <div className="progress" aria-label={`3단계 중 ${turn}단계`}>
         {[1, 2, 3].map((i) => <span key={i} className={i <= turn ? 'on' : ''} />)}
       </div>
