@@ -3,6 +3,9 @@
 > **판정하지 않습니다. 함께 확인합니다.**
 > 팀 **Second Look** (6인) · 해커톤 프로젝트
 
+**배포 주소: <https://gyeotnun.duckdns.org>** — PWA로 설치 가능(Android Chrome:
+주소창 메뉴 → "홈 화면에 추가"). 인증서는 Let's Encrypt, 90일마다 자동 갱신.
+
 ---
 
 ## 1. 무슨 서비스인가
@@ -56,7 +59,17 @@ cd ../web && npm install && npm run dev               # http://localhost:5173
 
 ```bash
 cp .env.example .env      # ★ 이 파일이 없으면 compose 가 멈춘다
-docker compose up --build # api(8000) + postgres(5432)
+docker compose up --build # api(127.0.0.1:8000만) + postgres(내부 네트워크 전용)
+```
+
+### 배포 (nginx + HTTPS)
+
+로컬 개발용 위 두 명령과 별도로, 배포는 `prod` 프로파일로 nginx·certbot까지 띄운다.
+자세한 절차·트러블슈팅은 [`deploy/README.md`](deploy/README.md) 참고.
+
+```bash
+cd web && npm run build                      # web/dist 생성 (VITE_USE_MOCK 비워 둘 것)
+docker compose --profile prod up -d --build   # api + db + nginx + certbot
 ```
 
 ---
@@ -71,13 +84,14 @@ curl "http://localhost:8000/api/v1/training/today?mock=1"
 curl -X POST "http://localhost:8000/api/v1/checks?mock=1" -F "device_id=demo"
 ```
 
-프론트는 **기본값이 mock ON** 입니다 (`web/src/api.js`).
-실제 백엔드에 붙이려면 주소창에 `?mock=0` 을 붙이거나 `api.js` 의 `USE_MOCK` 을 바꾸세요.
+프론트는 **기본값이 실제 API(mock OFF)** 입니다 (`web/src/api.js`). 우선순위는
+주소창 쿼리 `?mock=1`/`?mock=0` > 환경변수 `VITE_USE_MOCK=1`(`web/.env.example`
+참고) > 기본값(false). 개발 중 백엔드 없이 화면만 보고 싶으면 `?mock=1` 을 붙이세요.
 
-왜 이렇게 했는가
-1. 프론트(조희진)가 백엔드 완성을 기다리지 않고 화면을 끝까지 만들 수 있다.
-2. API 키 발급이 늦거나 한도가 막혀도 개발이 멈추지 않는다.
-3. **시연 중 외부 API가 죽어도 데모는 끝까지 돌아간다.** (가장 중요)
+왜 mock 토글 자체는 남겨 뒀는가
+1. 프론트(조희진)가 백엔드 없이도, 또는 특정 화면만 빠르게 볼 때 쓸 수 있다.
+2. API 키가 없는 환경에서도 개발이 멈추지 않는다.
+3. **시연 중 외부 API가 죽어도 `?mock=1` 로 즉시 폴백해 데모를 이어갈 수 있다.**
 
 mock 이 아닐 때 키가 없으면 **501 + 안내 메시지**를 돌려줍니다(서버가 죽지 않음).
 
@@ -97,7 +111,7 @@ mock 이 아닐 때 키가 없으면 **501 + 안내 메시지**를 돌려줍니�
 | **김태희** | 프롬프트 (판정 억제) | `api/services/prompt_chain.py` |
 | **장지석** | 태깅 · RAG · 코퍼스 | `api/services/tagger.py`, `api/services/rag.py`, `corpus/` |
 | **조희진** | 프론트 | `web/` 전체 |
-| **박진영** | API · DB · 배포 | `api/main.py`, `api/routers/`, `api/models/`, `docker-compose.yml` |
+| **박진영** | API · DB · 배포 | `api/main.py`, `api/routers/`, `api/models/`, `docker-compose.yml`, `deploy/` |
 
 > 남의 폴더를 고쳐야 하면 먼저 담당자에게 말하세요.
 > 단, `api/models/schemas.py`(계약서)는 **바꾸기 전에 반드시 팀 채널 공지**.
@@ -106,7 +120,8 @@ mock 이 아닐 때 키가 없으면 **501 + 안내 메시지**를 돌려줍니�
 
 ## 5. API 요약표
 
-Base URL: `http://localhost:8000/api/v1` · 모든 엔드포인트가 `?mock=1` 지원
+Base URL: 로컬 `http://localhost:8000/api/v1` · 배포 `https://gyeotnun.duckdns.org/api/v1`
+· 모든 엔드포인트가 `?mock=1` 지원
 
 | Method | Path | 설명 | 담당 |
 |---|---|---|---|
@@ -241,7 +256,7 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 
 ---
 
-## 11. 지금 상태 (스켈레톤)
+## 11. 지금 상태
 
 **동작함 (키 없이)**
 - 전 엔드포인트 `?mock=1` 응답 · `validate_question()` 판정 억제 검증 ·
@@ -257,10 +272,9 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
   (`services/corpus_index.py`, 네이버 검색 API 는 아직 미연동)
 - 오판유형 태깅: Claude 프롬프팅 기반 분류(`services/tagger.py` `tag_error_type_llm`),
   실패 시 규칙 기반으로 자동 폴백
-- PWA: manifest 아이콘·Web Share Target·최소 service worker(`web/public/sw.js`) 적용
-- 배포: nginx 리버스 프록시 + certbot 자동 갱신 구성 완료(`deploy/`, `docker compose
-  --profile prod`). **HTTPS는 DNS(gyeotnun.duckdns.org) 전파 대기 중 - 아직 미적용.**
-  자세한 절차는 `deploy/README.md` 참고.
+- PWA: 아이콘·Web Share Target·service worker 적용, 설치 조건 실측 통과
+- **배포: <https://gyeotnun.duckdns.org> 로 실제 서비스 중.** 자세한 내용은
+  아래 [12. 배포 · 인프라](#12-배포--인프라) 참고.
 
 **TODO (담당자별)**
 - 박진: 링크 본문 추출, 얼굴 블러
@@ -268,5 +282,35 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 - 김태희: 프롬프트 튜닝(질문 길이 등)
 - 장지석: 공공데이터 577건 수집·변환, 코퍼스→훈련카드 자동 생성
 - 조희진: iOS 대체 경로 실기기 테스트(Share Target 은 Android Chrome 전용)
-- 박진영: 메모리 저장소 → DB 세션 교체, Alembic, DNS 확인되면 `deploy/init-letsencrypt.sh`
-  실행 + AWS 보안그룹에 80/443 인바운드 열려 있는지 확인
+- 박진영: 메모리 저장소 → DB 세션 교체, Alembic, 인증서 갱신 후 nginx reload
+  crontab 등록(`deploy/README.md` 참고)
+
+---
+
+## 12. 배포 · 인프라
+
+**주소**: <https://gyeotnun.duckdns.org> (DuckDNS + Let's Encrypt)
+
+```
+인터넷 → nginx(80/443, 컨테이너) → api (127.0.0.1 전용, 도커 내부망으로만 붙음)
+                                  → db  (호스트 포트 없음, 내부망 전용)
+```
+
+- `docker compose --profile prod up -d --build` 로 nginx·certbot 까지 함께 기동한다.
+  로컬 개발(`docker compose up`)에는 이 둘이 안 뜬다 — nginx/certbot 은
+  `profiles: ["prod"]` 로 분리돼 있다.
+- **호스트에 외부로 열린 포트는 80 / 443 / 22 뿐이다.** api(8000)는
+  `127.0.0.1:8000` 으로만 바인딩돼 있어 nginx 를 거치지 않고는 접근할 수 없고,
+  db는 호스트 포트 자체가 없다(기본 비밀번호를 인터넷에 노출하지 않기 위함).
+- 인증서는 `deploy/init-letsencrypt.sh` 로 최초 발급했다(만료: 2026-10-27).
+  `certbot` 컨테이너가 12시간마다 자동 갱신을 시도한다(실제 갱신은 만료 30일
+  이내에만 일어난다). **단, 갱신 후 nginx reload 는 자동이 아니다** — crontab
+  등록 필요(`deploy/README.md` 참고, 현재 TODO).
+- PWA 설치 조건(manifest·아이콘·service worker·HTTPS)을 Chrome DevTools의
+  `Page.getInstallabilityErrors` 로 실측 확인했다(빈 배열 = 조건 충족). Android
+  Chrome에서 "홈 화면에 추가"가 뜬다. iOS Safari는 Web Share Target을 지원하지
+  않아 '사진 올리기' 버튼 경로가 그 대체 경로다.
+- 업로드 크기 한도: nginx `client_max_body_size 11m` (api의 `MAX_UPLOAD_MB=10`
+  보다 1MB 여유를 둬서, 10~11MB 구간은 nginx 기본 에러 페이지 대신 앱의 안내
+  메시지가 뜨게 했다).
+- 자세한 절차·트러블슈팅: [`deploy/README.md`](deploy/README.md)
