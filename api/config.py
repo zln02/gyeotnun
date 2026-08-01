@@ -52,6 +52,9 @@ class Settings:
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     NAVER_CLIENT_ID: str = os.getenv("NAVER_CLIENT_ID", "")
     NAVER_CLIENT_SECRET: str = os.getenv("NAVER_CLIENT_SECRET", "")
+    # 임베딩 검색(services/embeddings.py) - 공식 문서 청크 벡터 인덱스 구축·질의용.
+    # Upstage Solar Embedding (한국어 특화, 국내 API) - 2026-08 Voyage 에서 전환.
+    UPSTAGE_API_KEY: str = os.getenv("UPSTAGE_API_KEY", "")
     # 더 이상 쓰지 않는다: 이미지 인식이 Claude Vision(ANTHROPIC_API_KEY)으로
     # 옮겨 가면서 별도 Vision 키가 필요 없어졌다(services/ocr.py). 과거 .env 에
     # 이 값이 남아 있어도 무시된다. 필드 자체는 하위호환을 위해 남겨 둔다.
@@ -72,6 +75,10 @@ class Settings:
     def has_vision(self) -> bool:
         """이미지 인식(OCR) 가능 여부. Claude Vision 을 쓰므로 has_llm 과 같다."""
         return self.has_llm
+
+    @property
+    def has_embeddings(self) -> bool:
+        return bool(self.UPSTAGE_API_KEY)
 
 
 settings = Settings()

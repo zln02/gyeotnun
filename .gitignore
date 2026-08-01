@@ -44,6 +44,10 @@ pnpm-debug.log*
 corpus/public_data/*
 !corpus/public_data/.gitkeep
 
+# 임베딩 인덱스(용량 + API 비용을 들여 만든 산출물, api/tools/build_embedding_index.py
+# 로 재생성 가능) - corpus/ 가 읽기 전용 마운트라 api/data/ 밑에 저장한다.
+api/data/
+
 # IDE / OS
 .vscode/
 .idea/

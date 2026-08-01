@@ -11,6 +11,9 @@ httpx==0.28.1                   # 외부 API 호출 (네이버/Vision)
 anthropic==0.120.0              # Claude API (질문 생성). 0.42 는 output_config/adaptive thinking 미지원
 python-dotenv==1.0.1
 rank-bm25==0.2.2                # 공식 문서(OFFICIAL_DOCS) 검색 - BM25Okapi
+numpy==2.2.1                     # 임베딩 벡터 연산(코사인 유사도)
+# 임베딩 검색(services/embeddings.py) - Upstage Solar Embedding, httpx 로 REST 직접 호출
+# (전용 SDK 없이 위 httpx 의존성을 그대로 재사용한다 - 별도 패키지 불필요)
 
 # dev
 pytest==8.3.4

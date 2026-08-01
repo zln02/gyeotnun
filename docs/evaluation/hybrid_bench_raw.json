@@ -1,0 +1,845 @@
+[
+  {
+    "mode": "bm25",
+    "recall_at_3": 0.3,
+    "recall_at_3_n": 20,
+    "refs_found_rate": 0.733,
+    "expected_match_rate": 0.467,
+    "normal_false_positive": 0,
+    "avg_elapsed_sec": 0.0086,
+    "cases": [
+      {
+        "case_id": "N01",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": false,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.0066
+      },
+      {
+        "case_id": "N02",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": false,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.0089
+      },
+      {
+        "case_id": "N03",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.0035
+      },
+      {
+        "case_id": "N04",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 2,
+        "elapsed_sec": 0.0093
+      },
+      {
+        "case_id": "N05",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.0068
+      },
+      {
+        "case_id": "N06",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.0046
+      },
+      {
+        "case_id": "N07",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.0069
+      },
+      {
+        "case_id": "N08",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": false,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.0045
+      },
+      {
+        "case_id": "N09",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.0061
+      },
+      {
+        "case_id": "N10",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": false,
+        "verdict_hint": "needs_check",
+        "refs_count": 2,
+        "elapsed_sec": 0.0099
+      },
+      {
+        "case_id": "S01",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 3,
+        "elapsed_sec": 0.0125
+      },
+      {
+        "case_id": "S02",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 2,
+        "elapsed_sec": 0.0107
+      },
+      {
+        "case_id": "S03",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": null,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.0046
+      },
+      {
+        "case_id": "S04",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 3,
+        "elapsed_sec": 0.0094
+      },
+      {
+        "case_id": "S05",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.0089
+      },
+      {
+        "case_id": "S06",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 3,
+        "elapsed_sec": 0.0087
+      },
+      {
+        "case_id": "S07",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.0061
+      },
+      {
+        "case_id": "S08",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.0038
+      },
+      {
+        "case_id": "S09",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 5,
+        "elapsed_sec": 0.0078
+      },
+      {
+        "case_id": "S10",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 2,
+        "elapsed_sec": 0.0091
+      },
+      {
+        "case_id": "B01",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 4,
+        "elapsed_sec": 0.0114
+      },
+      {
+        "case_id": "B02",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": false,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.0107
+      },
+      {
+        "case_id": "B03",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 1,
+        "elapsed_sec": 0.0102
+      },
+      {
+        "case_id": "B04",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "needs_check",
+        "refs_count": 2,
+        "elapsed_sec": 0.0116
+      },
+      {
+        "case_id": "B05",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 4,
+        "elapsed_sec": 0.0098
+      },
+      {
+        "case_id": "B06",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 2,
+        "elapsed_sec": 0.0124
+      },
+      {
+        "case_id": "B07",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.0107
+      },
+      {
+        "case_id": "B08",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 1,
+        "elapsed_sec": 0.0104
+      },
+      {
+        "case_id": "B09",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 5,
+        "elapsed_sec": 0.0109
+      },
+      {
+        "case_id": "B10",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 1,
+        "elapsed_sec": 0.012
+      }
+    ]
+  },
+  {
+    "mode": "embedding",
+    "recall_at_3": 0.65,
+    "recall_at_3_n": 20,
+    "refs_found_rate": 0.867,
+    "expected_match_rate": 0.6,
+    "normal_false_positive": 0,
+    "avg_elapsed_sec": 0.1208,
+    "cases": [
+      {
+        "case_id": "N01",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.4576
+      },
+      {
+        "case_id": "N02",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.1117
+      },
+      {
+        "case_id": "N03",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.1116
+      },
+      {
+        "case_id": "N04",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.1067
+      },
+      {
+        "case_id": "N05",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.1082
+      },
+      {
+        "case_id": "N06",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.1116
+      },
+      {
+        "case_id": "N07",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.1185
+      },
+      {
+        "case_id": "N08",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.1069
+      },
+      {
+        "case_id": "N09",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.0996
+      },
+      {
+        "case_id": "N10",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 5,
+        "elapsed_sec": 0.1272
+      },
+      {
+        "case_id": "S01",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 3,
+        "elapsed_sec": 0.0983
+      },
+      {
+        "case_id": "S02",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 1,
+        "elapsed_sec": 0.1004
+      },
+      {
+        "case_id": "S03",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": null,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.1142
+      },
+      {
+        "case_id": "S04",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 2,
+        "elapsed_sec": 0.1159
+      },
+      {
+        "case_id": "S05",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 1,
+        "elapsed_sec": 0.1135
+      },
+      {
+        "case_id": "S06",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": true,
+        "verdict_hint": "partially_matched",
+        "refs_count": 5,
+        "elapsed_sec": 0.1153
+      },
+      {
+        "case_id": "S07",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.0932
+      },
+      {
+        "case_id": "S08",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.1191
+      },
+      {
+        "case_id": "S09",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 2,
+        "elapsed_sec": 0.1059
+      },
+      {
+        "case_id": "S10",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 2,
+        "elapsed_sec": 0.0959
+      },
+      {
+        "case_id": "B01",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": true,
+        "verdict_hint": "partially_matched",
+        "refs_count": 5,
+        "elapsed_sec": 0.1137
+      },
+      {
+        "case_id": "B02",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.1062
+      },
+      {
+        "case_id": "B03",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 1,
+        "elapsed_sec": 0.1112
+      },
+      {
+        "case_id": "B04",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.106
+      },
+      {
+        "case_id": "B05",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 4,
+        "elapsed_sec": 0.1021
+      },
+      {
+        "case_id": "B06",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 2,
+        "elapsed_sec": 0.1094
+      },
+      {
+        "case_id": "B07",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.1078
+      },
+      {
+        "case_id": "B08",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 1,
+        "elapsed_sec": 0.1108
+      },
+      {
+        "case_id": "B09",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 2,
+        "elapsed_sec": 0.1159
+      },
+      {
+        "case_id": "B10",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 1,
+        "elapsed_sec": 0.1099
+      }
+    ]
+  },
+  {
+    "mode": "hybrid_1_1",
+    "recall_at_3": 0.65,
+    "recall_at_3_n": 20,
+    "refs_found_rate": 0.9,
+    "expected_match_rate": 0.567,
+    "normal_false_positive": 0,
+    "avg_elapsed_sec": 0.1247,
+    "cases": [
+      {
+        "case_id": "N01",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.1332
+      },
+      {
+        "case_id": "N02",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.112
+      },
+      {
+        "case_id": "N03",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.1136
+      },
+      {
+        "case_id": "N04",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.1223
+      },
+      {
+        "case_id": "N05",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.0974
+      },
+      {
+        "case_id": "N06",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.1125
+      },
+      {
+        "case_id": "N07",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.1283
+      },
+      {
+        "case_id": "N08",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.1218
+      },
+      {
+        "case_id": "N09",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.1278
+      },
+      {
+        "case_id": "N10",
+        "유형": "정상",
+        "기대판단": "정상",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 5,
+        "elapsed_sec": 0.1212
+      },
+      {
+        "case_id": "S01",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 4,
+        "elapsed_sec": 0.1411
+      },
+      {
+        "case_id": "S02",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 2,
+        "elapsed_sec": 0.1212
+      },
+      {
+        "case_id": "S03",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": null,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.126
+      },
+      {
+        "case_id": "S04",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 3,
+        "elapsed_sec": 0.1169
+      },
+      {
+        "case_id": "S05",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 1,
+        "elapsed_sec": 0.1265
+      },
+      {
+        "case_id": "S06",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": true,
+        "verdict_hint": "partially_matched",
+        "refs_count": 5,
+        "elapsed_sec": 0.1413
+      },
+      {
+        "case_id": "S07",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.0963
+      },
+      {
+        "case_id": "S08",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "no_source_found",
+        "refs_count": 0,
+        "elapsed_sec": 0.1213
+      },
+      {
+        "case_id": "S09",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 5,
+        "elapsed_sec": 0.1251
+      },
+      {
+        "case_id": "S10",
+        "유형": "사칭",
+        "기대판단": "의심",
+        "recall_at_3": false,
+        "verdict_hint": "partially_matched",
+        "refs_count": 2,
+        "elapsed_sec": 0.1178
+      },
+      {
+        "case_id": "B01",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": true,
+        "verdict_hint": "partially_matched",
+        "refs_count": 5,
+        "elapsed_sec": 0.1354
+      },
+      {
+        "case_id": "B02",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": true,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.1305
+      },
+      {
+        "case_id": "B03",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 1,
+        "elapsed_sec": 0.1449
+      },
+      {
+        "case_id": "B04",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "needs_check",
+        "refs_count": 3,
+        "elapsed_sec": 0.1372
+      },
+      {
+        "case_id": "B05",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 4,
+        "elapsed_sec": 0.1347
+      },
+      {
+        "case_id": "B06",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 2,
+        "elapsed_sec": 0.1335
+      },
+      {
+        "case_id": "B07",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "needs_check",
+        "refs_count": 1,
+        "elapsed_sec": 0.1306
+      },
+      {
+        "case_id": "B08",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 1,
+        "elapsed_sec": 0.1111
+      },
+      {
+        "case_id": "B09",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 5,
+        "elapsed_sec": 0.122
+      },
+      {
+        "case_id": "B10",
+        "유형": "경계",
+        "기대판단": "확인불가",
+        "recall_at_3": null,
+        "verdict_hint": "partially_matched",
+        "refs_count": 1,
+        "elapsed_sec": 0.1383
+      }
+    ]
+  }
+]

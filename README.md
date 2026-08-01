@@ -288,8 +288,15 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
   (별도 Google Vision 키 불필요, `services/ocr.py`)
 - 질문 생성: Claude(`claude-sonnet-5`)로 실제 호출 + 재생성 루프 + 프롬프트 캐싱
   (`services/prompt_chain.py`)
-- 근거 대조: `근거_검증표`/`평가세트`/`사례_재라벨링표` CSV 로컬 인덱스 대조
-  (`services/corpus_index.py`, 네이버 검색 API 는 아직 미연동)
+- 근거 대조: `근거_검증표`/`평가세트`/`사례_재라벨링표` CSV 로컬 인덱스 대조 +
+  공공데이터 996건 BM25 검색(`services/corpus_index.py`, 네이버 검색 API 는
+  아직 미연동)
+- **실험적(아직 프로덕션 미채택)**: Upstage Solar Embedding 기반 임베딩 검색 +
+  RRF 하이브리드(`services/embeddings.py`, `search.match_official_docs_hybrid`).
+  30건 벤치마크 결과 임베딩이 BM25보다 뚜렷이 우수했으나(정상 근거매칭
+  7/10→10/10, Recall@3 30%→65%), 어느 방식을 실제로 쓸지는 아직 결정 전이라
+  `collect_evidence()`(실제 서비스 경로)는 여전히 BM25 단독이다. 근거와 비교표는
+  [`docs/evaluation/hybrid_search_report.md`](docs/evaluation/hybrid_search_report.md).
 - 오판유형 태깅: Claude 프롬프팅 기반 분류(`services/tagger.py` `tag_error_type_llm`),
   실패 시 규칙 기반으로 자동 폴백
 - PWA: 아이콘·Web Share Target·service worker 적용, 설치 조건 실측 통과
@@ -298,7 +305,8 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 
 **TODO (담당자별)**
 - 박진: 링크 본문 추출, 얼굴 블러
-- 김유리: 네이버 검색 API 연동(현재는 로컬 CSV 대조까지), 공공데이터 577건 수집 후 임베딩 검색
+- 김유리: 네이버 검색 API 연동(현재는 로컬 CSV 대조까지). 임베딩/하이브리드 검색은
+  구현·벤치마크 완료 - 채택 여부만 남음(위 "실험적" 항목 참고)
 - 김태희: 프롬프트 튜닝(질문 길이 등)
 - 장지석: 공공데이터 577건 수집·변환, 코퍼스→훈련카드 자동 생성
 - 조희진: iOS 대체 경로 실기기 테스트(Share Target 은 Android Chrome 전용)

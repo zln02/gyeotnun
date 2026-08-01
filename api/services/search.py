@@ -161,6 +161,83 @@ def _dedup_refs(refs: List[dict]) -> List[dict]:
     return out
 
 
+# ==================================================== 하이브리드 검색 (BM25 + 임베딩)
+# ★ 실험/벤치마크용이다. collect_evidence() 는 아직 이 함수들을 쓰지 않는다 - BM25/
+#   임베딩/하이브리드 중 어느 것을 실제로 쓸지는 3방식 벤치마크 결과를 보고 사용자가
+#   결정한다(docs/evaluation/hybrid_search_report.md). 그 전까지 프로덕션 경로는
+#   기존 BM25 단독(corpus_index.match_official_docs)이다.
+
+def _reciprocal_rank_fusion(
+    rankings: List[List[str]],
+    weights: List[float] | None = None,
+    k: int = 60,
+) -> dict:
+    """순위 기반 결합(RRF). 점수를 직접 더하지 않는 이유:
+
+    BM25 점수(코퍼스 크기에 따라 0~30점대까지 요동)와 코사인 유사도(항상 0~1)는
+    척도가 완전히 달라서, 그대로 더하면 절대값이 큰 BM25 가 결과를 사실상 지배해
+    버린다(정규화를 해도 분포 형태가 다르면 여전히 왜곡된다). RRF 는 "몇 점인지"가
+    아니라 "몇 등인지"만 보므로 척도가 다른 신호를 안전하게 섞을 수 있다 - 정보
+    검색에서 표준적으로 쓰이는 결합 방식이다(Cormack et al., 2009).
+
+        score(d) = Σ_r  weight_r / (k + rank_r(d))   (그 방법의 결과에 없으면 0)
+
+    k=60 은 RRF 원 논문의 기본값을 그대로 썼다 - 상위 몇 등 차이의 영향을 과하게
+    키우지 않으면서도 순위 정보를 반영하는 값으로 이미 널리 검증돼 있어, 우리
+    데이터로 다시 튜닝할 특별한 이유를 찾지 못했다(바꾸게 되면 이 주석에 실측
+    근거를 추가할 것).
+    """
+    if weights is None:
+        weights = [1.0] * len(rankings)
+    scores: dict = {}
+    for ranking, w in zip(rankings, weights):
+        for rank, doc_id in enumerate(ranking, start=1):
+            scores[doc_id] = scores.get(doc_id, 0.0) + w / (k + rank)
+    return scores
+
+
+# ★ 결합 가중치(BM25:임베딩)의 근거는 docs/evaluation/hybrid_search_report.md
+#   §가중치 튜닝 참고 - 30건 평가세트로 실측해서 정했다. 아래는 그 실측 결과값이다.
+HYBRID_WEIGHT_BM25 = 1.0
+HYBRID_WEIGHT_EMBEDDING = 1.0
+
+
+def match_official_docs_hybrid(
+    text: str,
+    limit: int = 2,
+    weight_bm25: float = HYBRID_WEIGHT_BM25,
+    weight_embedding: float = HYBRID_WEIGHT_EMBEDDING,
+    k: int = 60,
+):
+    """BM25 순위 + 임베딩 순위를 RRF 로 결합한 공식 문서 검색 (실험/벤치마크용).
+
+    한쪽이 후보를 못 찾아도(예: 임베딩 인덱스 파일이 아직 없음) 나머지 하나만으로
+    계속 동작한다 - 하이브리드가 반쪽만 살아 있어도 서비스가 죽지 않는다.
+    """
+    from services import embeddings  # 순환 임포트 방지 - embeddings.py 가 corpus_index 를 쓴다
+
+    bm25_docs = corpus_index.match_official_docs(text, limit=max(limit, 10))
+    bm25_ranking = [d.id for d in bm25_docs]
+
+    embedding_hits = embeddings.match_embedding_docs(text, limit=max(limit, 10))
+    embedding_ranking = [d.id for _, d in embedding_hits]
+
+    if not bm25_ranking and not embedding_ranking:
+        return []
+
+    fused = _reciprocal_rank_fusion(
+        [bm25_ranking, embedding_ranking],
+        weights=[weight_bm25, weight_embedding],
+        k=k,
+    )
+    ranked_ids = sorted(fused, key=lambda rid: -fused[rid])[:limit]
+    return [
+        corpus_index._OFFICIAL_DOCS_BY_ID[rid]
+        for rid in ranked_ids
+        if rid in corpus_index._OFFICIAL_DOCS_BY_ID
+    ]
+
+
 def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
     """근거 수집 파이프라인.
 
