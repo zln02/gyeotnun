@@ -168,6 +168,14 @@ async def summary(db: Session = Depends(get_db)):
     def _avg(vals: list[float]) -> float:
         return round(sum(vals) / len(vals), 1) if vals else 0.0
 
+    def _median(vals: list[float]) -> float:
+        if not vals:
+            return 0.0
+        s = sorted(vals)
+        n = len(s)
+        mid = n // 2
+        return round(s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2, 1)
+
     total_sessions = sum(1 for evs in sessions.values() if any(e.event_type == "screen_enter" for e in evs))
     s3_reached = reached.get("S3", 0)
 
@@ -180,6 +188,11 @@ async def summary(db: Session = Depends(get_db)):
             s: round(exited_last[s] / reached[s], 3) if reached[s] else 0.0 for s in _ALLOWED_SCREENS
         },
         screen_avg_time_to_first_click_sec={s: _avg(v) for s, v in first_click_latency.items()},
+        # ★ 평균 하나만 보면 이상치(한 명이 오래 헤맨 경우 등)에 쉽게 흔들려서
+        #   중앙값과 원본 표본(분포)을 함께 준다 - 8/5 테스트처럼 표본이 적을 때는
+        #   "분포를 눈으로 보는 것"이 평균 하나보다 훨씬 정확하다.
+        screen_median_time_to_first_click_sec={s: _median(v) for s, v in first_click_latency.items()},
+        screen_time_to_first_click_samples_sec={s: [round(x, 1) for x in v] for s, v in first_click_latency.items()},
         click_counts=click_counts,
         evidence_link_click_sessions=evidence_click_sessions,
         evidence_link_click_rate=round(evidence_click_sessions / s3_reached, 3) if s3_reached else 0.0,

@@ -201,6 +201,8 @@ class EventSummaryResponse(BaseModel):
     screen_dwell_sample_count: dict = Field(default_factory=dict, description="{screen: 체류시간 표본 수(leave 기록이 없는 세션은 제외됨)}")
     screen_drop_off_rate: dict = Field(default_factory=dict, description="{screen: 그 화면이 마지막이었던 세션 비율(0~1)}")
     screen_avg_time_to_first_click_sec: dict = Field(default_factory=dict, description="{screen: 진입~첫 클릭 평균초} - 시니어 UX 핵심 지표")
+    screen_median_time_to_first_click_sec: dict = Field(default_factory=dict, description="{screen: 진입~첫 클릭 중앙값(초)} - 평균은 소수 이상치에 쉽게 흔들리므로 함께 본다")
+    screen_time_to_first_click_samples_sec: dict = Field(default_factory=dict, description="{screen: [진입~첫 클릭 초, ...]} - 표본 수가 적은 사용성 테스트 특성상 분포(퍼짐) 자체를 눈으로 봐야 하므로 원본값을 그대로 반환한다")
     click_counts: dict = Field(default_factory=dict, description="{버튼 target: 클릭 수}")
     evidence_link_click_sessions: int = Field(0, description="근거 링크를 1번이라도 누른 세션 수")
     evidence_link_click_rate: float = Field(0.0, description="S3 도달 세션 중 근거 링크 클릭 비율(0~1) - '공식 출처 확인률'")
