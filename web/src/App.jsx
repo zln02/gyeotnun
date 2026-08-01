@@ -8,19 +8,30 @@
  *   시니어는 브라우저 뒤로가기로 흐름이 깨지면 크게 혼란스러워한다.
  *   화면 수가 5개뿐이라 단순 state 전환이 오히려 안전하다.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { USE_MOCK } from './api.js'
+import { logScreenEnter, logScreenLeave } from './events.js'
 import Home from './pages/Home.jsx'
 import Checking from './pages/Checking.jsx'
 import Question from './pages/Question.jsx'
 import Decision from './pages/Decision.jsx'
 import Training from './pages/Training.jsx'
 
+// 내부 screen 상태 이름 → 계측용 화면 코드(S1~S5). 화면 흐름이 한 곳(App.jsx)에서만
+// 바뀌므로, 진입/이탈 계측도 페이지마다 넣지 않고 여기 한 곳에만 넣는다.
+const SCREEN_CODE = { home: 'S1', checking: 'S2', question: 'S3', decision: 'S4', training: 'S5' }
+
 export default function App() {
   const [screen, setScreen] = useState('home')   // home | checking | question | decision | training
   const [checkId, setCheckId] = useState(null)
   const [checkData, setCheckData] = useState(null)
   const [evidence, setEvidence] = useState(null)
+
+  useEffect(() => {
+    const code = SCREEN_CODE[screen]
+    logScreenEnter(code)
+    return () => logScreenLeave(code)
+  }, [screen])
 
   const goHome = () => {
     setScreen('home')

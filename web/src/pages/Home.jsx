@@ -9,6 +9,9 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { createCheck } from '../api.js'
+import { logClick, logError } from '../events.js'
+
+const SCREEN = 'S1'
 
 // Web Share Target(sw.js)이 공유받은 이미지를 담아 두는 캐시 위치.
 // manifest.json 의 share_target.action("/share")과 sw.js 가 같은 이름을 쓴다.
@@ -33,11 +36,13 @@ export default function Home({ onStarted, onTraining }) {
       const data = await createCheck(payload)
       if (data.status === 'failed') {
         setFailMessage(data.message || '처리하지 못했습니다. 글로 직접 입력해 주세요.')
+        logError(SCREEN, 'upload_failed')
         return
       }
       onStarted(data)
     } catch (e) {
       setError(e.message)
+      logError(SCREEN, 'api_error')
     } finally {
       setBusy(false)
     }
@@ -88,12 +93,12 @@ export default function Home({ onStarted, onTraining }) {
           onChange={(e) => e.target.files?.[0] && start({ image: e.target.files[0] })}
         />
         {/* ★ 아이콘만 있는 버튼 금지 — 그림과 글자를 항상 함께 */}
-        <button className="btn" disabled={busy} onClick={() => fileRef.current?.click()}>
+        <button className="btn" disabled={busy} onClick={() => { logClick(SCREEN, 'photo_upload'); fileRef.current?.click() }}>
           <span aria-hidden="true">📷</span> 사진 올리기
         </button>
       </div>
 
-      <button className="btn secondary" disabled={busy} onClick={() => setShowText((v) => !v)}>
+      <button className="btn secondary" disabled={busy} onClick={() => { logClick(SCREEN, 'paste_text_toggle'); setShowText((v) => !v) }}>
         <span aria-hidden="true">⌨️</span> 글로 붙여넣기
       </button>
 
@@ -113,7 +118,7 @@ export default function Home({ onStarted, onTraining }) {
             className="btn"
             style={{ marginTop: 14 }}
             disabled={busy || !text.trim()}
-            onClick={() => start({ text })}
+            onClick={() => { logClick(SCREEN, 'submit_text'); start({ text }) }}
           >
             확인 시작하기
           </button>
@@ -127,7 +132,7 @@ export default function Home({ onStarted, onTraining }) {
           <button
             className="btn secondary"
             style={{ marginTop: 12 }}
-            onClick={() => { setFailMessage(''); setShowText(true) }}
+            onClick={() => { logClick(SCREEN, 'retry_as_text'); setFailMessage(''); setShowText(true) }}
           >
             <span aria-hidden="true">⌨️</span> 글로 입력하기
           </button>
@@ -142,7 +147,7 @@ export default function Home({ onStarted, onTraining }) {
         <p className="sub">
           어제 확인하신 내용과 비슷한 문제를 하나 준비했습니다.
         </p>
-        <button className="btn secondary" onClick={onTraining}>
+        <button className="btn secondary" onClick={() => { logClick(SCREEN, 'to_training'); onTraining() }}>
           오늘의 연습 하러 가기
         </button>
       </div>

@@ -9,6 +9,9 @@
  */
 import { useState } from 'react'
 import { submitVerdict } from '../api.js'
+import { logClick, logError } from '../events.js'
+
+const SCREEN = 'S4'
 
 const DECISIONS = [
   { id: 'not_apply', label: '이번엔 따라하지 않을래요', icon: '🙅' },
@@ -36,6 +39,7 @@ export default function Decision({ checkId, onTraining, onHome }) {
       setResult(await submitVerdict(checkId, decision))
     } catch (e) {
       setError(e.message)
+      logError(SCREEN, 'verdict_submit_failed')
     } finally {
       setBusy(false)
     }
@@ -49,8 +53,8 @@ export default function Decision({ checkId, onTraining, onHome }) {
           <span className="badge">{ERROR_TYPE_LABEL[result.tagged_error_type] || '확인이 필요한 글'}</span>
           <p className="lead" style={{ marginTop: 14 }}>{result.message}</p>
         </div>
-        <button className="btn" onClick={onTraining}>오늘의 5분 연습 하러 가기</button>
-        <button className="btn secondary" onClick={onHome}>처음으로 돌아가기</button>
+        <button className="btn" onClick={() => { logClick(SCREEN, 'to_training'); onTraining() }}>오늘의 5분 연습 하러 가기</button>
+        <button className="btn secondary" onClick={() => { logClick(SCREEN, 'to_home'); onHome() }}>처음으로 돌아가기</button>
       </>
     )
   }
@@ -66,7 +70,7 @@ export default function Decision({ checkId, onTraining, onHome }) {
       {error && <div className="error-box">{error}</div>}
 
       {DECISIONS.map((d) => (
-        <button key={d.id} className="btn choice" disabled={busy} onClick={() => choose(d.id)}>
+        <button key={d.id} className="btn choice" disabled={busy} onClick={() => { logClick(SCREEN, `decision_${d.id}`); choose(d.id) }}>
           <span aria-hidden="true">{d.icon}</span> {d.label}
         </button>
       ))}

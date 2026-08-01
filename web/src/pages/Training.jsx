@@ -7,6 +7,9 @@
  */
 import { useEffect, useState } from 'react'
 import { getTodayCard, getWeeklyReport } from '../api.js'
+import { logClick, logError } from '../events.js'
+
+const SCREEN = 'S5'
 
 const ERROR_TYPE_LABEL = {
   title_dependent: '제목만 보고 판단',
@@ -30,6 +33,7 @@ export default function Training({ onHome }) {
         setReport(r)
       } catch (e) {
         setError(e.message)
+        logError(SCREEN, 'training_fetch_failed')
       }
     })()
   }, [])
@@ -54,14 +58,14 @@ export default function Training({ onHome }) {
           key={it.id}
           className={`btn choice ${picked === it.id ? 'selected' : ''}`}
           disabled={showAnswer}
-          onClick={() => setPicked(it.id)}
+          onClick={() => { logClick(SCREEN, 'training_choice'); setPicked(it.id) }}
         >
           <span aria-hidden="true">{picked === it.id ? '✅' : '⬜'}</span> {it.label}
         </button>
       ))}
 
       {!showAnswer ? (
-        <button className="btn" disabled={!picked} onClick={() => setShowAnswer(true)}>
+        <button className="btn" disabled={!picked} onClick={() => { logClick(SCREEN, 'show_answer'); setShowAnswer(true) }}>
           답 확인하기
         </button>
       ) : (
@@ -92,7 +96,7 @@ export default function Training({ onHome }) {
         </div>
       )}
 
-      <button className="btn secondary" onClick={onHome}>처음으로 돌아가기</button>
+      <button className="btn secondary" onClick={() => { logClick(SCREEN, 'to_home'); onHome() }}>처음으로 돌아가기</button>
     </>
   )
 }

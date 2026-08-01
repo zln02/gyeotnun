@@ -166,6 +166,47 @@ class DiagnosisResponse(BaseModel):
     message: str
 
 
+# ---------------------------------------------------------------- 사용자 행동 계측
+EventType = Literal["screen_enter", "screen_leave", "click", "evidence_link_click", "error"]
+
+_SCREENS = Literal["S1", "S2", "S3", "S4", "S5"]
+
+
+class EventIn(BaseModel):
+    """POST /api/v1/events 요청 1건.
+
+    ★ 화면에 입력된 텍스트(붙여넣은 글, 질문 답변 자유 서술 등)는 절대 담지 않는다.
+      target/meta 는 버튼 id·화면 이름·오류 유형처럼 짧고 정해진 값만 담아야 한다
+      (그 외는 서버가 정제/폐기한다 - routers/events.py).
+    """
+    device_id: str = Field(..., description="비회원 식별자 (서버에서 SHA-256 해시로만 저장)")
+    session_id: str = Field(..., description="브라우저 세션(SPA 로드) 단위 UUID - 개인정보 아님")
+    event_type: EventType
+    screen: Optional[_SCREENS] = Field(None, description="S1~S5 중 하나")
+    target: Optional[str] = Field(None, max_length=64, description="버튼 id 또는 오류 유형 등")
+    ts: Optional[str] = Field(None, description="클라이언트 발생 시각(ISO 8601). 없으면 서버 수신 시각을 쓴다")
+    meta: Optional[dict] = Field(None, description="소량의 구조화된 부가정보 (자유 텍스트 금지)")
+
+
+class EventAckResponse(BaseModel):
+    """POST /api/v1/events 응답. fire-and-forget 이라 프론트는 이 값을 보지 않는다."""
+    accepted: int = Field(..., description="1이면 기록됨, 0이면 무시됨(실패해도 200을 돌려준다)")
+
+
+class EventSummaryResponse(BaseModel):
+    """GET /api/v1/events/summary 응답. 8/5 사용성 테스트 정량 집계용."""
+    total_sessions: int = Field(..., description="이벤트가 1건이라도 있는 세션 수")
+    screen_reached_sessions: dict = Field(default_factory=dict, description="{screen: 그 화면에 도달한 세션 수}")
+    screen_avg_dwell_sec: dict = Field(default_factory=dict, description="{screen: 평균 체류시간(초)}")
+    screen_dwell_sample_count: dict = Field(default_factory=dict, description="{screen: 체류시간 표본 수(leave 기록이 없는 세션은 제외됨)}")
+    screen_drop_off_rate: dict = Field(default_factory=dict, description="{screen: 그 화면이 마지막이었던 세션 비율(0~1)}")
+    screen_avg_time_to_first_click_sec: dict = Field(default_factory=dict, description="{screen: 진입~첫 클릭 평균초} - 시니어 UX 핵심 지표")
+    click_counts: dict = Field(default_factory=dict, description="{버튼 target: 클릭 수}")
+    evidence_link_click_sessions: int = Field(0, description="근거 링크를 1번이라도 누른 세션 수")
+    evidence_link_click_rate: float = Field(0.0, description="S3 도달 세션 중 근거 링크 클릭 비율(0~1) - '공식 출처 확인률'")
+    error_counts: dict = Field(default_factory=dict, description="{오류 유형: 발생 수}")
+
+
 # ---------------------------------------------------------------- 기타
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"

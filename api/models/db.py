@@ -1,5 +1,5 @@
 """
-곁눈(Gyeotnun) - SQLAlchemy 테이블 정의 (7테이블)
+곁눈(Gyeotnun) - SQLAlchemy 테이블 정의 (8테이블)
 담당: 박진영 (DB)
 
 ★★ 개인정보 처리 원칙 (보안 배점 대응) ★★
@@ -158,6 +158,34 @@ class WeeklyReport(Base):
     streak_days = Column(Integer, default=0)
     message = Column(Text, default="")
     created_at = Column(DateTime, default=_now)
+
+
+# ------------------------------------------------------------------ 8. events
+class Event(Base):
+    """사용자 행동 계측 1건 (8/5 60대 사용성 테스트 정량 지표용).
+
+    ★ 개인정보 원칙: 화면에 입력된 텍스트(붙여넣은 글, 자유 서술 답변 등)는
+      절대 저장하지 않는다. device_id 도 원문이 아니라 SHA-256 해시로만 남긴다
+      (users.device_hash 와 같은 방식). target/meta 도 자유 텍스트가 아니라
+      버튼 id·화면 이름·오류 유형처럼 미리 정해진 짧은 값만 들어온다 - 정제는
+      routers/events.py 에서 한다(여기 도달한 값은 이미 정제된 값이라고 가정).
+    """
+
+    __tablename__ = "events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_hash = Column(String(64), nullable=False, index=True)   # sha256(device_id)
+    # ★ "device_id 기준으로만 묶는다"는 원칙의 그룹핑 키는 device_hash 다. session_id 는
+    #   개인정보가 아니라 브라우저 세션(같은 기기를 여러 참가자가 돌려 쓸 수 있는 사용성
+    #   테스트 특성상) 단위로 화면 흐름을 정확히 재구성하기 위한 임의 UUID일 뿐이다 -
+    #   이게 없으면 같은 기기의 서로 다른 방문이 하나로 뒤섞여 체류시간/이탈지점이 틀어진다.
+    session_id = Column(String(64), nullable=False, index=True)
+    event_type = Column(String(24), nullable=False)                # screen_enter|screen_leave|click|evidence_link_click|error
+    screen = Column(String(8), nullable=True)                      # S1~S5
+    target = Column(String(64), nullable=True)                     # 버튼 id / 오류 유형 등 (자유 텍스트 아님)
+    client_ts = Column(DateTime, nullable=True)                    # 클라이언트가 기록한 발생 시각(참고용)
+    meta = Column(JSON, default=dict)                              # 소량의 구조화된 부가정보만
+    created_at = Column(DateTime, default=_now, index=True)        # 서버 수신 시각 - 집계는 이 값을 기준으로 한다
 
 
 # ------------------------------------------------------------------ 엔진/세션

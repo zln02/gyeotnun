@@ -14,6 +14,9 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { getQuestion } from '../api.js'
+import { logClick, logError, logEvidenceLinkClick } from '../events.js'
+
+const SCREEN = 'S3'
 
 // 실제 API 는 질문 검증(2단 가드레일)이 재시도되면 턴마다 몇 초~10여 초씩 걸릴 수
 // 있다(Checking.jsx 의 S2 화면과 같은 이유). S2 에는 이 안내가 있었는데 S3 의
@@ -124,6 +127,7 @@ export default function Question({ checkId, evidence, onDone }) {
     } catch (e) {
       if (myRequestId !== requestIdRef.current) return
       setError(e.message)
+      logError(SCREEN, 'dialogue_fetch_failed')
     } finally {
       clearTimeout(longWaitTimer)
       if (myRequestId === requestIdRef.current) setLoading(false)
@@ -188,7 +192,21 @@ export default function Question({ checkId, evidence, onDone }) {
         <span className="source-label">🔗 실제 자료 (직접 눌러 확인)</span>
         {refs.length > 0 ? (
           refs.map((r) => (
-            <a key={r.url} className="source-link" href={r.url} target="_blank" rel="noreferrer">
+            <a
+              key={r.url}
+              className="source-link"
+              href={r.url}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => {
+                // ★ '공식 출처 확인률' 지표의 원천 - URL 원문 대신 도메인만 남긴다
+                //   (URL 은 공개된 정부 자료 링크라 개인정보는 아니지만, target 길이
+                //   제한도 있고 도메인만으로 충분히 분석 가능하다).
+                let domain = 'unknown'
+                try { domain = new URL(r.url).hostname } catch { /* noop */ }
+                logEvidenceLinkClick(SCREEN, domain)
+              }}
+            >
               <span aria-hidden="true">📄</span>
               <span>
                 {r.title}
@@ -219,7 +237,7 @@ export default function Question({ checkId, evidence, onDone }) {
           <button
             key={o.id}
             className={`btn choice ${selected === o.id ? 'selected' : ''}`}
-            onClick={() => setSelected(o.id)}
+            onClick={() => { logClick(SCREEN, 'choice_option'); setSelected(o.id) }}
           >
             <span aria-hidden="true">{selected === o.id ? '✅' : '⬜'}</span> {o.label}
           </button>
@@ -227,7 +245,7 @@ export default function Question({ checkId, evidence, onDone }) {
       </div>
 
       {/* ★ 화살표만 있는 버튼 금지 — '다음' 글자를 반드시 병기 */}
-      <button className="btn" disabled={!selected} onClick={next}>
+      <button className="btn" disabled={!selected} onClick={() => { logClick(SCREEN, data.is_final ? 'finish' : 'next_turn'); next() }}>
         {data.is_final ? '다 확인했어요' : '다음 →'}
       </button>
     </>

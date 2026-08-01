@@ -10,3 +10,4 @@ from .verdict import router as verdict_router        # noqa: F401
 from .training import router as training_router      # noqa: F401
 from .reports import router as reports_router        # noqa: F401
 from .onboarding import router as onboarding_router  # noqa: F401
+from .events import router as events_router          # noqa: F401
