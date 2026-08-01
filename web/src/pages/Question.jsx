@@ -15,6 +15,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { getQuestion } from '../api.js'
 
+// 실제 API 는 질문 검증(2단 가드레일)이 재시도되면 턴마다 몇 초~10여 초씩 걸릴 수
+// 있다(Checking.jsx 의 S2 화면과 같은 이유). S2 에는 이 안내가 있었는데 S3 의
+// 턴 전환 로딩에는 없어서, 느린 턴에서 화면이 멈춘 것처럼 보여 사용자가 다시
+// 시도하다 이탈하는 사례가 실제로 있었다(2026-08-01 실사용 로그에서 확인) - 같은
+// 패턴을 S3 에도 그대로 적용한다.
+const LONG_WAIT_MS = 10000
+const LONG_WAIT_MESSAGE = '생각보다 시간이 걸리고 있어요. 더 정확한 질문을 만들고 있습니다. 조금만 더 기다려 주세요.'
+
 /**
  * 확인 결과 배지 (S3 상단, 질문보다 먼저 보여준다)
  * ★ verdict_hint 하나만 그대로 옮기지 않는다. search.py 의 official_source_found /
@@ -94,6 +102,7 @@ export default function Question({ checkId, evidence, onDone }) {
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [longWait, setLongWait] = useState(false)
   // ★ 실제 API 는 응답이 겹칠 만큼 느릴 수 있다(React.StrictMode 의 개발 중 이펙트
   //   이중 실행도 같은 상황을 만든다). 가장 최근 요청의 응답만 반영하고,
   //   먼저 보낸 요청이 나중에 도착해도 화면을 덮어쓰지 않게 막는다.
@@ -104,6 +113,10 @@ export default function Question({ checkId, evidence, onDone }) {
     setLoading(true)
     setError('')
     setSelected(null)
+    setLongWait(false)
+    const longWaitTimer = setTimeout(() => {
+      if (myRequestId === requestIdRef.current) setLongWait(true)
+    }, LONG_WAIT_MS)
     try {
       const result = await getQuestion(checkId, nextTurn, reply)
       if (myRequestId !== requestIdRef.current) return   // 더 최신 요청이 이미 나갔다 - 이 응답은 버린다
@@ -112,6 +125,7 @@ export default function Question({ checkId, evidence, onDone }) {
       if (myRequestId !== requestIdRef.current) return
       setError(e.message)
     } finally {
+      clearTimeout(longWaitTimer)
       if (myRequestId === requestIdRef.current) setLoading(false)
     }
   }
@@ -136,7 +150,10 @@ export default function Question({ checkId, evidence, onDone }) {
     return (
       <>
         {evidence && <VerdictBadge evidence={evidence} />}
-        <div className="loading"><div className="spinner" /><p className="lead">질문을 준비하고 있어요</p></div>
+        <div className="loading">
+          <div className="spinner" role="status" aria-live="polite" />
+          <p className="lead">{longWait ? LONG_WAIT_MESSAGE : '질문을 준비하고 있어요'}</p>
+        </div>
       </>
     )
   }
