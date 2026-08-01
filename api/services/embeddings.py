@@ -61,12 +61,17 @@ BATCH_SIZE = 100
 BATCH_PAUSE_SEC = 1.0
 
 
-def _embed_upstage(texts: List[str], model: str, max_retries: int = 5) -> Tuple[List[List[float]], int]:
+def _embed_upstage(
+    texts: List[str], model: str, max_retries: int = 5, timeout: float = 60.0,
+) -> Tuple[List[List[float]], int]:
     """Upstage Solar Embedding 호출 1건. (벡터 목록, 사용 토큰 수) 를 돌려준다.
 
     ★ 429(레이트리밋)는 재시도한다 - 새 계정/짧은 시간에 배치를 몰아서 보내면
       실제로 걸린다(2026-08-02 전체 인덱싱 중 실측). Retry-After 헤더가 있으면
       그 값을, 없으면 지수 백오프(2, 4, 8, 16, 32초)를 쓴다.
+    ★ max_retries=1 이면 재시도 없이 즉시 실패한다 - 실시간 검색 경로
+      (match_embedding_docs)가 쓰는 모드. 인덱싱(build_index)은 기본값(5)으로
+      느긋하게 재시도한다 - 그쪽은 사용자가 기다리는 경로가 아니다.
     """
     import time
 
@@ -80,7 +85,7 @@ def _embed_upstage(texts: List[str], model: str, max_retries: int = 5) -> Tuple[
                 "Content-Type": "application/json",
             },
             json={"input": texts, "model": model},
-            timeout=60,
+            timeout=timeout,
         )
         if resp.status_code == 429 and attempt < max_retries:
             wait = float(resp.headers.get("Retry-After", 2 ** attempt))
@@ -95,7 +100,9 @@ def _embed_upstage(texts: List[str], model: str, max_retries: int = 5) -> Tuple[
     raise RuntimeError("Upstage 임베딩 재시도 한도 초과")
 
 
-def embed_texts(texts: List[str], input_type: str) -> Tuple[List[List[float]], int]:
+def embed_texts(
+    texts: List[str], input_type: str, timeout: float = 60.0, max_retries: int = 5,
+) -> Tuple[List[List[float]], int]:
     """텍스트 목록을 배치로 나눠 임베딩한다. input_type 은 'document'|'query'.
 
     ★★ 문서용/질의용 모델을 여기서 정확히 갈라 쓴다 - 색인할 때(document)와
@@ -112,7 +119,7 @@ def embed_texts(texts: List[str], input_type: str) -> Tuple[List[List[float]], i
     n_batches = (len(texts) + BATCH_SIZE - 1) // BATCH_SIZE
     for bi, i in enumerate(range(0, len(texts), BATCH_SIZE)):
         batch = texts[i : i + BATCH_SIZE]
-        vectors, tokens = _embed_upstage(batch, model)
+        vectors, tokens = _embed_upstage(batch, model, max_retries=max_retries, timeout=timeout)
         out.extend(vectors)
         total_tokens += tokens
         log.info(
@@ -231,26 +238,50 @@ _INDEX = EmbeddingIndex(EMBEDDING_INDEX_PATH)
 #   §match_official_docs 임계값 근거와 같은 논리).
 EMBEDDING_MIN_SCORE = 0.45
 
+# ★ 실시간 검색(사용자 요청 경로) 전용 타임아웃 - 인덱싱과 다르다. 실측(10회 반복,
+#   docs/evaluation/hybrid_search_report.md §0-1) 결과 API 왕복이 평균 110.6ms,
+#   최대 333.9ms였다. 3초면 그 최댓값의 9배 여유가 있어 정상 응답을 절대 짧게
+#   끊지 않으면서도, 사용자를 그 이상 기다리게 하지는 않는다. 재시도는 하지
+#   않는다(max_retries=1) - 재시도하면 그만큼 더 기다리게 할 뿐이고, 실패하면
+#   search.py 가 BM25 로 즉시 폴백하는 게 사용자 입장에서 더 빠르다.
+QUERY_TIMEOUT_SEC = 3.0
+
+
+class EmbeddingUnavailableError(Exception):
+    """임베딩 검색을 쓸 수 없다(키 없음/인덱스 없음/API 실패/타임아웃 등).
+
+    ★ 호출하는 쪽(search.py)이 이 예외를 잡아 BM25 로 즉시 폴백한다. 여기서
+      예외를 삼키고 빈 리스트를 돌려주면 "임베딩이 정말 0건을 찾았다"와
+      "임베딩 자체가 고장났다"를 구분할 수 없어 폴백이 불가능해진다.
+    """
+
 
 def match_embedding_docs(text: str, limit: int = 2, min_score: float = EMBEDDING_MIN_SCORE) -> List[tuple]:
     """질의 문장을 임베딩해 코사인 유사도로 가장 가까운 공식 문서를 찾는다.
 
     BM25 와 동일하게 청크 단위로 검색하고 문서(record_id) 단위로 최고점만 남긴다.
-    반환값은 (score, OfficialDoc) 튜플 리스트다.
+    반환값은 (score, OfficialDoc) 튜플 리스트다. 실패하면 빈 리스트가 아니라
+    EmbeddingUnavailableError 를 던진다 - 위 클래스 docstring 참고.
     """
-    if not settings.has_embeddings or not _INDEX.ready:
-        return []
+    if not settings.has_embeddings:
+        raise EmbeddingUnavailableError("UPSTAGE_API_KEY 가 설정되지 않았다")
+    if not _INDEX.ready:
+        raise EmbeddingUnavailableError("임베딩 인덱스 파일이 없거나 지금 설정과 맞지 않는다")
+
     try:
-        vectors, _tokens = embed_texts([text], input_type="query")
+        vectors, _tokens = embed_texts(
+            [text], input_type="query", timeout=QUERY_TIMEOUT_SEC, max_retries=1,
+        )
         q_vec = vectors[0]
-    except Exception as e:  # noqa: BLE001
-        log.warning("[embeddings] 질의 임베딩 실패(무시하고 0건 반환): %s", e)
-        return []
+    except EmbeddingUnavailableError:
+        raise
+    except Exception as e:  # noqa: BLE001 - httpx 타임아웃/네트워크 오류/HTTP 오류 전부 포함
+        raise EmbeddingUnavailableError(f"질의 임베딩 실패: {e}") from e
 
     q = np.array(q_vec, dtype=np.float32)
     q_norm = np.linalg.norm(q)
     if q_norm == 0:
-        return []
+        raise EmbeddingUnavailableError("질의 임베딩이 영벡터로 돌아왔다")
     q = q / q_norm
 
     sims = _INDEX.vectors @ q  # 저장 시 이미 정규화했으므로 내적 = 코사인 유사도

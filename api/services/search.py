@@ -30,13 +30,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from config import MissingKeyError, settings
 from services import corpus_index
+
+log = logging.getLogger("gyeotnun.search")
 
 CORPUS_DIR = Path(__file__).resolve().parents[2] / "corpus" / "public_data"
 
@@ -238,10 +241,51 @@ def match_official_docs_hybrid(
     ]
 
 
+# ★ 2026-08 채택 결정: 임베딩 단독(Upstage) - 30건 벤치마크에서 BM25 대비 뚜렷한
+#   우위(정상 근거매칭 7/10→10/10, Recall@3 30%→65%)를 실측으로 확인했다
+#   (docs/evaluation/hybrid_search_report.md). 하이브리드(RRF)는 미채택이지만
+#   코드는 지우지 않고 남겨 뒀다(match_official_docs_hybrid, 위) - 나중에 다시
+#   검토하거나 폴백 전략을 바꿀 때 재활용한다.
+#
+# ★ 발표 당일 최대 리스크는 외부 API(Upstage) 의존이다(사용자 명시) - 그래서
+#   임베딩을 기본으로 쓰되, 실패하면 로컬 BM25 로 즉시 폴백한다. BM25 는 "공짜
+#   보험" - 어떤 이유로든 임베딩이 안 되면 서비스가 멈추는 대신 조용히 BM25 로
+#   내려간다.
+def match_official_docs_safe(text: str, limit: int = 2) -> tuple:
+    """공식 문서 검색 - 임베딩을 우선 쓰고, 실패하면 즉시 BM25 로 폴백한다.
+
+    반환값: (문서 리스트, 실제 쓰인 방식("embedding"|"bm25_fallback"),
+    임베딩 최상위 유사도 - BM25 폴백이면 None, 척도가 달라 비교 불가하다).
+    """
+    from services import embeddings
+
+    try:
+        hits = embeddings.match_embedding_docs(text, limit=limit)
+        docs = [d for _, d in hits]
+        top_score = hits[0][0] if hits else None
+        log.info("[official_search] 임베딩 검색 성공 (%d건)", len(docs))
+        return docs, "embedding", top_score
+    except embeddings.EmbeddingUnavailableError as e:
+        log.warning("[official_search] 임베딩 검색 실패 - BM25 로 폴백: %s", e)
+        docs = corpus_index.match_official_docs(text, limit=limit)
+        log.info("[official_search] BM25 폴백 완료 (%d건)", len(docs))
+        return docs, "bm25_fallback", None
+
+
+# ★ 임계값(0.52)의 근거: 30건 평가세트 실측(docs/evaluation/hybrid_search_report.md
+#   §0-1과 같은 실측 세션). '정상' 10건 중 최저 유사도는 0.5378(N02)이었고,
+#   '경계'(모호한 사례, 확인불가가 기대판단) 10건 중 최고 유사도는 0.5058(B01)
+#   이었다 - 0.5058과 0.5378 사이가 비어 있어 0.52 를 그 사이에 놓았다. 이 값
+#   아래면 "근거는 찾았지만(레퍼런스로는 보여주되) 확인됨으로 단정할 만큼
+#   확신하지는 않는다"로 취급해 확인불가로 유보한다 - 검색 성공 여부(참고자료
+#   유무)와 판정 확신도(needs_check로 볼지)를 분리한 것이다.
+CONFIDENT_MATCH_THRESHOLD = 0.52
+
+
 def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
     """근거 수집 파이프라인.
 
-    우선순위: corpus_index 공식 문서(OFFICIAL_DOCS, 공공데이터 1,017건, BM25 검색)
+    우선순위: 공식 문서(임베딩 우선, 실패 시 BM25 폴백 - match_official_docs_safe)
     → corpus_index 근거_검증표(EVIDENCE, 11건 수작업 검증 통계) → public_data 레거시
     (577건, 아직 비어 있음). 셋 다 못 찾으면 '못 찾았다'는 사실 자체를 신호로 남긴다
     (판정하지 않는다).
@@ -251,9 +295,8 @@ def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
     """
     signals = detect_signals(text)
 
-    # ---- 공식 문서를 먼저 검색한다 (corpus_index.OFFICIAL_DOCS, BM25 - 청크 단위로
-    #      검색하고 문서 단위로 묶여서 돌아온다. match_official_docs() 참고)
-    matched_official = corpus_index.match_official_docs(text)
+    # ---- 공식 문서를 먼저 검색한다 (임베딩 우선, 실패 시 BM25 폴백)
+    matched_official, official_mode, official_top_score = match_official_docs_safe(text)
     matched_evidence = corpus_index.match_evidence(text)
     matched_scam = corpus_index.match_scam_cases(text)
     legacy_refs = search_corpus(text, domain=domain)
@@ -294,6 +337,19 @@ def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
     #   attention 신호(사기 패턴 일치, 조건 생략, 서두름)가 있을 때만 '의심'으로 올린다.
     risky = any(s["severity"] == "attention" for s in signals)
 
+    # ★ 경계 케이스 개선(2026-08): "근거를 찾았는가"와 "그 근거를 확인됨으로 볼
+    #   만큼 확신하는가"를 분리한다. matched_evidence(수작업 검증 통계)·
+    #   matched_scam(사기사례 매칭, 자체 임계값 5.0 통과)·BM25 폴백(자체 임계값
+    #   12.0 통과)은 이미 각자의 검증을 거쳤으니 그대로 확신 있는 근거로 본다.
+    #   임베딩 경로만 추가로 CONFIDENT_MATCH_THRESHOLD 를 넘는지 본다 - 넘지
+    #   못하면(예: 0.45~0.52 사이의 약한 유사도) references 에는 그대로 보여주되
+    #   (근거는 찾되) needs_check 로 단정하지는 않는다.
+    if official_mode == "embedding":
+        official_confident = official_top_score is not None and official_top_score >= CONFIDENT_MATCH_THRESHOLD
+    else:  # bm25_fallback 이거나 애초에 매칭이 없었던 경우
+        official_confident = bool(matched_official)
+    has_confident_source = official_confident or bool(matched_evidence) or bool(matched_scam)
+
     if not refs:
         # ★ 확인 불가가 기본값이다. 출처를 못 찾았을 때 '가짜'라고 단정하지 않고
         #   '못 찾았다'는 사실만 남긴다 - 애매할 때 의심/확인됨으로 넘기지 않는다.
@@ -305,6 +361,11 @@ def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
         })
     elif risky:
         hint = "partially_matched"
+    elif not has_confident_source:
+        # ★ 근거는 있다(refs 는 비어 있지 않다 - 화면에 참고자료로 계속 보여준다)
+        #   그런데 그 근거가 임베딩의 약한 유사도뿐이라 확신하기엔 부족하다.
+        #   확인됨으로 단정하지 않고 확인불가로 유보한다.
+        hint = "no_source_found"
     else:
         hint = "needs_check"
 

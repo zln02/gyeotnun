@@ -289,13 +289,15 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 - 질문 생성: Claude(`claude-sonnet-5`)로 실제 호출 + 재생성 루프 + 프롬프트 캐싱
   (`services/prompt_chain.py`)
 - 근거 대조: `근거_검증표`/`평가세트`/`사례_재라벨링표` CSV 로컬 인덱스 대조 +
-  공공데이터 996건 BM25 검색(`services/corpus_index.py`, 네이버 검색 API 는
-  아직 미연동)
-- **실험적(아직 프로덕션 미채택)**: Upstage Solar Embedding 기반 임베딩 검색 +
-  RRF 하이브리드(`services/embeddings.py`, `search.match_official_docs_hybrid`).
-  30건 벤치마크 결과 임베딩이 BM25보다 뚜렷이 우수했으나(정상 근거매칭
-  7/10→10/10, Recall@3 30%→65%), 어느 방식을 실제로 쓸지는 아직 결정 전이라
-  `collect_evidence()`(실제 서비스 경로)는 여전히 BM25 단독이다. 근거와 비교표는
+  공공데이터 996건 대상 **Upstage Solar Embedding 검색을 채택해 프로덕션
+  적용**(`services/embeddings.py`, `search.match_official_docs_safe`). BM25
+  단독 대비 정상 근거매칭 7/10→10/10, Recall@3 30%→65%, 경계 확인불가
+  1/10→3/10(정상 오판은 0/10 그대로 유지)로 전 지표 개선. 임베딩 API 장애·
+  타임아웃(3초) 시 로컬 BM25 검색(`services/corpus_index.py`)으로 자동
+  폴백하며 그 사실을 로그로 남긴다 - 발표 당일 외부 API 의존 리스크에 대한
+  "공짜 보험". RRF 하이브리드 결합(`search.match_official_docs_hybrid`)은
+  벤치마크 결과 임베딩 단독보다 나은 지표가 없어 미채택했지만, 코드는
+  삭제하지 않고 남겨 뒀다. 근거·비교표는
   [`docs/evaluation/hybrid_search_report.md`](docs/evaluation/hybrid_search_report.md).
 - 오판유형 태깅: Claude 프롬프팅 기반 분류(`services/tagger.py` `tag_error_type_llm`),
   실패 시 규칙 기반으로 자동 폴백
@@ -305,8 +307,8 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 
 **TODO (담당자별)**
 - 박진: 링크 본문 추출, 얼굴 블러
-- 김유리: 네이버 검색 API 연동(현재는 로컬 CSV 대조까지). 임베딩/하이브리드 검색은
-  구현·벤치마크 완료 - 채택 여부만 남음(위 "실험적" 항목 참고)
+- 김유리: 네이버 검색 API 연동(현재는 로컬 CSV 대조까지). 임베딩 검색은 채택·
+  프로덕션 적용 완료(위 항목 참고)
 - 김태희: 프롬프트 튜닝(질문 길이 등)
 - 장지석: 공공데이터 577건 수집·변환, 코퍼스→훈련카드 자동 생성
 - 조희진: iOS 대체 경로 실기기 테스트(Share Target 은 Android Chrome 전용)
