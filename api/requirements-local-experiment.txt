@@ -1,0 +1,9 @@
+# 로컬 OCR·임베딩 실험 전용 의존성 (2026-08, 8/2 멘토 지적 대응)
+# ★ 이 파일은 프로덕션 requirements.txt 와 분리돼 있다 - 운영 이미지 빌드에
+#   영향을 주지 않는다(운영 컨테이너에는 절대 설치하지 않는다). 실험은
+#   api/Dockerfile.local-experiment 로 만든 별도 격리 컨테이너에서만 돈다.
+# 설치: pip install -r requirements-local-experiment.txt
+
+pytesseract==0.3.13          # Tesseract 바인딩 (시스템 tesseract-ocr 필요)
+easyocr==1.7.2                # 딥러닝 기반 OCR (torch CPU 로 동작)
+sentence-transformers==3.3.1  # 로컬 임베딩 (multilingual-e5-small, ko-sroberta 등)
