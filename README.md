@@ -135,6 +135,8 @@ Base URL: 로컬 `http://localhost:8000/api/v1` · 배포 `https://gyeotnun.duck
 | `POST` | `/onboarding/diagnosis` | 첫 실행 3문항 진단 | 장지석 |
 | `POST` | `/events` | 사용자 행동 이벤트 기록 (fire-and-forget, mock 없음) | 박진영 |
 | `GET` | `/events/summary` | 화면별 체류시간·이탈률·클릭수·근거링크 클릭률 집계 | 박진영 |
+| `GET` | `/errors/codes` | 오류 코드 전체 정의(단일 소스, mock 없음) | 박진영 |
+| `GET` | `/errors/summary` | 최근 오류를 코드별로 집계 | 박진영 |
 
 ### 주요 응답 형태
 
@@ -232,7 +234,7 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 
 ---
 
-## 8. DB 스키마 (8테이블)
+## 8. DB 스키마 (9테이블)
 
 `api/models/db.py`
 
@@ -246,6 +248,25 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 | `corpus` | 공공데이터 577건 |
 | `weekly_reports` | 주간 리포트 스냅샷 |
 | `events` | 사용자 행동 계측 (화면 진입/이탈·클릭·오류 - **입력 내용 없음**, device 해시만) |
+| `error_logs` | 장애 로그(2026-08) - 코드/화면/device 해시/짧은 진단정보만, **개인정보 없음** |
+
+### 오류 코드 체계 (2026-08 추가, 8/2 보안 멘토링 지시사항)
+
+- 목적: 심사 배점(시스템 오류 대비·복구) 대응 - 모든 오류 응답과 화면에 코드를
+  실어 문의 시 식별할 수 있게 한다.
+- 단일 소스: `api/services/error_codes.py` (영역별 접두어: 입력 IN·인식 RC·
+  마스킹 MK·검색 SR·생성 GN·저장 ST·외부연동 EX·공통 SYS). 프론트는 이 표를
+  `GET /api/v1/errors/codes` 로 받아서 쓴다 - 프론트에 따로 복사해 두지 않는다.
+- 표 전체(코드/상황/사용자 안내/복구 방법)는 [`docs/error_codes.md`](docs/error_codes.md)
+  (`api/tools/gen_error_codes_doc.py` 로 단일 소스에서 자동 생성).
+- 장애 로그: 서버가 스스로 인지한 실패는 `error_logs` 테이블에(`services/incident_log.py`,
+  DB 쓰기 자체가 실패해도 절대 상위로 예외를 던지지 않는다), 프론트가 신고한 오류는
+  기존 `events` 테이블(`event_type=error`, `target`에 오류 코드)에 남는다.
+  `GET /api/v1/errors/summary` 로 두 표를 코드 기준으로 합쳐 집계한다.
+- **주의**: 코드를 부여하는 작업이지 폴백 동작을 바꾸는 작업이 아니다 - 임베딩
+  실패 시 BM25 자동 전환(EX-003), 질문 재생성 실패 시 기본 질문 대체(GN-001),
+  태깅 LLM 실패 시 규칙 기반 대체(GN-002) 등 기존 폴백은 그대로 두고 코드+로그만
+  추가했다.
 
 ---
 

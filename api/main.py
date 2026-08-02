@@ -42,6 +42,7 @@ from models.schemas import HealthResponse
 from routers import (
     checks_router,
     dialogue_router,
+    errors_router,
     events_router,
     onboarding_router,
     reports_router,
@@ -60,7 +61,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (checks_router, dialogue_router, verdict_router, training_router, reports_router, onboarding_router, events_router):
+for r in (checks_router, dialogue_router, verdict_router, training_router, reports_router, onboarding_router, events_router, errors_router):
     app.include_router(r, prefix=settings.API_PREFIX)
 
 

@@ -31,13 +31,16 @@ async def record_verdict(check_id: str, body: VerdictRequest, mock: int = MockFl
         data["check_id"] = check_id
         return VerdictResponse(**data)
 
+    stored: dict = {}
     try:
         stored = _MEMORY_STORE.get(check_id, {})
         text = stored.get("masked_text", "")
         signals = search.detect_signals(text)                     # 키 불필요 (규칙 기반)
         error_type, confidence = tagger.tag_error_type_llm(text, signals, decision=body.decision)
-    except Exception as e:  # noqa: BLE001
-        raise not_implemented(e) from e
+    except Exception as e:  # noqa: BLE001 - tag_error_type_llm() 은 실패해도 예외를 던지지
+        # 않으므로(자체적으로 규칙 기반 GN-002 로 대체) 여기 도달하는 예외는 정말 예상 밖의
+        # 버그다. 특정 영역으로 분류할 근거가 없어 미분류 안전망(SYS-000)을 쓴다.
+        raise not_implemented(e, "SYS-000", screen="S4", device_id=stored.get("device_id")) from e
 
     return VerdictResponse(
         check_id=check_id,

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 from config import MissingKeyError, settings
+from services.incident_log import log_incident
 
 CARDS_PATH = Path(__file__).resolve().parents[2] / "corpus" / "training_cards" / "sample_cards.json"
 
@@ -26,10 +27,14 @@ CARDS_PATH = Path(__file__).resolve().parents[2] / "corpus" / "training_cards" /
 def load_sample_cards() -> list[dict]:
     """샘플 훈련카드 로드 (키 불필요). 코퍼스 확보 전까지의 기본 공급원."""
     if not CARDS_PATH.exists():
-        return []
+        return []   # ★ 파일이 아직 없는 건 정상 상태(코퍼스 준비 전)이지 장애가 아니다.
     try:
         return json.loads(CARDS_PATH.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as e:
+        # ★ 파일은 있는데 못 읽는 건 진짜 장애다(손상/권한 등) - ST-002 로 서버가 인지한다.
+        #   기존처럼 빈 목록을 돌려주는 폴백 자체는 그대로 유지한다(routers/training.py 가
+        #   빈 목록을 501+ST-002 안내로 바꾼다).
+        log_incident("ST-002", detail=f"sample_cards.json 로드 실패: {e}")
         return []
 
 

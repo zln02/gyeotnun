@@ -228,6 +228,10 @@ def tag_error_type_llm(
         return etype, confidence
     except Exception as e:  # noqa: BLE001 - 어떤 이유로든 실패하면 규칙 기반으로 내려간다
         log.warning("[tag] LLM 분류 실패, 규칙 기반으로 대체: %s", e)
+        # ★ 오류 코드 체계(2026-08): 규칙 기반 대체는 그대로 두고(기존 폴백, 동작 변경
+        #   없음), 서버가 빈도를 인지하도록 GN-002 만 남긴다.
+        from services.incident_log import log_incident
+        log_incident("GN-002", detail=str(e)[:120])
         return tag_error_type(signals, text=text, decision=decision)
 
 

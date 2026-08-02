@@ -11,6 +11,8 @@
  *   3) 기본값 = 실제 API (false)
  */
 
+import { withCode } from './errorCodes.js'
+
 const params = new URLSearchParams(window.location.search)
 const envDefaultMock = import.meta.env.VITE_USE_MOCK === '1'
 
@@ -26,29 +28,48 @@ function url(path) {
   return `${BASE}${path}${sep}mock=${USE_MOCK ? 1 : 0}`
 }
 
+/** 오류 코드를 실은 Error 를 만든다. 화면(error.message)과 계측(error.code) 양쪽에 다 쓴다. */
+function codedError(message, code) {
+  const err = new Error(withCode(message, code))
+  err.code = code
+  return err
+}
+
+// ★ fetch() 자체가 실패하면(오프라인 등) 응답이 아예 없다 - 서버는 이 실패를
+//   볼 수 없으므로(요청이 도달하지 않음) 프론트에서만 EX-004 로 판단한다.
+async function safeFetch(input, init) {
+  try {
+    return await fetch(input, init)
+  } catch {
+    throw codedError('인터넷 연결을 확인해 주세요.', 'EX-004')
+  }
+}
+
 async function handle(res) {
   if (res.ok) return res.json()
+  let code = ''
   let detail = ''
   try {
     const body = await res.json()
+    code = body?.detail?.code || ''
     detail = body?.detail?.message || body?.detail || JSON.stringify(body)
   } catch {
     detail = await res.text()
   }
   // 501 = 키가 없거나 아직 구현 전. 사용자에게는 부드럽게 안내한다.
   if (res.status === 501) {
-    throw new Error(`아직 준비 중인 기능입니다. (${detail})`)
+    throw codedError(`아직 준비 중인 기능입니다. (${detail})`, code || 'SYS-000')
   }
-  throw new Error(detail || `요청에 실패했습니다. (${res.status})`)
+  throw codedError(detail || `요청에 실패했습니다. (${res.status})`, code || 'SYS-000')
 }
 
 async function getJSON(path) {
-  return handle(await fetch(url(path)))
+  return handle(await safeFetch(url(path)))
 }
 
 async function postJSON(path, body) {
   return handle(
-    await fetch(url(path), {
+    await safeFetch(url(path), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body ?? {}),
@@ -74,7 +95,7 @@ export async function createCheck({ image, link, text }) {
   if (image) fd.append('image', image)
   if (link) fd.append('link', link)
   if (text) fd.append('text', text)
-  return handle(await fetch(url('/checks'), { method: 'POST', body: fd }))
+  return handle(await safeFetch(url('/checks'), { method: 'POST', body: fd }))
 }
 
 /* ------------------------------------------------------------------ S2 */
@@ -114,5 +135,5 @@ export async function submitDiagnosis(answers) {
 
 /** GET /health */
 export async function health() {
-  return handle(await fetch('/health'))
+  return handle(await safeFetch('/health'))
 }

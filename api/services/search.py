@@ -267,6 +267,11 @@ def match_official_docs_safe(text: str, limit: int = 2) -> tuple:
         return docs, "embedding", top_score
     except embeddings.EmbeddingUnavailableError as e:
         log.warning("[official_search] 임베딩 검색 실패 - BM25 로 폴백: %s", e)
+        # ★ 오류 코드 체계(2026-08): 폴백 동작 자체는 그대로 두고(BM25 결과를 반환),
+        #   서버가 이 발생 빈도를 스스로 인지하도록 EX-003 을 남긴다. 사용자 화면은
+        #   바뀌지 않는다("주의: 기존 폴백 동작을 바꾸지 마라").
+        from services.incident_log import log_incident
+        log_incident("EX-003", detail=str(e)[:120])
         docs = corpus_index.match_official_docs(text, limit=limit)
         log.info("[official_search] BM25 폴백 완료 (%d건)", len(docs))
         return docs, "bm25_fallback", None

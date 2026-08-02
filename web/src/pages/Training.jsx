@@ -33,7 +33,7 @@ export default function Training({ onHome }) {
         setReport(r)
       } catch (e) {
         setError(e.message)
-        logError(SCREEN, 'training_fetch_failed')
+        logError(SCREEN, e.code || 'training_fetch_failed')
       }
     })()
   }, [])

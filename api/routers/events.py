@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 from models.db import Event, get_db
 from models.schemas import EventAckResponse, EventIn, EventSummaryResponse
+from services.incident_log import log_incident
 
 router = APIRouter(prefix="/events", tags=["events"])
 log = logging.getLogger("gyeotnun.events")
@@ -99,6 +100,10 @@ async def create_event(body: EventIn, db: Session = Depends(get_db)):
         return EventAckResponse(accepted=1)
     except Exception as e:  # noqa: BLE001 - 계측 실패가 사용자 화면에 나가면 안 된다
         log.warning("[events] 기록 실패(무시하고 계속): %s", e)
+        # ★ 멘토 조언 적용: 사용자에게는 그대로 200(accepted=0)을 돌려주지만(기존 폴백,
+        #   동작 변경 없음), 서버는 이 실패를 error_logs 에도 남겨 스스로 인지한다.
+        #   incident_log 는 별도 세션을 쓰므로 위에서 실패한 `db` 세션과 무관하게 동작한다.
+        log_incident("ST-003", screen=body.screen, device_id=body.device_id, detail=str(e)[:120])
         return EventAckResponse(accepted=0)
 
 

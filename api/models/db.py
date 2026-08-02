@@ -1,5 +1,5 @@
 """
-곁눈(Gyeotnun) - SQLAlchemy 테이블 정의 (8테이블)
+곁눈(Gyeotnun) - SQLAlchemy 테이블 정의 (9테이블)
 담당: 박진영 (DB)
 
 ★★ 개인정보 처리 원칙 (보안 배점 대응) ★★
@@ -186,6 +186,29 @@ class Event(Base):
     client_ts = Column(DateTime, nullable=True)                    # 클라이언트가 기록한 발생 시각(참고용)
     meta = Column(JSON, default=dict)                              # 소량의 구조화된 부가정보만
     created_at = Column(DateTime, default=_now, index=True)        # 서버 수신 시각 - 집계는 이 값을 기준으로 한다
+
+
+# ------------------------------------------------------------------ 9. error_logs
+class ErrorLog(Base):
+    """장애 로그 1건 (2026-08 오류 코드 체계 도입, 8/2 보안 멘토링 지시사항).
+
+    ★ 멘토 조언의 직접 구현: "저장 실패 시 사용자에게 조치를 요구하지 말고, 서버가
+      로그를 받아 장애를 인지하고 상태를 공지한 뒤 수정하는 방식으로 가라." - 이 표는
+      클라이언트 요청 없이도 서버 코드 스스로가 자기 실패를 여기에 남긴다
+      (services/incident_log.py 참고).
+    ★ 개인정보 원칙: events 테이블과 동일하다 - device_hash 만 남기고 원문은 저장하지
+      않는다. detail 은 예외 메시지를 그대로 넣지 않고 길이를 짧게 자른 진단 정보만
+      담는다(services/incident_log.py 에서 자름).
+    """
+
+    __tablename__ = "error_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String(16), nullable=False, index=True)           # 예: EX-001 (services/error_codes.py)
+    screen = Column(String(8), nullable=True)                       # S1~S5, 알 수 없으면 null
+    device_hash = Column(String(64), nullable=True, index=True)     # sha256(device_id), 없으면 null
+    detail = Column(String(200), nullable=True)                     # 짧은 진단 정보만 (개인정보 절대 금지)
+    created_at = Column(DateTime, default=_now, index=True)
 
 
 # ------------------------------------------------------------------ 엔진/세션

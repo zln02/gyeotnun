@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createCheck } from '../api.js'
 import { logClick, logError } from '../events.js'
+import { withCode } from '../errorCodes.js'
 
 const SCREEN = 'S1'
 
@@ -35,14 +36,17 @@ export default function Home({ onStarted, onTraining }) {
     try {
       const data = await createCheck(payload)
       if (data.status === 'failed') {
-        setFailMessage(data.message || '처리하지 못했습니다. 글로 직접 입력해 주세요.')
-        logError(SCREEN, 'upload_failed')
+        const code = data.error_code || 'SYS-000'
+        setFailMessage(withCode(data.message || '처리하지 못했습니다. 글로 직접 입력해 주세요.', code))
+        logError(SCREEN, code)
         return
       }
       onStarted(data)
     } catch (e) {
+      // ★ e.message 는 api.js 의 handle()/safeFetch() 가 이미 "(오류 코드: XX-000)" 를
+      //   덧붙여 준 상태다 - 화면에 별도로 코드를 또 붙이지 않는다.
       setError(e.message)
-      logError(SCREEN, 'api_error')
+      logError(SCREEN, e.code || 'SYS-000')
     } finally {
       setBusy(false)
     }
@@ -66,8 +70,8 @@ export default function Home({ onStarted, onTraining }) {
         const cache = await caches.open(SHARE_CACHE)
         const res = await cache.match(SHARE_KEY)
         if (!res) {
-          logError(SCREEN, 'share_image_missing')
-          setFailMessage('공유된 사진을 받지 못했습니다. 아래 "사진 올리기"로 다시 시도해 주세요.')
+          logError(SCREEN, 'IN-003')
+          setFailMessage(withCode('공유된 사진을 받지 못했습니다. 아래 "사진 올리기"로 다시 시도해 주세요.', 'IN-003'))
           return
         }
         const blob = await res.blob()
@@ -75,8 +79,8 @@ export default function Home({ onStarted, onTraining }) {
         const file = new File([blob], 'shared-image.jpg', { type: blob.type || 'image/jpeg' })
         start({ image: file })
       } catch (e) {
-        logError(SCREEN, 'share_image_read_failed')
-        setFailMessage('공유된 사진을 받지 못했습니다. 아래 "사진 올리기"로 다시 시도해 주세요.')
+        logError(SCREEN, 'IN-003')
+        setFailMessage(withCode('공유된 사진을 받지 못했습니다. 아래 "사진 올리기"로 다시 시도해 주세요.', 'IN-003'))
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps

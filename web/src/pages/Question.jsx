@@ -127,7 +127,7 @@ export default function Question({ checkId, evidence, onDone }) {
     } catch (e) {
       if (myRequestId !== requestIdRef.current) return
       setError(e.message)
-      logError(SCREEN, 'dialogue_fetch_failed')
+      logError(SCREEN, e.code || 'dialogue_fetch_failed')
     } finally {
       clearTimeout(longWaitTimer)
       if (myRequestId === requestIdRef.current) setLoading(false)

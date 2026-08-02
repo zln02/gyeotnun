@@ -42,7 +42,7 @@ export default function Checking({ checkId, checkData, onReady, onError }) {
         // 최소 2초는 보여 준다 — 너무 빨리 넘어가면 "제대로 본 게 맞나" 불안해한다
         setTimeout(() => { if (!cancelled) onReady(ev) }, 2000)
       } catch (e) {
-        if (!cancelled) { setError(e.message); logError(SCREEN, 'evidence_fetch_failed') }
+        if (!cancelled) { setError(e.message); logError(SCREEN, e.code || 'evidence_fetch_failed') }
       }
     })()
     return () => { cancelled = true; clearInterval(t); clearTimeout(longWaitTimer) }

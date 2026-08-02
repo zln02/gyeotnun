@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from config import MissingKeyError
 from mocks import fixtures
 from models.schemas import DialogueRequest, DialogueResponse
 from routers._common import MockFlag, not_implemented, use_mock
@@ -37,7 +38,7 @@ async def next_question(check_id: str, body: DialogueRequest, mock: int = MockFl
 
     stored = _MEMORY_STORE.get(check_id)
     if not stored:
-        raise not_implemented(RuntimeError(f"check_id={check_id} 를 찾을 수 없습니다."))
+        raise not_implemented(RuntimeError(f"check_id={check_id} 를 찾을 수 없습니다."), "ST-001", screen="S3")
 
     history = stored.setdefault("history", [])
     if body.user_reply:
@@ -52,7 +53,12 @@ async def next_question(check_id: str, body: DialogueRequest, mock: int = MockFl
             history=history,
         )
     except Exception as e:  # noqa: BLE001
-        raise not_implemented(e) from e
+        # ★ 키 자체가 없어 시도조차 못 한 경우만 외부연동(EX-002)이다. generate_question()
+        #   은 호출이 "됐지만" 반복 실패한 경우엔 예외를 던지지 않고 GN-001 로 자체
+        #   폴백하므로(services/prompt_chain.py), 여기까지 올라오는 다른 예외는 대부분
+        #   collect_evidence() 쪽 예상 밖 버그(SR-001)다.
+        code = "EX-002" if isinstance(e, MissingKeyError) else "SR-001"
+        raise not_implemented(e, code, screen="S3", device_id=stored.get("device_id")) from e
 
     history.append(f"질문{body.turn}: {vq.question}")
 

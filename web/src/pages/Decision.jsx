@@ -39,7 +39,7 @@ export default function Decision({ checkId, onTraining, onHome }) {
       setResult(await submitVerdict(checkId, decision))
     } catch (e) {
       setError(e.message)
-      logError(SCREEN, 'verdict_submit_failed')
+      logError(SCREEN, e.code || 'verdict_submit_failed')
     } finally {
       setBusy(false)
     }

@@ -52,7 +52,7 @@ async def create_check(
                 #   텍스트 직접 입력 경로를 제시한다.
                 return CheckCreateResponse(
                     check_id=check_id, extracted_text="", masked=False, masked_items=[],
-                    detected_domain=None, status="failed",
+                    detected_domain=None, status="failed", error_code="IN-001",
                     message=(
                         f"사진 용량이 너무 큽니다 ({len(raw) / 1024 / 1024:.1f}MB). "
                         f"{settings.MAX_UPLOAD_MB}MB 이하 사진으로 다시 올려 주시거나, "
@@ -69,21 +69,28 @@ async def create_check(
                 masked_items=[], detected_domain=None, status="needs_input",
             )
     except (NotImplementedError, Exception) as e:  # noqa: BLE001
-        raise not_implemented(e) from e
+        # ★ 오류 코드 체계(2026-08): 어느 입력 경로에서 실패했는지로 코드를 나눈다.
+        #   link → 아직 미구현(IN-002), image → AI 인식 서비스 자체가 실패(EX-001),
+        #   그 외(text 경로는 원래 예외를 던지지 않는다)는 미분류 안전망(SYS-000).
+        code = "IN-002" if link else ("EX-001" if image else "SYS-000")
+        raise not_implemented(e, code, screen="S1", device_id=device_id) from e
 
     if extracted.status == "failed":
         # ★ 인식 실패(흐림/텍스트 없음/캡처 아님)도 서버 오류가 아니다.
         #   ocr.extract_from_image() 가 예외 대신 이 상태로 알려 준 정상 결과다.
         return CheckCreateResponse(
             check_id=check_id, extracted_text="", masked=False, masked_items=[],
-            detected_domain=None, status="failed",
+            detected_domain=None, status="failed", error_code="RC-001",
             message=(
                 "사진에서 글자를 읽지 못했습니다. 밝은 곳에서 화면 전체가 나오게 "
                 "다시 찍어 주시거나, '글로 붙여넣기'로 내용을 직접 입력해 주세요."
             ),
         )
 
-    masked = masking.mask_text(extracted.text)    # ★ DB 저장 전 비식별화
+    try:
+        masked = masking.mask_text(extracted.text)    # ★ DB 저장 전 비식별화
+    except Exception as e:  # noqa: BLE001 - 이 지점은 기존에 보호되지 않던 곳이라 새로 감쌌다
+        raise not_implemented(e, "MK-001", screen="S1", device_id=device_id) from e
     _MEMORY_STORE[check_id] = {
         "masked_text": masked.text,
         "domain": extracted.detected_domain,
@@ -113,11 +120,14 @@ async def get_evidence(check_id: str, mock: int = MockFlag):
 
     stored = _MEMORY_STORE.get(check_id)
     if not stored:
-        raise not_implemented(RuntimeError(f"check_id={check_id} 를 찾을 수 없습니다. 먼저 POST /checks 를 호출하세요."))
+        raise not_implemented(
+            RuntimeError(f"check_id={check_id} 를 찾을 수 없습니다. 먼저 POST /checks 를 호출하세요."),
+            "ST-001", screen="S2",
+        )
     try:
         result = search.collect_evidence(stored["masked_text"], domain=stored.get("domain"))
     except Exception as e:  # noqa: BLE001
-        raise not_implemented(e) from e
+        raise not_implemented(e, "SR-001", screen="S2", device_id=stored.get("device_id")) from e
     return EvidenceResponse(
         check_id=check_id,
         verdict_hint=result.verdict_hint,

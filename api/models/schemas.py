@@ -47,6 +47,9 @@ class CheckCreateResponse(BaseModel):
     message: Optional[str] = Field(
         None, description="status 가 extracted 가 아닐 때 사용자에게 보여줄 안내 문구 (예: 재촬영/직접입력 유도)"
     )
+    error_code: Optional[str] = Field(
+        None, description="status='failed' 일 때의 오류 코드 (예: IN-001, RC-001) - services/error_codes.py 참고"
+    )
 
 
 # ---------------------------------------------------------------- S2: 근거 수집
@@ -207,6 +210,37 @@ class EventSummaryResponse(BaseModel):
     evidence_link_click_sessions: int = Field(0, description="근거 링크를 1번이라도 누른 세션 수")
     evidence_link_click_rate: float = Field(0.0, description="S3 도달 세션 중 근거 링크 클릭 비율(0~1) - '공식 출처 확인률'")
     error_counts: dict = Field(default_factory=dict, description="{오류 유형: 발생 수}")
+
+
+# ---------------------------------------------------------------- 오류 코드 체계 (2026-08)
+class ErrorCodeItem(BaseModel):
+    """GET /api/v1/errors/codes 의 원소 1개. services/error_codes.py 가 단일 소스이고,
+    이 스키마는 그 내용을 그대로 실어 보내는 그릇일 뿐이다."""
+    code: str = Field(..., examples=["EX-001"])
+    area: str = Field(..., description="입력/인식/마스킹/검색/생성/저장/외부연동/공통")
+    situation: str
+    user_message: str = Field(..., description="시니어가 이해할 수 있는 안내 문구 (빈 문자열이면 화면에 노출 안 됨 - 자동 폴백)")
+    recovery: str
+    internal_handling: str = Field(..., description="내부 처리 방식(팀 문서용) - 화면에는 보이지 않는다")
+
+
+class ErrorSummaryItem(BaseModel):
+    """GET /api/v1/errors/summary 의 원소 1개 - 코드 하나에 대한 집계."""
+    code: str
+    area: str
+    situation: str
+    user_message: str
+    recovery: str
+    count: int = Field(..., description="server_count + client_count")
+    server_count: int = Field(..., description="서버가 스스로 인지한 건수 (error_logs 테이블)")
+    client_count: int = Field(..., description="프론트가 신고한 건수 (events 테이블, event_type=error)")
+    last_occurred_at: Optional[str] = Field(None, description="가장 최근 발생 시각(ISO 8601)")
+
+
+class ErrorSummaryResponse(BaseModel):
+    """GET /api/v1/errors/summary 응답 - 최근 오류를 코드별로 집계한다."""
+    items: List[ErrorSummaryItem] = Field(default_factory=list, description="발생 건수 내림차순 정렬")
+    total_count: int = 0
 
 
 # ---------------------------------------------------------------- 기타

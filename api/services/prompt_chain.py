@@ -457,6 +457,10 @@ def _fallback_question(allowed: Sequence[str]) -> ValidatedQuestion:
         "[guardrail] fallback used - %d회 생성이 모두 검증을 통과하지 못했습니다. stats=%s",
         MAX_ATTEMPTS, guardrail_stats(),
     )
+    # ★ 오류 코드 체계(2026-08): 이 폴백(기본 질문으로 대체)은 그대로 두고, 서버가
+    #   빈도를 인지하도록 GN-001 만 남긴다. 사용자에게 보이는 질문 화면은 바뀌지 않는다.
+    from services.incident_log import log_incident
+    log_incident("GN-001", detail=f"재생성 {MAX_ATTEMPTS}회 모두 검증 실패")
     vq = validate_question(FALLBACK_QUESTION, allowed_refs=allowed, evidence_refs=list(allowed)[:1])
     vq.why = FALLBACK_WHY
     vq.options = list(FALLBACK_OPTIONS)

@@ -28,5 +28,8 @@ async def today_card(
 
     card = rag.pick_today_card(error_type)
     if not card:
-        raise not_implemented(RuntimeError("훈련 카드가 없습니다. corpus/training_cards 를 채워 주세요."))
+        raise not_implemented(
+            RuntimeError("훈련 카드가 없습니다. corpus/training_cards 를 채워 주세요."),
+            "ST-002", screen="S5",
+        )
     return TrainingCardResponse(**card)
