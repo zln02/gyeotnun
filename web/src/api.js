@@ -87,6 +87,25 @@ export function deviceId() {
   return id
 }
 
+/**
+ * ★ 2026-08 홈 화면 개인화(Figma "OO 님의 곁눈"): deviceId() 는 위 주석대로
+ * 의도적으로 이름을 받지 않는 무작위 값이다 - 그 원칙은 그대로 두고, 화면에
+ * 표시할 이름만 "완전히 선택"으로 별도 저장한다. 서버로는 전송하지 않고
+ * deviceId() 와 같은 방식(이 기기의 localStorage, 회원가입 없음)으로만 둔다.
+ */
+const NAME_KEY = 'gyeotnun_display_name'
+
+export function getDisplayName() {
+  return localStorage.getItem(NAME_KEY) || ''
+}
+
+export function setDisplayName(name) {
+  const trimmed = (name || '').trim().slice(0, 12)
+  if (trimmed) localStorage.setItem(NAME_KEY, trimmed)
+  else localStorage.removeItem(NAME_KEY)
+  return trimmed
+}
+
 /* ------------------------------------------------------------------ S1 */
 /** POST /checks — 이미지/링크/텍스트 업로드 (multipart) */
 export async function createCheck({ image, link, text }) {

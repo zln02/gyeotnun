@@ -19,9 +19,16 @@
  *   고정 좌표는 가져오지 않고 Flex 로 재구성했다 - 다른 폰 크기에서도 깨지지
  *   않아야 하기 때문. "링크 확인" 카드는 기존에 UI가 없던 createCheck({link})
  *   경로를 문자 모달과 같은 패턴으로 새로 노출한 것이다(백엔드는 이미 지원).
+ *
+ * ★ 2026-08 이름 개인화: 헤더의 "OO 님의 곁눈"을 실제로 채우기 위해, 기기에만
+ *   저장되는(회원가입 없음) 이름 입력을 추가했다(api.js 의 getDisplayName/
+ *   setDisplayName). deviceId() 는 원래 "이름을 받지 않기 위한" 무작위 값이라는
+ *   원칙을 그대로 두고, 이름은 완전히 별개의 선택 항목으로 로컬에만 둔다.
+ *   서버에는 보내지 않는다. 처음 방문했고 아직 이름/건너뛰기 기록이 없을 때만
+ *   한 번 물어보고, 이후엔 헤더 제목을 눌러 언제든 다시 바꿀 수 있게 했다.
  */
 import { useEffect, useRef, useState } from 'react'
-import { createCheck } from '../api.js'
+import { createCheck, getDisplayName, setDisplayName } from '../api.js'
 import { logClick, logError } from '../events.js'
 import { withCode } from '../errorCodes.js'
 
@@ -106,15 +113,20 @@ function ModalShell({ label, eyebrow, title, onClose, children, footer }) {
   )
 }
 
-function HomeHeader({ onBell }) {
+function HomeHeader({ displayName, onEditName, onBell }) {
   return (
     <div className="home-header">
       <div>
         <p className="home-eyebrow">오늘도 스스로 확인하는 시간</p>
-        {/* ★ Figma 원안 "OO 님의 곁눈" - 사용자 이름을 저장하는 백엔드 필드가
-            아직 없어(온보딩은 3문항 진단뿐, 이름 수집 없음) 없는 이름을 지어내는
-            대신 이름 없이도 자연스러운 문구로 바꿨다. */}
-        <h1 className="home-title">나의 곁눈</h1>
+        <button
+          type="button"
+          className="home-title-btn"
+          onClick={onEditName}
+          aria-label={displayName ? '이름 바꾸기' : '이름 입력하기'}
+        >
+          <h1 className="home-title">{displayName ? `${displayName} 님의 곁눈` : '나의 곁눈'}</h1>
+          <img src={icPencil} width="14" height="14" alt="" aria-hidden="true" className="home-title-edit" />
+        </button>
       </div>
       <button type="button" className="home-bell" aria-label="알림" onClick={onBell}>
         <img src={icBell} width="20" height="20" alt="" aria-hidden="true" />
@@ -254,6 +266,19 @@ export default function Home({ onStarted, onTraining }) {
   const navToastTimer = useRef(null)
   useEffect(() => () => window.clearTimeout(navToastTimer.current), [])
 
+  // ---- 이름 입력 (2026-08, 기기에만 저장 - 회원가입 아님) ----
+  const [displayName, setDisplayNameValue] = useState(() => getDisplayName())
+  const [nameOpen, setNameOpen] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  useEffect(() => {
+    // 처음 방문(이름도 없고, "나중에" 누른 기록도 없을 때)에만 한 번 먼저 물어본다.
+    if (!displayName && !localStorage.getItem('gyeotnun_name_skipped')) {
+      setNameDraft('')
+      setNameOpen(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function start(payload) {
     setBusy(true)
     setError('')
@@ -381,9 +406,27 @@ export default function Home({ onStarted, onTraining }) {
     showNavToast('준비 중입니다')
   }
 
+  function openNameModal() {
+    logClick(SCREEN, displayName ? 'name_edit_open' : 'name_prompt_open')
+    setNameDraft(displayName)
+    setNameOpen(true)
+  }
+  function skipNameModal() {
+    logClick(SCREEN, 'name_skip')
+    localStorage.setItem('gyeotnun_name_skipped', '1')
+    setNameOpen(false)
+  }
+  function confirmNameModal() {
+    logClick(SCREEN, 'name_confirm')
+    const saved = setDisplayName(nameDraft)
+    setDisplayNameValue(saved)
+    localStorage.removeItem('gyeotnun_name_skipped')
+    setNameOpen(false)
+  }
+
   return (
     <>
-      <HomeHeader onBell={handleBell} />
+      <HomeHeader displayName={displayName} onEditName={openNameModal} onBell={handleBell} />
 
       {failMessage && (
         <div className="error-box">
@@ -412,6 +455,11 @@ export default function Home({ onStarted, onTraining }) {
 
       {/* 하단 고정 네비 아래에 콘텐츠가 가리지 않도록 여백 확보 */}
       <div aria-hidden="true" style={{ height: 110 }} />
+      {/* ★ 짧은 화면(360x800 등)에서는 포인트 배너 등이 하단 네비 뒤로 일부만
+          비치며 글자가 잘려 보이는("깨진" 것처럼 보이는) 문제가 있었다 - 기기별
+          여백을 딱 맞추는 대신, 네비 위에 배경색으로 자연스럽게 페이드되는 막을
+          깔아 어떤 화면 크기에서도 텍스트가 어중간하게 잘려 보이지 않게 했다. */}
+      <div className="bottom-scrim" aria-hidden="true" />
       <BottomNav onTap={handleNavTap} />
       <div className="nav-toast-wrap" aria-live="polite">
         {navToast && <div className="nav-toast">{navToast}</div>}
@@ -558,6 +606,48 @@ export default function Home({ onStarted, onTraining }) {
               <StepGuide steps={['위에 적힌 주소가 맞는지 살펴보세요.', '처음 받은 주소와 같은지 확인해요.']} />
             </>
           )}
+        </ModalShell>
+      )}
+
+      {nameOpen && (
+        <ModalShell
+          label="이름 입력"
+          eyebrow="곁눈 사용"
+          title={displayName ? '이름을 바꿔볼까요?' : '이름을 알려주시겠어요?'}
+          onClose={() => { logClick(SCREEN, 'name_modal_close'); setNameOpen(false) }}
+          footer={
+            <div className="modal-actions-2">
+              {displayName ? (
+                <button type="button" className="action-secondary" onClick={() => { logClick(SCREEN, 'name_modal_close'); setNameOpen(false) }}>
+                  취소
+                </button>
+              ) : (
+                <button type="button" className="action-secondary" onClick={skipNameModal}>
+                  나중에 할게요
+                </button>
+              )}
+              <button type="button" className="action-primary" disabled={!nameDraft.trim()} onClick={confirmNameModal}>
+                <span aria-hidden="true">✓</span> 이렇게 부를게요
+              </button>
+            </div>
+          }
+        >
+          <div className="input-hint">
+            <span aria-hidden="true">😊</span>
+            <p style={{ margin: 0 }}>이 기기에만 저장돼요. 화면 위 이름을 눌러 언제든 바꿀 수 있어요.</p>
+          </div>
+          <label style={{ display: 'block', marginTop: 18 }}>
+            <span style={{ display: 'block', marginBottom: 8, fontSize: 19, fontWeight: 800, color: 'var(--fg-ink-title)' }}>부를 이름</span>
+            <input
+              type="text"
+              className="name-input"
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              placeholder="예) 순자"
+              maxLength={12}
+              autoFocus
+            />
+          </label>
         </ModalShell>
       )}
 

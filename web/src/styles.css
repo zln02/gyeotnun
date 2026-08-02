@@ -547,6 +547,19 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   color: var(--fg-ink-body);
 }
 
+/* ---- 한 줄 입력창(이름 등) ---- */
+.name-input {
+  width: 100%;
+  min-height: 56px;
+  font-family: inherit;
+  font-size: 19px;
+  padding: 12px 14px;
+  border: 2px solid var(--fg-hairline);
+  border-radius: 10px;
+  color: var(--fg-ink-input);
+}
+.name-input:focus { border-color: var(--fg-primary); outline: 3px solid var(--fg-primary-disabled-bg); }
+
 /* ============================================================
    S1 홈 - 신규 레이아웃 (2026-08, Figma 이식 2차)
    출처: 헤더/히어로 카드/확인 카드 3개+SNS/포인트 배너/하단 고정 네비.
@@ -588,6 +601,20 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 }
 .home-eyebrow { margin: 0 0 6px; font-size: 16px; font-weight: 700; color: var(--home2-muted); }
 .home-title { margin: 0; font-size: 24px; font-weight: 900; color: var(--fg-ink-title); letter-spacing: -0.7px; line-height: 1.2; }
+.home-title-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 4px 0;
+  margin: -4px 0 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.home-title-btn:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+.home-title-edit { flex-shrink: 0; opacity: 0.55; }
 .home-bell {
   display: grid;
   place-items: center;
@@ -793,6 +820,21 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 .point-text { margin: 0; font-size: 15px; font-weight: 700; color: var(--home2-body); line-height: 1.5; } /* ★ 12→15 */
 .point-text b { color: var(--fg-ink-title); font-weight: 900; }
 .point-text b.pt { color: var(--home2-gold); }
+
+/* ---- 하단 네비 위 페이드 막 ---- */
+/* 스크롤 위치와 무관하게, 네비 뒤로 지나가는 콘텐츠가 어중간하게 잘려
+   보이지 않도록 배경색으로 자연스럽게 사라지게 한다(iOS 탭바류 패턴).
+   네비(z-index 40)보다는 아래, 일반 콘텐츠보다는 위에 둔다. */
+.bottom-scrim {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 168px;
+  z-index: 39;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.8) 0%, var(--bg) 38%);
+}
 
 /* ---- 하단 고정 네비 ---- */
 .bottom-nav {
