@@ -20,7 +20,11 @@
     "동작 조건: HTTPS + PWA 설치(홈 화면에 추가) + Android Chrome. iOS Safari 는 미지원이라",
     "iOS 는 '사진 올리기' 버튼 경로를 폴백으로 유지해야 한다.",
     "POST 요청은 sw.js 가 fetch 이벤트로 가로채 이미지를 캐시에 저장하고 '/?share=1' 로",
-    "리다이렉트한다. Home.jsx 가 그 쿼리를 보고 캐시에서 이미지를 꺼내 S1 업로드로 이어붙인다."
+    "리다이렉트한다. Home.jsx 가 그 쿼리를 보고 캐시에서 이미지를 꺼내 S1 업로드로 이어붙인다.",
+    "★ 2026-08 실측 버그: accept 에 MIME 타입만 있으면(확장자 없이) 일부 OS/브라우저의",
+    "공유 목록(특히 카카오톡→삼성인터넷 조합에서 실측됨)이 파일을 아예 첨부하지 않고도",
+    "곁눈을 그냥 열어 버린다 - 곁눈은 뜨는데(관문 통과) 이미지는 안 들어오는 증상으로",
+    "나타났다. MDN 권고대로 MIME 타입과 확장자를 함께 넣어야 한다."
   ],
   "share_target": {
     "action": "/share",
@@ -31,7 +35,13 @@
       "text": "text",
       "url": "link",
       "files": [
-        { "name": "image", "accept": ["image/png", "image/jpeg", "image/webp"] }
+        {
+          "name": "image",
+          "accept": [
+            "image/png", "image/jpeg", "image/webp",
+            ".png", ".jpg", ".jpeg", ".webp"
+          ]
+        }
       ]
     }
   }

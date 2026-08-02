@@ -50,8 +50,12 @@ export default function Home({ onStarted, onTraining }) {
 
   // ★ 카카오톡 등에서 '공유 → 곁눈'으로 들어온 경우: sw.js 가 이미지를 캐시에 넣고
   //   '/?share=1' 로 리다이렉트해 온다. 여기서 꺼내 S1 업로드 흐름 그대로 이어붙인다.
-  //   지원하지 않는 브라우저(caches 없음)나 캐시에 아무것도 없으면 조용히 넘어간다 -
-  //   이 경로가 실패해도 '사진 올리기' 버튼은 항상 그대로 동작해야 한다.
+  //   지원하지 않는 브라우저(caches 없음)나 캐시에 아무것도 없으면 안내만 하고
+  //   넘어간다 - 이 경로가 실패해도 '사진 올리기' 버튼은 항상 그대로 동작해야 한다.
+  //   ★ 2026-08 실측: 공유 목록에 곁눈이 뜨고 눌러서 열리기까지는 되는데(관문 통과)
+  //   OS/브라우저 조합에 따라 실제 파일이 아예 첨부되지 않고 열리는 경우가 있었다
+  //   (manifest.json 의 accept 에 확장자 누락이 원인 - 고쳤지만, 조용히 실패하면
+  //   사용자는 원인을 알 길이 없으므로 실패 시 안내 문구 + 계측을 남긴다).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('share') !== '1') return
@@ -61,13 +65,18 @@ export default function Home({ onStarted, onTraining }) {
       try {
         const cache = await caches.open(SHARE_CACHE)
         const res = await cache.match(SHARE_KEY)
-        if (!res) return
+        if (!res) {
+          logError(SCREEN, 'share_image_missing')
+          setFailMessage('공유된 사진을 받지 못했습니다. 아래 "사진 올리기"로 다시 시도해 주세요.')
+          return
+        }
         const blob = await res.blob()
         await cache.delete(SHARE_KEY)
         const file = new File([blob], 'shared-image.jpg', { type: blob.type || 'image/jpeg' })
         start({ image: file })
       } catch (e) {
-        // 공유 이미지를 못 꺼내도 홈 화면은 정상 동작해야 한다.
+        logError(SCREEN, 'share_image_read_failed')
+        setFailMessage('공유된 사진을 받지 못했습니다. 아래 "사진 올리기"로 다시 시도해 주세요.')
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
