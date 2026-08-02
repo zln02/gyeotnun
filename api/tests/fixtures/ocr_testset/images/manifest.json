@@ -1,0 +1,390 @@
+{
+  "note": "합성 데이터셋. 실제 폰 캡처보다 깨끗하므로 정확도의 상한으로 해석할 것. 등장 인물·번호·계좌는 모두 가공값.",
+  "count": 24,
+  "items": [
+    {
+      "image": "01_s01_light.png",
+      "truth": "01_s01_light.txt",
+      "scenario": "s01",
+      "label": "사칭",
+      "room": "행복한 동창 모임",
+      "theme": "light",
+      "font_scale": 1.0,
+      "degraded": false,
+      "cropped": false,
+      "size": [
+        900,
+        968
+      ],
+      "lines": 8
+    },
+    {
+      "image": "02_s01_light_low.png",
+      "truth": "02_s01_light_low.txt",
+      "scenario": "s01",
+      "label": "사칭",
+      "room": "행복한 동창 모임",
+      "theme": "light",
+      "font_scale": 1.0,
+      "degraded": true,
+      "cropped": false,
+      "size": [
+        900,
+        968
+      ],
+      "lines": 8
+    },
+    {
+      "image": "03_s02_dark.png",
+      "truth": "03_s02_dark.txt",
+      "scenario": "s02",
+      "label": "사칭",
+      "room": "택배 알림",
+      "theme": "dark",
+      "font_scale": 1.0,
+      "degraded": false,
+      "cropped": false,
+      "size": [
+        900,
+        602
+      ],
+      "lines": 3
+    },
+    {
+      "image": "04_s02_dark_big.png",
+      "truth": "04_s02_dark_big.txt",
+      "scenario": "s02",
+      "label": "사칭",
+      "room": "택배 알림",
+      "theme": "dark",
+      "font_scale": 1.35,
+      "degraded": false,
+      "cropped": false,
+      "size": [
+        900,
+        717
+      ],
+      "lines": 3
+    },
+    {
+      "image": "05_s03_light_big.png",
+      "truth": "05_s03_light_big.txt",
+      "scenario": "s03",
+      "label": "경계",
+      "room": "카드 안내",
+      "theme": "light",
+      "font_scale": 1.35,
+      "degraded": false,
+      "cropped": false,
+      "size": [
+        900,
+        768
+      ],
+      "lines": 4
+    },
+    {
+      "image": "06_s03_light_crop.png",
+      "truth": "06_s03_light_crop.txt",
+      "scenario": "s03",
+      "label": "경계",
+      "room": "카드 안내",
+      "theme": "light",
+      "font_scale": 1.0,
+      "degraded": false,
+      "cropped": true,
+      "size": [
+        900,
+        378
+      ],
+      "lines": 3
+    },
+    {
+      "image": "07_s04_light_low.png",
+      "truth": "07_s04_light_low.txt",
+      "scenario": "s04",
+      "label": "정상",
+      "room": "건강보험 안내",
+      "theme": "light",
+      "font_scale": 1.0,
+      "degraded": true,
+      "cropped": false,
+      "size": [
+        900,
+        678
+      ],
+      "lines": 4
+    },
+    {
+      "image": "08_s04_dark_low.png",
+      "truth": "08_s04_dark_low.txt",
+      "scenario": "s04",
+      "label": "정상",
+      "room": "건강보험 안내",
+      "theme": "dark",
+      "font_scale": 1.0,
+      "degraded": true,
+      "cropped": false,
+      "size": [
+        900,
+        678
+      ],
+      "lines": 4
+    },
+    {
+      "image": "09_s05_dark_big.png",
+      "truth": "09_s05_dark_big.txt",
+      "scenario": "s05",
+      "label": "정상",
+      "room": "국민연금 안내",
+      "theme": "dark",
+      "font_scale": 1.35,
+      "degraded": false,
+      "cropped": false,
+      "size": [
+        900,
+        717
+      ],
+      "lines": 2
+    },
+    {
+      "image": "10_s05_light_big_low.png",
+      "truth": "10_s05_light_big_low.txt",
+      "scenario": "s05",
+      "label": "정상",
+      "room": "국민연금 안내",
+      "theme": "light",
+      "font_scale": 1.35,
+      "degraded": true,
+      "cropped": false,
+      "size": [
+        900,
+        717
+      ],
+      "lines": 2
+    },
+    {
+      "image": "11_s06_light_crop.png",
+      "truth": "11_s06_light_crop.txt",
+      "scenario": "s06",
+      "label": "경계",
+      "room": "우리 아파트 주민방",
+      "theme": "light",
+      "font_scale": 1.0,
+      "degraded": false,
+      "cropped": true,
+      "size": [
+        900,
+        620
+      ],
+      "lines": 5
+    },
+    {
+      "image": "12_s06_light.png",
+      "truth": "12_s06_light.txt",
+      "scenario": "s06",
+      "label": "경계",
+      "room": "우리 아파트 주민방",
+      "theme": "light",
+      "font_scale": 1.0,
+      "degraded": false,
+      "cropped": false,
+      "size": [
+        900,
+        920
+      ],
+      "lines": 6
+    },
+    {
+      "image": "13_s07_dark_low.png",
+      "truth": "13_s07_dark_low.txt",
+      "scenario": "s07",
+      "label": "사칭",
+      "room": "010-2938-4471",
+      "theme": "dark",
+      "font_scale": 1.0,
+      "degraded": true,
+      "cropped": false,
+      "size": [
+        900,
+        602
+      ],
+      "lines": 3
+    },
+    {
+      "image": "14_s07_dark.png",
+      "truth": "14_s07_dark.txt",
+      "scenario": "s07",
+      "label": "사칭",
+      "room": "010-2938-4471",
+      "theme": "dark",
+      "font_scale": 1.0,
+      "degraded": false,
+      "cropped": false,
+      "size": [
+        900,
+        602
+      ],
+      "lines": 3
+    },
+    {
+      "image": "15_s08_light_big_low.png",
+      "truth": "15_s08_light_big_low.txt",
+      "scenario": "s08",
+      "label": "사칭",
+      "room": "건강정보 나눔",
+      "theme": "light",
+      "font_scale": 1.35,
+      "degraded": true,
+      "cropped": false,
+      "size": [
+        900,
+        895
+      ],
+      "lines": 5
+    },
+    {
+      "image": "16_s08_light_big.png",
+      "truth": "16_s08_light_big.txt",
+      "scenario": "s08",
+      "label": "사칭",
+      "room": "건강정보 나눔",
+      "theme": "light",
+      "font_scale": 1.35,
+      "degraded": false,
+      "cropped": false,
+      "size": [
+        900,
+        895
+      ],
+      "lines": 5
+    },
+    {
+      "image": "17_s09_light.png",
+      "truth": "17_s09_light.txt",
+      "scenario": "s09",
+      "label": "사칭",
+      "room": "금융 안내",
+      "theme": "light",
+      "font_scale": 1.0,
+      "degraded": false,
+      "cropped": false,
+      "size": [
+        900,
+        640
+      ],
+      "lines": 4
+    },
+    {
+      "image": "18_s09_light_low.png",
+      "truth": "18_s09_light_low.txt",
+      "scenario": "s09",
+      "label": "사칭",
+      "room": "금융 안내",
+      "theme": "light",
+      "font_scale": 1.0,
+      "degraded": true,
+      "cropped": false,
+      "size": [
+        900,
+        640
+      ],
+      "lines": 4
+    },
+    {
+      "image": "19_s10_dark.png",
+      "truth": "19_s10_dark.txt",
+      "scenario": "s10",
+      "label": "정상",
+      "room": "보건소 안내",
+      "theme": "dark",
+      "font_scale": 1.0,
+      "degraded": false,
+      "cropped": false,
+      "size": [
+        900,
+        640
+      ],
+      "lines": 3
+    },
+    {
+      "image": "20_s10_dark_big.png",
+      "truth": "20_s10_dark_big.txt",
+      "scenario": "s10",
+      "label": "정상",
+      "room": "보건소 안내",
+      "theme": "dark",
+      "font_scale": 1.35,
+      "degraded": false,
+      "cropped": false,
+      "size": [
+        900,
+        768
+      ],
+      "lines": 3
+    },
+    {
+      "image": "21_s11_light_big.png",
+      "truth": "21_s11_light_big.txt",
+      "scenario": "s11",
+      "label": "사칭",
+      "room": "한국전력",
+      "theme": "light",
+      "font_scale": 1.35,
+      "degraded": false,
+      "cropped": false,
+      "size": [
+        900,
+        717
+      ],
+      "lines": 4
+    },
+    {
+      "image": "22_s11_light_crop.png",
+      "truth": "22_s11_light_crop.txt",
+      "scenario": "s11",
+      "label": "사칭",
+      "room": "한국전력",
+      "theme": "light",
+      "font_scale": 1.0,
+      "degraded": false,
+      "cropped": true,
+      "size": [
+        900,
+        340
+      ],
+      "lines": 3
+    },
+    {
+      "image": "23_s12_light_low.png",
+      "truth": "23_s12_light_low.txt",
+      "scenario": "s12",
+      "label": "정상",
+      "room": "가족방",
+      "theme": "light",
+      "font_scale": 1.0,
+      "degraded": true,
+      "cropped": false,
+      "size": [
+        900,
+        778
+      ],
+      "lines": 3
+    },
+    {
+      "image": "24_s12_dark_low.png",
+      "truth": "24_s12_dark_low.txt",
+      "scenario": "s12",
+      "label": "정상",
+      "room": "가족방",
+      "theme": "dark",
+      "font_scale": 1.0,
+      "degraded": true,
+      "cropped": false,
+      "size": [
+        900,
+        778
+      ],
+      "lines": 3
+    }
+  ]
+}
