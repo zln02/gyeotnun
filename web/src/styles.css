@@ -14,14 +14,42 @@
 :root {
   /* 색: 고대비 위주. 파랑=신뢰(AI 질문), 초록=근거(실제 출처), 노랑=주의 */
   --bg: #FFFFFF;
-  --bg-soft: #F4F6F9;
+  /* ★ 2026-08 Figma 톤 맞춤: --bg-soft/--line 은 텍스트 대비와 무관한 배경·테두리
+     라 접근성 위험 없이 Figma 의 따뜻한 뉴트럴(#FAFAFA/#E6E2DA)로 바꿨다 - S2~S5
+     구조는 그대로 두고 이 두 값만 바뀌어도 카드·입력창 테두리 톤이 전체적으로
+     맞춰진다. 대비가 검증된 텍스트 색(--text/--text-sub, AAA 주석 참고)은
+     접근성을 우선해 그대로 뒀다(1번 항목 "충돌 시 접근성 우선" 원칙 적용). */
+  --bg-soft: #FAFAFA;
   --text: #16181D;              /* 흰 배경 대비 약 16:1 */
   --text-sub: #454B54;          /* 약 9:1 — 보조 텍스트도 AAA 유지 */
-  --line: #C7CDD6;
+  --line: #E6E2DA;
 
   --brand: #1B4D8F;             /* 곁눈 파랑 */
   --brand-dark: #113463;
   --brand-soft: #E8F0FB;        /* AI 질문 카드 배경 */
+
+  /* ---- Figma 디자인 이식 토큰 (2026-08, 곁눈(figma) 내보내기의 home.tsx/
+     loading.tsx 손글씨 부분에서 실측한 값) ----
+     ★ 기존 --brand(파랑=AI 질문)/--source(초록=출처)의 의미는 그대로 둔다.
+     이 초록(--fg-primary)은 그 둘과 다른 세 번째 색으로, S1 홈의 새 CTA/모달
+     전용이다 - "출처=초록"이라는 기존 신뢰 신호와 섞이지 않도록 --source
+     (#1F6B3E, 어두운 숲색)와 --fg-primary(#47D899, 밝은 민트)를 의도적으로
+     다른 톤으로 유지했다. */
+  --fg-primary: #47D899;         /* S1 주 CTA 배경 */
+  --fg-primary-soft: #72C4A0;    /* 단계 번호 배지 등 보조 강조 */
+  --fg-primary-border: #12E56A;  /* 주 버튼 강조 테두리 */
+  --fg-primary-disabled-bg: #C7E5D5;
+  --fg-primary-disabled-border: #D7E8DF;
+
+  --fg-ink-title: #111111;       /* 모달 제목 (기존 --text 와 거의 동일) */
+  --fg-ink-body: #3F3F3F;        /* 본문 설명 */
+  --fg-ink-mid: #575757;         /* 보조 버튼 텍스트·아이콘 */
+  --fg-ink-soft: #8F887E;        /* placeholder, 안내 텍스트 */
+  --fg-ink-input: #22201D;       /* 입력창 글자 */
+
+  --fg-hairline: #E6E2DA;        /* 테두리 */
+  --fg-surface: #FAFAFA;         /* 옅은 회백색 배경 */
+  --fg-surface-tint: #F8FFFB;    /* 옅은 초록빛 안내 배경 */
 
   --source: #1F6B3E;            /* 근거(출처) 초록 */
   --source-soft: #E6F4EC;       /* 출처 블록 배경 */
@@ -34,7 +62,14 @@
   --unknown: #4A4A55;           /* 확인 불가 - 회색/보라 계열, 파랑·초록·주황과 구분 */
   --unknown-soft: #ECECF2;
 
-  /* 타이포 */
+  /* 타이포
+     ★ Figma 이식 시 충돌 검토(2026-08): Figma 본문은 18px, 보조는 15~16px,
+       버튼은 56~58px 로 우리 기존 기준(본문 19px, 버튼 60px)보다 낮다. 전부
+       우리 접근성 최소선(본문 18px 이상, 버튼 56px 이상)은 지키므로 "위반"은
+       아니지만, 기존에 정해둔 값보다는 낮다 - 접근성 기준을 우선해 기존
+       --fs-body(19px)·--btn-h(60px)는 내리지 않고 그대로 둔다. Figma 쪽 18px/
+       56~58px 값은 S1 모달 내부 설명문·보조 버튼처럼 "본문"이 아닌 곳에만
+       그대로 쓴다(아래 모달/스텝가이드 스타일 참고). */
   --fs-body: 19px;              /* ★ 본문 18px 이상 */
   --fs-lead: 21px;
   --fs-title: 27px;             /* ★ 제목 24px 이상 */
@@ -302,4 +337,198 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 .error-box {
   background: #FDECEC; border: 2px solid var(--danger); color: var(--danger);
   border-radius: 10px; padding: 14px; font-size: 17px; font-weight: 700; margin-bottom: 14px;
+}
+
+/* ============================================================
+   S1 홈 - Figma 이식 (2026-08)
+   출처: 곁눈(figma)/src/app/screens/home.tsx 의 손글씨 컴포넌트
+   (CaptureGuide/StepGuide/ModalShell/PrimaryAction/SecondaryAction 을
+   plain CSS 로 옮긴 것 - src/imports/ 의 절대좌표 코드는 가져오지 않았다)
+   ============================================================ */
+
+/* ---- 단계 안내 목록 (번호 배지 + 설명) ---- */
+.step-guide {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.step-guide li {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: start;
+  gap: 12px;
+}
+.step-badge {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: var(--fg-primary-soft);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+}
+.step-text {
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--fg-ink-body);
+  margin: 0;
+}
+
+/* ---- 화면 사진 찍는 방법 안내 ---- */
+.capture-guide {
+  margin: 0 0 4px;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--fg-hairline);
+  background: var(--fg-surface);
+}
+.capture-guide .img-wrap { display: flex; justify-content: center; padding: 12px; }
+.capture-guide img { height: 142px; width: 100%; max-width: 290px; object-fit: contain; }
+.capture-guide figcaption {
+  border-top: 1px solid var(--fg-hairline);
+  background: #fff;
+  padding: 12px 16px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.55;
+  color: var(--fg-ink-body);
+}
+
+/* ---- 모달(바텀시트) 구조 ---- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(17, 17, 17, 0.35);
+}
+.modal-shell {
+  display: flex;
+  width: 100%;
+  max-width: 380px;
+  max-height: calc(100vh - 36px);
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid var(--fg-hairline);
+  background: #fff;
+}
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--fg-hairline);
+  padding: 18px 20px;
+}
+.modal-eyebrow { margin: 0; font-size: 16px; font-weight: 700; color: var(--fg-primary); }
+.modal-title { margin: 4px 0 0; font-size: 22px; font-weight: 800; color: var(--fg-ink-title); line-height: 1.35; }
+.modal-close {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 1px solid var(--fg-hairline);
+  background: #fff;
+  color: var(--fg-ink-mid);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.modal-close:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+.modal-body { padding: 18px 20px; overflow-y: auto; }
+.modal-footer { border-top: 1px solid var(--fg-hairline); padding: 16px 20px 20px; }
+.modal-actions-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ---- 모달 안 버튼 ---- */
+.action-primary {
+  display: flex;
+  width: 100%;
+  min-height: var(--btn-h);      /* ★ 60px - 접근성 기존 기준 유지 (Figma 원안 58px) */
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 16px;
+  border: 2px solid var(--fg-primary-border);
+  background: var(--fg-primary);
+  color: #fff;
+  font-size: 19px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+.action-primary:disabled {
+  cursor: not-allowed;
+  border-color: var(--fg-primary-disabled-border);
+  background: var(--fg-primary-disabled-bg);
+}
+.action-secondary {
+  display: flex;
+  min-height: 56px;              /* ★ 접근성 최소선(56px 이상) - Figma 원안과 동일 */
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 16px;
+  border: 1px solid var(--fg-hairline);
+  background: #fff;
+  color: var(--fg-ink-mid);
+  font-size: 18px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+.action-primary:focus-visible,
+.action-secondary:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* ---- 사진 미리보기 / 안내 박스 ---- */
+.photo-preview {
+  overflow: hidden;
+  border: 1px solid var(--fg-hairline);
+  background: var(--fg-surface);
+  padding: 8px;
+  border-radius: 10px;
+}
+.photo-preview img { max-height: 270px; width: 100%; object-fit: contain; display: block; }
+
+.input-hint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--fg-hairline);
+  background: var(--fg-surface-tint);
+  padding: 12px 16px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.55;
+  color: var(--fg-ink-mid);
+}
+
+.confirm-box {
+  max-height: 246px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border: 1px solid var(--fg-hairline);
+  background: var(--fg-surface);
+  padding: 16px;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.65;
+  color: var(--fg-ink-body);
 }

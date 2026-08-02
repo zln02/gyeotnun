@@ -67,3 +67,8 @@ deploy/certbot/www/*
 
 # nginx reload crontab 로그 (서버 로컬 산출물)
 deploy/nginx-reload.log
+
+# Figma Make 내보내기 원본 (참고용, 프로젝트 본체가 아니다) - 여기서 필요한 값만
+# 손으로 옮겨 web/src 에 반영한다(web/src/styles.css "Figma 이식" 절 참고).
+# src/imports/ 의 자동생성 코드(393x852 고정 좌표)는 절대 가져오지 않는다.
+web/곁눈(figma)/

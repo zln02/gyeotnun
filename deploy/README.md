@@ -89,6 +89,15 @@ deploy/
 ## 트러블슈팅
 
 - **502 Bad Gateway**: `api` 컨테이너가 안 떠 있거나 재시작 중. `docker compose ps` 확인.
+- **`GET /` 가 500(rewrite or internal redirection cycle)**: `web/dist` 를
+  `rm -rf dist && npm run build` 처럼 **디렉터리째 삭제 후 재생성**하면, 이미 떠
+  있는 nginx 컨테이너의 바인드 마운트가 옛 디렉터리(inode)를 붙들고 있어 새
+  디렉터리를 못 본다(컨테이너 안에서 `/usr/share/nginx/html` 이 빈 폴더로
+  보임). `npm run build` 만 다시 돌리는 건 안전하다(Vite 가 `dist` 를 지우지
+  않고 안의 파일만 정리·교체한다) - 문제는 오직 `rm -rf dist` 로 디렉터리
+  자체를 지웠을 때만 생긴다. 이미 걸렸다면
+  `docker compose --profile prod up -d --force-recreate nginx` 로 마운트를
+  다시 맺어야 한다(`restart`/`up -d`만으로는 재마운트가 안 될 수 있다).
 - **413 Request Entity Too Large**: nginx 의 `client_max_body_size` 는 11MB로
   일부러 앱의 10MB 제한보다 1MB 여유를 뒀다(앱이 먼저 친절한 안내를 보여주게 하려고).
   11MB를 넘는 진짜 대용량 업로드만 nginx 선에서 막힌다.
