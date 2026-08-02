@@ -210,12 +210,12 @@ export default function Home({ onStarted, onTraining }) {
           카카오톡에서 받은 사진을<br />그대로 올려 주세요
         </p>
         {/* ★ 아이콘만 있는 버튼 금지 — 그림과 글자를 항상 함께 */}
-        <button className="btn" disabled={busy} onClick={openPhotoModal}>
+        <button className="btn figma-primary" disabled={busy} onClick={openPhotoModal}>
           <span aria-hidden="true">📷</span> 사진으로 확인하기
         </button>
       </div>
 
-      <button className="btn secondary" disabled={busy} onClick={openTextModal}>
+      <button className="btn figma-outline" disabled={busy} onClick={openTextModal}>
         <span aria-hidden="true">⌨️</span> 글로 확인하기
       </button>
 
@@ -224,7 +224,7 @@ export default function Home({ onStarted, onTraining }) {
           <p>{failMessage}</p>
           {/* ★ 10MB 초과 · 인식 실패 공통 안내: 문자 직접 입력 경로로 바로 넘겨준다 */}
           <button
-            className="btn secondary"
+            className="btn figma-outline"
             style={{ marginTop: 12 }}
             onClick={() => { logClick(SCREEN, 'retry_as_text'); setFailMessage(''); openTextModal() }}
           >

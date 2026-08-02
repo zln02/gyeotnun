@@ -300,14 +300,28 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
 
-/* ------------------------------------------------------ 업로드 */
+/* ------------------------------------------------------ 업로드
+   ★ 2026-08 Figma 톤: S1 첫 화면 자체(모달을 열기 전)도 --fg-* 로 바꿨다 -
+   전에는 모달 안쪽만 Figma 톤이고 바깥 화면은 기존 파랑이라 "안 바뀐 것처럼"
+   보였다. .btn.figma-primary/.figma-outline 는 .btn 의 크기(60px·100% 폭·
+   그림자)는 그대로 두고 색만 S1 전용으로 바꾼 변형이다. */
 .upload-box {
-  border: 3px dashed var(--brand);
-  background: var(--brand-soft);
+  border: 3px dashed var(--fg-primary-soft);
+  background: var(--fg-surface-tint);
   border-radius: var(--radius);
   padding: 26px 18px;
   text-align: center;
   margin-bottom: 18px;
+}
+.btn.figma-primary {
+  background: var(--fg-primary);
+  border-color: var(--fg-primary-border);
+  color: #fff;
+}
+.btn.figma-outline {
+  background: #fff;
+  color: var(--fg-ink-mid);
+  border-color: var(--fg-hairline);
 }
 .textarea {
   width: 100%;
