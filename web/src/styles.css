@@ -877,3 +877,82 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   white-space: nowrap;
 }
 
+/* ============================================================
+   S2 확인 중 - Figma 이식 (2026-08)
+   출처: 곁눈(figma) 신규 내보내기 node 95:901(체크리스트형 로딩 화면).
+   기존 스피너+한 줄 순환 문구를 마스코트 아이콘 + 고정 문구 + 단계별
+   체크리스트 + 진행바로 바꿨다. .loading/.spinner 는 Question/Training 이
+   그대로 쓰고 있어 손대지 않고, 이 화면 전용 클래스만 새로 추가한다.
+   ============================================================ */
+.checking2 { text-align: center; padding: 48px 0 20px; }
+.checking2-icon-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+}
+.checking2-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(71,216,153,0.35), rgba(71,216,153,0) 72%);
+  filter: blur(6px);
+}
+.checking2-icon { position: relative; width: 80px; height: 80px; object-fit: contain; }
+.checking2-title {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  margin: 0 0 8px;
+  color: var(--fg-ink-title);
+}
+.checking2-title .brand { color: var(--fg-primary); }
+.checking2-sub { font-size: 15px; font-weight: 500; color: #444; margin: 0 0 28px; }
+
+.checking2-steps {
+  list-style: none;
+  margin: 0 auto 24px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 329px;
+  text-align: left;
+}
+.checking2-steps li { display: flex; align-items: center; gap: 14px; }
+.checking2-step-badge {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #dbe3df;
+  transition: background 0.3s ease;
+}
+.checking2-steps li.done .checking2-step-badge { background: var(--fg-primary); }
+.checking2-step-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #a8a8a8;
+  transition: color 0.3s ease;
+}
+.checking2-steps li.done .checking2-step-text { color: var(--fg-ink-title); }
+
+.checking2-progress {
+  max-width: 329px;
+  height: 6px;
+  margin: 0 auto;
+  background: #e8e8e8;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.checking2-progress-fill {
+  height: 100%;
+  background: var(--fg-primary);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
