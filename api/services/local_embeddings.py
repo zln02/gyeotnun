@@ -72,9 +72,25 @@ def _get_model(provider: Provider):
         torch.set_num_threads(threads)
         log.info("[local_embeddings] torch CPU 스레드 %d 개로 설정", threads)
 
+        # ★ 실행 장치 선택(2026-08-04): Linux 서버(CPU)와 Apple Silicon Mac(MPS)
+        #   양쪽에서 같은 코드를 돌리기 위해 자동 감지한다. M 시리즈 Mac 에서는
+        #   MPS(GPU)가 CPU 보다 수 배 빠르므로, 청크 크기 실험처럼 재인덱싱을
+        #   반복하는 작업은 Mac 에서 돌리는 편이 훨씬 유리하다.
+        #   EMBED_DEVICE 로 강제 지정할 수 있다(cpu/mps/cuda) - 결과 비교 시
+        #   장치를 고정하고 싶을 때 쓴다.
+        device = os.getenv("EMBED_DEVICE")
+        if not device:
+            if torch.backends.mps.is_available():
+                device = "mps"
+            elif torch.cuda.is_available():
+                device = "cuda"
+            else:
+                device = "cpu"
+        log.info("[local_embeddings] 실행 장치: %s", device)
+
         name = _MODEL_NAMES[provider]
         log.info("[local_embeddings] %s 모델 로드 중(최초 1회)...", name)
-        model = SentenceTransformer(name, device="cpu")
+        model = SentenceTransformer(name, device=device)
 
         # ★ 청크 실측 토큰 길이는 최대 577(99%가 536 이하)이다. bge-m3 기본값
         #   8192 를 그대로 두면 불필요하게 긴 시퀀스를 가정하게 되므로 640 으로

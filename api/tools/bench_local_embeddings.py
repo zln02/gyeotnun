@@ -35,10 +35,19 @@ import warnings
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "/app")
 
-CSV_PATH = Path("/corpus/곁눈_평가세트_30건.csv")
-OUT_PATH = Path("/app/data/local_embeddings_bench.json")
+# ★ 경로 자동 판별(2026-08-04): 격리 컨테이너(/app, /corpus)와 맥·리눅스 로컬
+#   체크아웃(<repo>/api, <repo>/corpus) 양쪽에서 같은 스크립트가 돌아야 한다.
+#   컨테이너에서는 /app 이 존재하고, 로컬에서는 이 파일 기준 상대경로를 쓴다.
+if Path("/app/services").is_dir():                 # 격리 컨테이너
+    API_DIR, CORPUS_DIR = Path("/app"), Path("/corpus")
+else:                                              # 맥/리눅스 로컬 체크아웃
+    API_DIR = Path(__file__).resolve().parents[1]   # <repo>/api
+    CORPUS_DIR = API_DIR.parent / "corpus"
+sys.path.insert(0, str(API_DIR))
+
+CSV_PATH = CORPUS_DIR / "곁눈_평가세트_30건.csv"
+OUT_PATH = API_DIR / "data" / "local_embeddings_bench.json"
 
 EXPECTED_HINT = {"정상": "needs_check", "사칭": "partially_matched", "경계": "no_source_found"}
 
