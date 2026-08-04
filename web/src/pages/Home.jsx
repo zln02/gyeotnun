@@ -31,6 +31,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createCheck, getDisplayName, setDisplayName } from '../api.js'
 import { logClick, logError } from '../events.js'
 import { withCode } from '../errorCodes.js'
+import BottomNav from '../components/BottomNav.jsx'
 
 import envelopeImg from '../assets/home/envelope.png'
 import icPhoto from '../assets/home/ic_photo.png'
@@ -40,11 +41,6 @@ import kakaoImg from '../assets/home/kakao.png'
 import icPencil from '../assets/home/ic_pencil.svg'
 import icBell from '../assets/home/ic_bell.svg'
 import icChevron from '../assets/home/ic_chevron.svg'
-import navHomeIcon from '../assets/home/nav_home.svg'
-import navLearnIcon from '../assets/home/nav_learn.svg'
-import navGrowthIcon from '../assets/home/nav_growth.svg'
-import navMeIcon from '../assets/home/nav_me.svg'
-import navCheckIcon from '../assets/home/nav_check.svg'
 import bubble2Img from '../assets/home/bubble2.svg'
 import bubble3Img from '../assets/home/bubble3.svg'
 
@@ -206,35 +202,6 @@ function PointBanner() {
         280,000원을 지켜 <b className="pt">30 포인트</b>를 받았어요.
       </p>
     </section>
-  )
-}
-
-function NavItem({ itemKey, label, icon, onTap }) {
-  return (
-    <button
-      type="button"
-      className={`nav-item${itemKey === 'home' ? ' active' : ''}`}
-      onClick={() => onTap(itemKey)}
-    >
-      <img src={icon} width="26" height="26" alt="" aria-hidden="true" />
-      <span>{label}</span>
-    </button>
-  )
-}
-
-function BottomNav({ onTap }) {
-  return (
-    <nav className="bottom-nav" aria-label="주요 메뉴">
-      <NavItem itemKey="home" label="홈" icon={navHomeIcon} onTap={onTap} />
-      <NavItem itemKey="learn" label="학습" icon={navLearnIcon} onTap={onTap} />
-      <span className="nav-gap" aria-hidden="true" />
-      <NavItem itemKey="growth" label="성장" icon={navGrowthIcon} onTap={onTap} />
-      <NavItem itemKey="me" label="내 정보" icon={navMeIcon} onTap={onTap} />
-      <button type="button" className="nav-fab" onClick={() => onTap('fab')}>
-        <img src={navCheckIcon} width="33" height="33" alt="" aria-hidden="true" />
-        <span>바로<br />확인</span>
-      </button>
-    </nav>
   )
 }
 
@@ -460,7 +427,7 @@ export default function Home({ onStarted, onTraining }) {
           여백을 딱 맞추는 대신, 네비 위에 배경색으로 자연스럽게 페이드되는 막을
           깔아 어떤 화면 크기에서도 텍스트가 어중간하게 잘려 보이지 않게 했다. */}
       <div className="bottom-scrim" aria-hidden="true" />
-      <BottomNav onTap={handleNavTap} />
+      <BottomNav active="home" onTap={handleNavTap} />
       <div className="nav-toast-wrap" aria-live="polite">
         {navToast && <div className="nav-toast">{navToast}</div>}
       </div>
