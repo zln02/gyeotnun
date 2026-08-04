@@ -26,6 +26,7 @@
 """
 from __future__ import annotations
 
+import os
 import logging
 import time
 from dataclasses import dataclass
@@ -36,12 +37,22 @@ import numpy as np
 
 log = logging.getLogger("gyeotnun.local_embeddings")
 
-Provider = Literal["e5-small", "ko-sroberta"]
+Provider = Literal["e5-small", "ko-sroberta", "bge-m3", "bge-m3-ko", "e5-large", "koe5"]
 
 _MODEL_NAMES = {
     "e5-small": "intfloat/multilingual-e5-small",
     "ko-sroberta": "jhgan/ko-sroberta-multitask",
+    # ---- 2026-08-03 추가 후보 (서버 여유 12GB 확인 후, 모델 크기로 배제하지 않음)
+    "bge-m3": "BAAI/bge-m3",                 # MIT, 한국어 검색 벤치마크 상위. dense 만 쓴다
+    "bge-m3-ko": "dragonkue/BGE-m3-ko",      # 위를 한국어 파인튜닝(같은 아키텍처)
+    "e5-large": "intfloat/multilingual-e5-large",
+    "koe5": "nlpai-lab/KoE5",                # e5 계열 → 접두어 필수
 }
+
+# ★ e5 계열은 "query: "/"passage: " 접두어가 필수다(모델 카드 공식 권고).
+#   안 붙이면 성능이 크게 떨어져서 "e5 가 별로다"라는 잘못된 결론이 난다.
+#   bge-m3 계열은 반대로 접두어를 쓰지 않는다(붙이면 오히려 노이즈).
+_NEEDS_E5_PREFIX = {"e5-small", "e5-large", "koe5"}
 
 LOCAL_DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "local_embeddings"
 
@@ -50,17 +61,34 @@ _models: dict[str, object] = {}
 
 def _get_model(provider: Provider):
     if provider not in _models:
+        import torch
         from sentence_transformers import SentenceTransformer
+
+        # ★ CPU 스레드를 명시적으로 잡는다(2026-08-03 실측): 기본값으로 두면
+        #   bge-m3 인덱싱 중 컨테이너에 3코어를 줬는데도 162% 밖에 안 쓰고
+        #   배치당 104초가 걸렸다. torch 가 컨테이너의 cpu 제한을 못 읽고
+        #   스레드를 적게 잡는 것이 원인이라, 가용 코어 수로 직접 지정한다.
+        threads = int(os.getenv("EMBED_THREADS") or os.cpu_count() or 1)
+        torch.set_num_threads(threads)
+        log.info("[local_embeddings] torch CPU 스레드 %d 개로 설정", threads)
+
         name = _MODEL_NAMES[provider]
         log.info("[local_embeddings] %s 모델 로드 중(최초 1회)...", name)
-        _models[provider] = SentenceTransformer(name, device="cpu")
+        model = SentenceTransformer(name, device="cpu")
+
+        # ★ 청크 실측 토큰 길이는 최대 577(99%가 536 이하)이다. bge-m3 기본값
+        #   8192 를 그대로 두면 불필요하게 긴 시퀀스를 가정하게 되므로 640 으로
+        #   낮춘다 - 잘리는 청크가 하나도 없으면서 낭비를 줄이는 값이다.
+        if getattr(model, "max_seq_length", 0) > 640:
+            model.max_seq_length = 640
+        _models[provider] = model
     return _models[provider]
 
 
 def _prefix(provider: Provider, text: str, kind: Literal["query", "passage"]) -> str:
-    # ★ e5 계열은 "query: "/"passage: " 프리픽스가 없으면 성능이 눈에 띄게 떨어진다
-    #   (모델 카드 공식 권고). ko-sroberta 는 그런 규약이 없어 그대로 쓴다.
-    if provider == "e5-small":
+    """e5 계열에만 접두어를 붙인다(위 _NEEDS_E5_PREFIX 주석 참고).
+    ko-sroberta·bge-m3 계열은 접두어 규약이 없으므로 원문 그대로 쓴다."""
+    if provider in _NEEDS_E5_PREFIX:
         return f"{kind}: {text}"
     return text
 
@@ -120,8 +148,17 @@ class LocalIndex:
             log.warning("[local_embeddings] 인덱스 파일 없음: %s (build_index() 먼저 실행)", path)
             return cls(provider=provider, ready=False)
         data = np.load(path, allow_pickle=False)
+        # ★ provider 뿐 아니라 모델명·차원수까지 확인한다. 모델이 다르면 벡터 공간이
+        #   달라서, 섞이면 검색이 조용히 망가진다(에러 없이 엉뚱한 결과가 나온다).
         if str(data["provider"]) != provider:
             log.warning("[local_embeddings] provider 불일치 - 인덱스 사용 안 함")
+            return cls(provider=provider, ready=False)
+        if str(data["model"]) != _MODEL_NAMES[provider]:
+            log.warning("[local_embeddings] 모델명 불일치(%s != %s) - 인덱스 사용 안 함",
+                        data["model"], _MODEL_NAMES[provider])
+            return cls(provider=provider, ready=False)
+        if int(data["dimensions"]) != data["vectors"].shape[1]:
+            log.warning("[local_embeddings] 차원수 메타와 실제 벡터가 불일치 - 인덱스 사용 안 함")
             return cls(provider=provider, ready=False)
         return cls(
             provider=provider, ready=True,
