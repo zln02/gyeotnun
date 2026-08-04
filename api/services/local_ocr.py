@@ -129,14 +129,80 @@ def extract_tesseract(image_path: str | Path, sender_name: str | None = None) ->
         return LocalOcrResult(text="", provider="tesseract", elapsed_sec=time.perf_counter() - t0, status="failed")
 
 
-def extract_easyocr(image_path: str | Path, sender_name: str | None = None) -> LocalOcrResult:
+# ---- 말풍선 영역 판별 파라미터 (2026-08-04, 실측 좌표/배경색으로 정했다) ----
+# 900x968(light)·900x602(dark) 두 장의 전체 검출 박스를 찍어 보고 정한 값이다.
+# ★ 절대 픽셀이 아니라 이미지 크기 대비 "비율"로 둔다 - 캡처 해상도가 제각각이다.
+_TOP_EXCLUDE_RATIO = 0.20     # 상태바(y~3%) + 대화방 제목(y~10~17%) 구간
+_BOTTOM_EXCLUDE_RATIO = 0.88  # 입력창(y~91~95%) 구간
+# 말풍선 배경은 채팅 배경보다 뚜렷하게 밝다 - 라이트(255 vs 178)든 다크(54 vs 29)든
+# 공통이라 '밝기 비율'로 보면 테마를 안 가리고 동작한다. 실측 분포:
+#   말풍선 1.43(light)/1.86(dark)  vs  발신자명·시각 1.11  vs  아바타 0.93
+# 1.25 를 그 사이에 놓았다.
+_BUBBLE_BRIGHTNESS_RATIO = 1.25
+
+
+def _luma(rgb) -> float:
+    return 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+
+
+def _chat_background_luma(im) -> float:
+    """채팅 배경 밝기를 추정한다. 좌측 가장자리(글자가 거의 없는 여백)를 세로로
+    훑어 중앙값을 쓴다 - 말풍선·아바타를 피해 배경만 잡기 위해서다."""
+    import statistics
+    w, h = im.size
+    x = max(0, int(w * 0.02))
+    ys = [int(h * r) for r in (0.30, 0.40, 0.50, 0.60, 0.70, 0.80)]
+    return statistics.median([_luma(im.getpixel((x, min(y, h - 1)))) for y in ys])
+
+
+def _keep_bubble_boxes(image_path, boxes) -> list[str]:
+    """검출 박스 중 '말풍선 안'으로 보이는 것만 남긴다.
+
+    boxes: easyocr readtext(detail=1) 결과 [(bbox, text, conf), ...]
+
+    ★ 왜 목록(발신자명 사전)이 아니라 위치·색으로 거르는가: 발신자명·대화방 이름은
+      캡처마다 달라서 목록으로 관리할 수 없다. 반면 카카오톡 화면 구조(상단 상태바·
+      헤더, 하단 입력창, 말풍선이 배경보다 밝음)는 캡처가 달라도 일정하다.
+    """
+    from PIL import Image
+
+    im = Image.open(image_path).convert("RGB")
+    w, h = im.size
+    chat_luma = _chat_background_luma(im) or 1.0
+    kept = []
+    for bbox, text, _conf in boxes:
+        s = (text or "").strip()
+        if len(s) <= 1:
+            continue                      # 아바타 이니셜("김","배") 제거
+        xs = [p[0] for p in bbox]
+        ys = [p[1] for p in bbox]
+        cy = (min(ys) + max(ys)) / 2
+        if cy < h * _TOP_EXCLUDE_RATIO or cy > h * _BOTTOM_EXCLUDE_RATIO:
+            continue                      # 상태바·헤더·입력창 구간 제거
+        # 텍스트 박스 바로 왼쪽 바깥을 찍어 배경색을 본다(글자 획을 피한다)
+        sx = max(0, int(min(xs)) - 6)
+        sy = max(0, min(h - 1, int(cy)))
+        if _luma(im.getpixel((sx, sy))) < chat_luma * _BUBBLE_BRIGHTNESS_RATIO:
+            continue                      # 말풍선 밖(발신자명·시각·날짜칩) 제거
+        kept.append(s)
+    return kept
+
+
+def extract_easyocr(image_path: str | Path, sender_name: str | None = None,
+                    bubble_filter: bool = True) -> LocalOcrResult:
+    """bubble_filter=True 면 좌표·배경색으로 말풍선 안만 남긴다(기본).
+    False 면 종전처럼 정규식 후처리만 한다 - 두 방식 비교 측정용."""
     t0 = time.perf_counter()
     try:
         reader = _get_easyocr_reader()
         # ★ paragraph=False 로 둔다: True 면 검출된 박스들을 한 문단으로 합쳐 버려서
         #   상태바 시각·입력창 문구가 본문과 같은 줄에 섞이고, 그러면 줄 단위
         #   UI 잡음 제거(_strip_ui_noise)가 아예 동작하지 못한다(실측 확인).
-        lines = reader.readtext(str(image_path), detail=0, paragraph=False)
+        if bubble_filter:
+            boxes = reader.readtext(str(image_path), detail=1, paragraph=False)
+            lines = _keep_bubble_boxes(image_path, boxes)
+        else:
+            lines = reader.readtext(str(image_path), detail=0, paragraph=False)
         text = _strip_ui_noise("\n".join(lines), sender_name)
         elapsed = time.perf_counter() - t0
         return LocalOcrResult(text=text, provider="easyocr", elapsed_sec=elapsed,
@@ -146,9 +212,11 @@ def extract_easyocr(image_path: str | Path, sender_name: str | None = None) -> L
         return LocalOcrResult(text="", provider="easyocr", elapsed_sec=time.perf_counter() - t0, status="failed")
 
 
-def extract(image_path: str | Path, provider: Provider = "tesseract", sender_name: str | None = None) -> LocalOcrResult:
+def extract(image_path: str | Path, provider: Provider = "tesseract", sender_name: str | None = None,
+            bubble_filter: bool = True) -> LocalOcrResult:
+    """bubble_filter 는 easyocr 에만 적용된다(tesseract 는 좌표를 이 형태로 주지 않는다)."""
     if provider == "tesseract":
         return extract_tesseract(image_path, sender_name)
     if provider == "easyocr":
-        return extract_easyocr(image_path, sender_name)
+        return extract_easyocr(image_path, sender_name, bubble_filter=bubble_filter)
     raise ValueError(f"알 수 없는 provider: {provider}")
