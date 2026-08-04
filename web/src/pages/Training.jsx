@@ -180,72 +180,73 @@ function PracticeStep({ index, total, step, answer, hintOpen, onToggleHint, onPi
       <div className="practice-progress" aria-label={`4단계 중 ${index + 1}단계`}>
         {PRACTICE_STEPS.map((s, i) => (
           <div key={s.categoryLabel} className={`practice-progress-seg${i < index ? ' done' : i === index ? ' current' : ''}`}>
-            {i === index ? (
-              <span className="practice-progress-tag">진행 중</span>
-            ) : (
-              <span className="practice-progress-tag" style={{ visibility: 'hidden' }}>진행 중</span>
-            )}
+            <span className={`practice-progress-tag${i === index ? ' visible' : ''}`}>진행 중</span>
             <span className="practice-progress-bar" />
             <span className="practice-progress-label">{i + 1}단계</span>
           </div>
         ))}
       </div>
 
-      <div className="practice-focus-card">
-        <span className="practice-focus-num" aria-hidden="true">{index + 1}</span>
-        <div>
-          <p className="practice-focus-step">{index + 1}단계</p>
-          <p className="practice-focus-tip">{step.focusTip}</p>
+      {/* ★ key={index}로 매 단계 다시 마운트시켜 CSS 등장 애니메이션(practiceFadeIn)이
+          단계가 바뀔 때마다 새로 걸리게 한다 - 이전엔 React 가 내용만 갈아끼워서
+          클릭한 순간 다음 문항이 뚝 튀어나오듯 바뀌었다("매끄럽지 않다"는 지적). */}
+      <div className="practice-step-body" key={index}>
+        <div className="practice-focus-card">
+          <span className="practice-focus-num" aria-hidden="true">{index + 1}</span>
+          <div>
+            <p className="practice-focus-step">{index + 1}단계</p>
+            <p className="practice-focus-tip">{step.focusTip}</p>
+          </div>
         </div>
-      </div>
 
-      <div className="practice-message-card">
-        <div className="practice-message-head">
-          <span>받은 문자</span>
-          <span className="practice-message-tag">SMS</span>
+        <div className="practice-message-card">
+          <div className="practice-message-head">
+            <span>받은 문자</span>
+            <span className="practice-message-tag">SMS</span>
+          </div>
+          <MessageBody highlight={step.highlight} />
         </div>
-        <MessageBody highlight={step.highlight} />
-      </div>
 
-      <button type="button" className="practice-hint-toggle" onClick={onToggleHint}>
-        <img src={icHint} width="18" height="18" alt="" aria-hidden="true" />
-        {hintOpen ? '힌트 닫기' : '힌트 보기'}
-      </button>
-      {hintOpen && <p className="practice-hint-box">{step.hint}</p>}
-
-      <h3 className="practice-question">{step.question}</h3>
-      <div className="practice-answers">
-        <button
-          type="button"
-          className={`practice-answer believe${answer === 'trust' ? ' selected' : ''}`}
-          onClick={() => onPick('trust')}
-          aria-pressed={answer === 'trust'}
-        >
-          <span className="glyph" aria-hidden="true">O</span>
-          <span className="label">믿어요</span>
+        <button type="button" className="practice-hint-toggle" onClick={onToggleHint}>
+          <img src={icHint} width="18" height="18" alt="" aria-hidden="true" />
+          {hintOpen ? '힌트 닫기' : '힌트 보기'}
         </button>
-        <button
-          type="button"
-          className={`practice-answer doubt${answer === 'suspicious' ? ' selected' : ''}`}
-          onClick={() => onPick('suspicious')}
-          aria-pressed={answer === 'suspicious'}
-        >
-          <span className="glyph" aria-hidden="true">X</span>
-          <span className="label">의심해요</span>
+        {hintOpen && <p className="practice-hint-box">{step.hint}</p>}
+
+        <h3 className="practice-question">{step.question}</h3>
+        <div className="practice-answers">
+          <button
+            type="button"
+            className={`practice-answer believe${answer === 'trust' ? ' selected' : ''}`}
+            onClick={() => onPick('trust')}
+            aria-pressed={answer === 'trust'}
+          >
+            <span className="glyph" aria-hidden="true">O</span>
+            <span className="label">믿어요</span>
+          </button>
+          <button
+            type="button"
+            className={`practice-answer doubt${answer === 'suspicious' ? ' selected' : ''}`}
+            onClick={() => onPick('suspicious')}
+            aria-pressed={answer === 'suspicious'}
+          >
+            <span className="glyph" aria-hidden="true">X</span>
+            <span className="label">의심해요</span>
+          </button>
+        </div>
+
+        {feedback && (
+          <div className={`practice-feedback ${answer === 'suspicious' ? 'good' : 'retry'}`} role="status" aria-live="polite">
+            <b>{feedback.title}</b>
+            {feedback.detail}
+          </div>
+        )}
+
+        <button type="button" className="practice-next-btn" disabled={!picked} onClick={onNext}>
+          {isLast ? '학습 마치기' : '다음 단계'}
+          <img src={icNext} width="18" height="18" alt="" aria-hidden="true" style={picked ? { filter: 'brightness(0) invert(1)' } : undefined} />
         </button>
       </div>
-
-      {feedback && (
-        <div className={`practice-feedback ${answer === 'suspicious' ? 'good' : 'retry'}`} role="status" aria-live="polite">
-          <b>{feedback.title}</b>
-          {feedback.detail}
-        </div>
-      )}
-
-      <button type="button" className="practice-next-btn" disabled={!picked} onClick={onNext}>
-        {isLast ? '학습 마치기' : '다음 단계'}
-        <img src={icNext} width="18" height="18" alt="" aria-hidden="true" style={picked ? { filter: 'brightness(0) invert(1)' } : undefined} />
-      </button>
     </>
   )
 }
