@@ -703,7 +703,7 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   padding: 13px;
   margin: 0 0 12px;
 }
-.confirm-cards { flex: 1 1 58%; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.confirm-cards { flex: 1 1 100%; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .confirm-card {
   display: flex;
   align-items: center;
@@ -763,39 +763,6 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   background: var(--home2-arrow-bg);
 }
 
-.confirm-sns {
-  flex: 1 1 42%;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  position: relative;
-  background: transparent;
-  border: none;
-  padding: 8px 4px;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.confirm-sns:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
-/* ★ SNS 48px/20px 는 Figma 원안 그대로 - 시니어 확대 대상 목록(카드 설명·부제·
-   배너·카드 제목)에 없었고, 원래도 충분히 큰 값이라 그대로 뒀다. */
-.sns-big { display: block; font-size: 48px; font-weight: 900; color: var(--home2-muted); line-height: 1.05; }
-.sns-desc { display: block; margin-top: 2px; font-size: 20px; font-weight: 700; color: var(--home2-muted); line-height: 1.3; }
-.sns-bubbles { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
-.sns-bubbles .bubble { height: auto; }
-.sns-bubbles .bubble-2 { width: 92px; }
-.sns-bubbles .bubble-3 { width: 74px; }
-.sns-kakao {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  width: 34px;
-  height: 34px;
-  object-fit: contain;
-  transform: rotate(20.19deg);
-}
 
 /* ---- 포인트 배너 ---- */
 .point-banner {

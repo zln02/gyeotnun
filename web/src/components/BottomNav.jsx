@@ -27,7 +27,7 @@ export default function BottomNav({ active, onTap }) {
   return (
     <nav className="bottom-nav" aria-label="주요 메뉴">
       <NavItem itemKey="home" label="홈" icon={navHomeIcon} active={active === 'home'} onTap={onTap} />
-      <NavItem itemKey="learn" label="학습" icon={navLearnIcon} active={active === 'learn'} onTap={onTap} />
+      <NavItem itemKey="learn" label="훈련" icon={navLearnIcon} active={active === 'learn'} onTap={onTap} />
       <span className="nav-gap" aria-hidden="true" />
       <NavItem itemKey="growth" label="성장" icon={navGrowthIcon} active={active === 'growth'} onTap={onTap} />
       <NavItem itemKey="me" label="내 정보" icon={navMeIcon} active={active === 'me'} onTap={onTap} />

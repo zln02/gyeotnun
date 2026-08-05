@@ -1,5 +1,5 @@
 /**
- * S1 - 홈: 확인 시작 + 오늘의 학습
+ * S1 - 홈: 확인 시작 + 오늘의 훈련
  * 담당: 조희진
  *
  * 시니어 UX 원칙
@@ -37,12 +37,9 @@ import envelopeImg from '../assets/home/envelope.png'
 import icPhoto from '../assets/home/ic_photo.png'
 import icLink from '../assets/home/ic_link.png'
 import icSms from '../assets/home/ic_sms.png'
-import kakaoImg from '../assets/home/kakao.png'
 import icPencil from '../assets/home/ic_pencil.svg'
 import icBell from '../assets/home/ic_bell.svg'
 import icChevron from '../assets/home/ic_chevron.svg'
-import bubble2Img from '../assets/home/bubble2.svg'
-import bubble3Img from '../assets/home/bubble3.svg'
 
 const SCREEN = 'S1'
 
@@ -143,7 +140,7 @@ function HeroCard({ onLearn }) {
       </section>
       <button type="button" className="hero-cta" onClick={onLearn}>
         <img src={icPencil} width="18" height="18" alt="" aria-hidden="true" />
-        <span>오늘의 학습</span>
+        <span>오늘의 훈련</span>
         {/* ★ 포인트 시스템 백엔드 없음 - G/120 은 고정값. TODO: 포인트 API 나오면 교체 */}
         <span className="hero-cta-badge">
           <b className="g">G</b><b className="pt">120</b>
@@ -174,19 +171,8 @@ function ConfirmCluster({ onPhoto, onLink, onText }) {
       <div className="confirm-cards">
         <ConfirmCard icon={icPhoto} title="사진 확인" desc="클릭하여 사진 선택하기" onClick={onPhoto} />
         <ConfirmCard icon={icLink} title="링크 확인" desc="클릭하여 주소 붙여넣기" onClick={onLink} />
-        <ConfirmCard icon={icSms} title="문자 확인" desc="클릭하여 문자 붙여넣기" onClick={onText} />
+        <ConfirmCard icon={icSms} title="문자 확인" desc="클릭하여 내용 입력하기" onClick={onText} />
       </div>
-      {/* ★ SNS(카카오톡 등) 캡처도 결국 사진이라 사진 확인 흐름으로 이어지게 했다 -
-          Figma 에는 이 블록의 클릭 동작이 정의돼 있지 않아 내린 판단이다. */}
-      <button type="button" className="confirm-sns" onClick={onPhoto}>
-        <span className="sns-big">SNS</span>
-        <span className="sns-desc">의심 정보 확인</span>
-        <span className="sns-bubbles" aria-hidden="true">
-          <img src={bubble2Img} className="bubble bubble-2" alt="" />
-          <img src={bubble3Img} className="bubble bubble-3" alt="" />
-        </span>
-        <img src={kakaoImg} className="sns-kakao" width="40" height="40" alt="" aria-hidden="true" />
-      </button>
     </section>
   )
 }
