@@ -190,6 +190,17 @@ def embed_texts(
     return out, total_tokens
 
 
+def _index_metadata() -> tuple[str, str]:
+    """인덱스 파일에 적을 (provider, model). 저장과 검증이 이 함수 하나를 공유한다.
+
+    ★ 로컬 인덱스는 실험 모듈이 먼저 만들었고 provider 필드에 모델 별칭
+      (e5-small-ko-v2)을 넣는 규약을 썼다. 그 파일을 계속 쓰려면 규약을 맞춰야 한다.
+    """
+    if EMBEDDING_PROVIDER == "local":
+        return "e5-small-ko-v2", LOCAL_EMBED_MODEL
+    return EMBEDDING_PROVIDER, EMBEDDING_MODEL_DOCUMENT
+
+
 def build_index(chunks: Optional[list] = None) -> None:
     """청크 목록을 임베딩해 EMBEDDING_INDEX_PATH 에 저장한다.
 
@@ -224,14 +235,23 @@ def build_index(chunks: Optional[list] = None) -> None:
     chunk_ids = np.array([c.chunk_id for c in chunks])
     record_ids = np.array([c.record_id for c in chunks])
 
+    # ★ 2026-08-05 버그 수정 - 메타데이터를 제공자에 맞게 쓴다.
+    #   기존에는 provider 로컬일 때도 model 에 Upstage 모델명
+    #   (solar-embedding-1-large-passage)을 적었다. 아래 EmbeddingIndex 검증부는
+    #   provider="e5-small-ko-v2" / model=LOCAL_EMBED_MODEL 을 기대하므로 항상
+    #   불일치로 거부됐고, 이 도구로 만든 인덱스는 통째로 무시된 채 BM25 폴백으로
+    #   동작했다(EX-003). 지금까지 쓰던 인덱스는 실험 모듈이 만든 것이라 우연히
+    #   맞아 있었을 뿐이다. 저장과 검증이 같은 값을 보도록 한 곳에서 만든다.
+    meta_provider, meta_model = _index_metadata()
+
     EMBEDDING_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
         EMBEDDING_INDEX_PATH,
         vectors=arr,
         chunk_ids=chunk_ids,
         record_ids=record_ids,
-        provider=np.array([EMBEDDING_PROVIDER]),
-        model=np.array([EMBEDDING_MODEL_DOCUMENT]),
+        provider=np.array([meta_provider]),
+        model=np.array([meta_model]),
         dimensions=np.array([arr.shape[1]]),
     )
     log.info(
@@ -269,12 +289,10 @@ class EmbeddingIndex:
             model = str(_meta("model", ""))
             dims = int(_meta("dimensions", data["vectors"].shape[1]))
 
-            # ★ 기대값은 제공자별로 다르다. 로컬 인덱스는 실험 모듈이 만든 것이라
-            #   provider 필드에 모델 별칭(e5-small-ko-v2)이 들어 있다.
-            if EMBEDDING_PROVIDER == "local":
-                want_provider, want_model, want_dims = "e5-small-ko-v2", LOCAL_EMBED_MODEL, LOCAL_EMBED_DIMENSIONS
-            else:
-                want_provider, want_model, want_dims = EMBEDDING_PROVIDER, EMBEDDING_MODEL_DOCUMENT, EMBEDDING_DIMENSIONS
+            # ★ 기대값은 저장할 때 쓰는 함수와 같은 것을 쓴다 - 둘이 갈라지면
+            #   build_index() 로 만든 인덱스가 통째로 거부된다(실제로 그랬다).
+            want_provider, want_model = _index_metadata()
+            want_dims = LOCAL_EMBED_DIMENSIONS if EMBEDDING_PROVIDER == "local" else EMBEDDING_DIMENSIONS
 
             if provider != want_provider or model != want_model or dims != want_dims:
                 log.warning(

@@ -371,10 +371,17 @@ def _load_official_docs() -> List[OfficialDoc]:
       OFFICIAL_DOCS 에 남는다.
     """
     docs: List[OfficialDoc] = []
-    if not OFFICIAL_RECORDS_PATH.exists():
+    # ★ 2026-08-05 추가: 직접 수집분(질병관리청·보건복지부)을 함께 읽는다.
+    #   원본 전달본(records_merged.jsonl)을 건드리지 않고 별도 파일로 두는 이유는
+    #   출처와 수집 시점을 분리해 두어야 나중에 재수집·롤백이 쉽기 때문이다.
+    #   수집 스크립트: api/tools/collect_public_docs.py
+    paths = [p for p in (OFFICIAL_RECORDS_PATH, *sorted(OFFICIAL_DATA_DIR.glob("records_collected_*.jsonl")))
+             if p.exists()]
+    if not paths:
         return docs
-    with OFFICIAL_RECORDS_PATH.open(encoding="utf-8") as f:
-        for line in f:
+    seen_urls: set = set()
+    for path in paths:
+        for line in path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line:
                 continue
@@ -392,6 +399,9 @@ def _load_official_docs() -> List[OfficialDoc]:
             #   링크는 근거가 아니다 - 이 파일 맨 위 docstring의 원칙을 그대로 따른다)
             if not title or not url.startswith(("http://", "https://")):
                 continue
+            if url in seen_urls:      # 파일 간 중복(재수집분과 원본이 겹칠 때)
+                continue
+            seen_urls.add(url)
             docs.append(OfficialDoc(
                 id=(row.get("id") or "").strip(),
                 title=title,
