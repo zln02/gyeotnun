@@ -43,7 +43,8 @@ def main() -> None:
 
     report = {"cases": []}
     llm_scores, rule_scores = [], []
-    need_llm = 0
+    need_llm = 0      # (가) 근거검색 성공 건수 - 참고용
+    need_llm_b = 0    # (나) 규칙 질문 4지표 미달 건수 - 정식 지표
 
     for i, row in enumerate(rows, 1):
         cid, ytype = row["case_id"], row["유형"]
@@ -66,12 +67,18 @@ def main() -> None:
         rs = score_question(rqs[0].question, text)
         rule_scores.append(rs)
 
-        # ---- 4) 하이브리드: 근거 문서를 인용해야 하는 경우 = LLM 필요
-        #      규칙 템플릿은 문서 내용을 인용하지 못한다(고정 문장이므로).
-        #      근거가 실제로 붙은 케이스는 LLM 이 그 문서를 가리켜 줄 수 있어야 한다.
-        cite_needed = len(ev.references) > 0
+        # ---- 4) 하이브리드
+        #  ★ 정의 (나) 가 정식 정의다 (2026-08-05 교정).
+        #     (나) LLM 필요 = 규칙 질문이 4지표에 미달한 비율.
+        #         규칙으로 충분하면 LLM 을 부를 이유가 없다 - 이것이 원가 절감 판단의 근거다.
+        #     (가) 근거 문서가 검색된 비율 ← 이건 LLM 필요 조건이 아니다.
+        #         근거가 붙었다는 사실과 "규칙 질문으로 부족하다"는 사실은 별개다.
+        #         비교용으로만 함께 기록한다.
+        cite_needed = len(ev.references) > 0   # (가) 참고 지표
         if cite_needed:
             need_llm += 1
+        if not rs.passed_all:                  # (나) 정식 지표
+            need_llm_b += 1
 
         sig_keys = [s.key for s in detect_rule_signals(text)]
         report["cases"].append({
@@ -97,8 +104,15 @@ def main() -> None:
                         "question": c["rule"]["question"][:60]} for c in rule_susp],
         },
         "하이브리드": {
-            "LLM필요_건수": need_llm, "전체": len(rows),
-            "LLM필요_비율": round(need_llm / len(rows), 3),
+            "정식정의_나_규칙미달": {
+                "LLM필요_건수": need_llm_b, "전체": len(rows),
+                "LLM필요_비율": round(need_llm_b / len(rows), 3),
+            },
+            "참고정의_가_근거검색성공": {
+                "건수": need_llm, "전체": len(rows),
+                "비율": round(need_llm / len(rows), 3),
+                "주의": "이것은 LLM 필요 조건이 아니다. 원가 판단에 쓰지 말 것.",
+            },
         },
         "평균_생성시간": {
             "llm_sec": round(sum(c["llm"]["sec"] for c in report["cases"]) / 30, 2),
@@ -120,8 +134,12 @@ def main() -> None:
     print(f"\n정상 10건 규칙 의심유도: {s['정상10건_규칙_의심유도']['건수']}건")
     for c in s["정상10건_규칙_의심유도"]["케이스"]:
         print(f"  ⚠ {c['case_id']} [{c['signal']}] {c['question']}")
-    h = s["하이브리드"]
-    print(f"\n하이브리드: LLM 필요 {h['LLM필요_건수']}/{h['전체']} ({h['LLM필요_비율']*100:.1f}%)")
+    b = s["하이브리드"]["정식정의_나_규칙미달"]
+    g = s["하이브리드"]["참고정의_가_근거검색성공"]
+    print(f"\n하이브리드 (나) LLM 필요 = 규칙 4지표 미달"
+          f" : {b['LLM필요_건수']}/{b['전체']} ({b['LLM필요_비율']*100:.1f}%)")
+    print(f"           (가) 근거검색 성공(참고, 원가판단에 쓰지 말 것)"
+          f" : {g['건수']}/{g['전체']} ({g['비율']*100:.1f}%)")
     print(f"평균 생성시간: LLM {s['평균_생성시간']['llm_sec']}s / 규칙 {s['평균_생성시간']['rule_sec']}s")
     print(f"\n저장: {OUT_PATH}")
 

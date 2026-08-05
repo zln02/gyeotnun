@@ -23,8 +23,31 @@ from typing import List
 
 sys.path.insert(0, "/app")
 
-from services.prompt_chain import count_sentences, find_forbidden  # noqa: E402
+from services.prompt_chain import count_sentences as _prod_count_sentences  # noqa: E402
+from services.prompt_chain import find_forbidden  # noqa: E402
 from services.search import SIGNAL_RULES, detect_signals  # noqa: E402
+
+# ★ 도메인·소수점의 마침표를 문장 구분자로 세지 않는다(2026-08-05).
+#   프로덕션 count_sentences() 는 마침표를 무조건 구분자로 보기 때문에
+#   "정부 기관 주소(go.kr)와 다릅니다." 같은 정상적인 1문장을 2문장으로 센다.
+#   실측에서 규칙 질문 2건(S03·S08)이 이 이유만으로 3문장 판정을 받았다.
+#   ※ 프로덕션 코드는 건드리지 않고, 채점 시 LLM·규칙 양쪽에 똑같이 적용한다.
+#     프로덕션에도 같은 문제가 있다는 사실은 보고서에 남긴다.
+_DOMAIN_DOT = re.compile(r"\b([a-zA-Z][a-zA-Z0-9\-]*)\.((?:go|or|co|ne|re|pe|kr|com|net|org|kr)\b)")
+_DECIMAL_DOT = re.compile(r"(?<=\d)\.(?=\d)")
+
+
+# 마침표 대신 쓸 임시 문자(one-dot leader). 문장 구분자로 세지 않는다.
+_DOT_SAFE = "\u2024"
+
+
+def count_sentences(text: str) -> int:
+    """도메인·소수점을 보호한 뒤 프로덕션 계산기에 넘긴다.
+    (re.sub 의 치환 템플릿은 유니코드 이스케이프를 해석하지 않으므로
+     lambda 로 실제 문자를 넣는다.)"""
+    t = _DOMAIN_DOT.sub(lambda m: m.group(1) + _DOT_SAFE + m.group(2), text or "")
+    t = _DECIMAL_DOT.sub(_DOT_SAFE, t)
+    return _prod_count_sentences(t)
 
 # ---- 지표 3) 신호 대응: 원문에 이 신호가 있으면, 질문이 아래 단어 중 하나를
 #      담고 있어야 "그 신호를 짚었다"고 본다. 신호 정의(SIGNAL_RULES)의 안내

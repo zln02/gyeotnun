@@ -43,11 +43,66 @@ PAT = {
     "official_domain": re.compile(r"\b[a-z0-9\-]+\.(?:go\.kr|or\.kr)\b", re.I),
 }
 
+# ══════════════════════════════════════════════════════════════════════════
+# 공개 수법 분류 (2026-08-05 조사) — 아래 카테고리는 전부 공공기관 공개 자료에서
+# 도출했다. ★ 평가셋(30건)을 열어보지 않고 작성했다.
+#
+# [출처 A] 금융감독원 보이스피싱지킴이 - 주요 사기유형
+#   http://fss.or.kr/fss/main/contents.do?menuNo=200565
+#   · 기관사칭형: "검찰, 경찰, 금융감독원 등 공공기관 및 금융기관을 사칭 ...
+#                  사기범이 불러주는 계좌로 이체하도록 유도"
+#   · 대출빙자형: "신용카드정보(카드번호, 비밀번호, CVC번호)를 알아낸 후 ...
+#                  피해자에게 사기범계좌로 이체하도록 유도"
+#   · 수사기관 사칭: "계좌가 사건(범죄)에 연루되어 안전조치가 필요하다고 기망하여
+#                     자동화기기로 유인"
+#
+# [출처 B] 금융감독원 보이스피싱 예방요령
+#   http://fss.or.kr/fss/main/contents.do?menuNo=200364
+#   · "계좌번호, 카드번호, 인터넷뱅킹 정보를 묻거나 인터넷 사이트에 입력을
+#      요구하는 경우 절대 응하지 말 것"
+#   · "세금·보험료 등을 환급해 준다거나 계좌안전조치를 취해주겠다면서
+#      현금지급기로 유인하는 경우 절대 응하지 말 것"
+#
+# [출처 C] 경찰청 사이버안전지킴이 - 사이버금융범죄 유형
+#   https://cyberbureau.police.go.kr/prevention/sub2_2.jsp
+#   · 스미싱: "문자 내 링크 클릭 → 악성코드 설치 → 소액결제 피해 또는
+#              개인·금융정보 탈취"
+#   · 악성앱: "무료쿠폰, 돌잔치 초대장 등 문자 내 인터넷주소 클릭 → 악성코드 설치"
+#   · 원격제어앱: "화상채팅에 필요한 어플이라거나 ... 특정파일 설치를 요구"
+#   · 인증번호 요구: "금융정보 입력제한 보안승급 등을 명목으로 보안카드번호를 요구"
+#
+# 위 자료에서 도출한 탐지 카테고리
+#   ① 자금 이체 요구      (A 기관사칭형·수사기관사칭, B 현금지급기 유인)
+#   ② 인증번호·보안카드   (C 인증번호 요구)
+#   ③ 앱·파일 설치 유도   (C 악성앱·원격제어앱)
+#   ④ 카드·계좌 정보 요구 (A 대출빙자형, B 예방요령)
+#   ⑤ 링크 클릭 유도      (C 스미싱)
+#   ⑥ 대출 빙자           (A 대출빙자형)
+#   ⑦ 선입금 요구         (기존)
+#   ⑧ 긴급성·조건생략     (기존)
+# ══════════════════════════════════════════════════════════════════════════
+
 KEYWORDS = {
     "urgency": ["오늘까지", "마감", "긴급", "서둘러", "선착순", "즉시", "지금 바로", "안 하면", "취소됩니다", "기한"],
     "condition_omitted": ["전원", "누구나", "무조건", "모두에게", "전부", "전 국민", "대상자로 선정"],
     "prepay": ["인증비", "수수료", "선입금", "입금 후", "먼저 입금", "보증금", "예치금"],
     "personal_info": ["주민번호", "주민등록번호", "본인인증", "계좌번호", "카드번호", "비밀번호", "이름과 전화번호"],
+    # ① 자금 이체 요구 — 출처 A(기관사칭형 "계좌로 이체하도록 유도", 수사기관사칭
+    #    "안전조치"), 출처 B("계좌안전조치", "현금지급기로 유인")
+    "fund_transfer": ["안전조치", "안전계좌", "안전 계좌", "지정 계좌", "지정계좌",
+                      "계좌로 옮", "예금을 옮", "옮겨야", "이체하", "현금지급기",
+                      "자동화기기", "출금해", "인출해"],
+    # ② 인증번호·보안카드 — 출처 C("보안승급 등을 명목으로 보안카드번호를 요구")
+    "verification_code": ["인증번호", "인증 번호", "보안카드", "보안 카드", "승인번호",
+                          "보안승급", "인증코드", "OTP"],
+    # ③ 앱·파일 설치 유도 — 출처 C(악성앱 "악성코드가 설치", 원격제어앱 "특정파일 설치를 요구")
+    "app_install": ["앱을 설치", "앱 설치", "어플 설치", "어플을 설치", "설치하세요",
+                    "설치해 주", "원격", "파일을 설치"],
+    # ④ 카드정보 요구 — 출처 A(대출빙자형 "카드번호, 비밀번호, CVC번호")
+    "card_info": ["CVC", "cvc", "카드 비밀번호", "카드번호와", "유효기간"],
+    # ⑥ 대출 빙자 — 출처 A(대출빙자형)
+    "loan_bait": ["저금리", "대환대출", "정부지원 대출", "한도 조회", "신용등급 상향",
+                  "대출 가능", "무담보"],
     "agency_claim": ["정부", "복지부", "보건복지부", "국민연금", "건강보험", "정부24", "복지로", "주민센터",
                      "한국사회보장정보원", "질병관리청", "국세청", "공단"],
     "money_claim": ["지원금", "환급금", "당첨", "지급", "만원", "포인트", "혜택"],
@@ -87,41 +142,63 @@ def detect_rule_signals(text: str) -> List[RuleSignal]:
                 return w
         return ""
 
+    # 우선순위 근거: 공개 분류에서 '돈이 즉시 빠져나가는' 수법(자금이체·선입금)과
+    # '계정 통제권을 넘기는' 수법(인증번호·앱설치)을 최상위로 뒀다.
+    w = has("fund_transfer")
+    if w:
+        out.append(RuleSignal("fund_transfer", "예금을 다른 곳으로 옮기라는 요구", w, 1))
+
     w = has("prepay")
     if w:
-        out.append(RuleSignal("prepay", "돈을 먼저 보내라는 요구", w, 1))
+        out.append(RuleSignal("prepay", "돈을 먼저 보내라는 요구", w, 2))
+
+    w = has("verification_code")
+    if w:
+        out.append(RuleSignal("verification_code", "인증번호·보안카드 요구", w, 3))
+
+    w = has("app_install")
+    if w:
+        out.append(RuleSignal("app_install", "앱·파일 설치 유도", w, 4))
+
+    w = has("card_info")
+    if w:
+        out.append(RuleSignal("card_info", "카드 정보 요구", w, 5))
+
+    w = has("loan_bait")
+    if w:
+        out.append(RuleSignal("loan_bait", "대출 조건 제시", w, 6))
 
     if PAT["account"].search(t) or PAT["account_ctx"].search(t):
         m = PAT["account"].search(t) or PAT["account_ctx"].search(t)
-        out.append(RuleSignal("account", "계좌번호가 적혀 있음", m.group(0), 2))
+        out.append(RuleSignal("account", "계좌번호가 적혀 있음", m.group(0), 7))
 
     w = has("personal_info")
     if w:
-        out.append(RuleSignal("personal_info", "개인정보를 요구함", w, 3))
+        out.append(RuleSignal("personal_info", "개인정보를 요구함", w, 8))
 
     if PAT["short_url"].search(t):
-        out.append(RuleSignal("short_url", "단축 주소가 있음", PAT["short_url"].search(t).group(0), 4))
+        out.append(RuleSignal("short_url", "단축 주소가 있음", PAT["short_url"].search(t).group(0), 9))
 
     # 비공식 도메인: go.kr/or.kr 이 아닌 링크가 있는데 기관을 사칭하는 경우
     nonoff = PAT["nonofficial_url"].search(t)
     if nonoff and not PAT["official_domain"].search(t):
-        out.append(RuleSignal("nonofficial_url", "공식 주소가 아닌 링크", nonoff.group(1), 5))
+        out.append(RuleSignal("nonofficial_url", "공식 주소가 아닌 링크", nonoff.group(1), 10))
 
     w = has("urgency")
     if w:
-        out.append(RuleSignal("urgency", "서두르게 만드는 표현", w, 6))
+        out.append(RuleSignal("urgency", "서두르게 만드는 표현", w, 11))
 
     w = has("condition_omitted")
     if w:
-        out.append(RuleSignal("condition_omitted", "조건 없이 모두에게 준다는 표현", w, 7))
+        out.append(RuleSignal("condition_omitted", "조건 없이 모두에게 준다는 표현", w, 12))
 
     if PAT["phone"].search(t):
-        out.append(RuleSignal("phone", "연락처가 적혀 있음", PAT["phone"].search(t).group(0), 8))
+        out.append(RuleSignal("phone", "연락처가 적혀 있음", PAT["phone"].search(t).group(0), 13))
 
     agency = has("agency_claim")
     money = has("money_claim")
     if agency and money:
-        out.append(RuleSignal("agency_money", f"기관 이름과 금액이 함께 있음", f"{agency}/{money}", 9))
+        out.append(RuleSignal("agency_money", f"기관 이름과 금액이 함께 있음", f"{agency}/{money}", 14))
 
     out.sort(key=lambda s: s.priority)
     return out
@@ -135,6 +212,37 @@ TEMPLATES = {
          "지원금을 준다면서 먼저 돈을 요구하는 것은 공식 절차에 없는 방식입니다."),
         ("받기 전에 내야 하는 돈이 있다고 합니다. 해당 기관 대표번호로 전화해 같은 안내를 하는지 물어봐 주시겠어요?",
          "기관에 직접 확인하면 안내 내용이 실제인지 바로 알 수 있습니다."),
+    ],
+    # ① 자금 이체 — 출처 A(기관사칭형·수사기관사칭), 출처 B(계좌안전조치·현금지급기 유인)
+    "fund_transfer": [
+        ("돈을 다른 곳으로 옮기라고 되어 있습니다. 옮기기 전에 가족이나 은행 창구에 이런 절차가 있는지 먼저 물어봐 주시겠어요?",
+         "수사기관과 금융기관은 예금을 다른 계좌로 옮기라고 요구하지 않습니다(금융감독원 예방요령)."),
+        ("계좌를 안전하게 해주겠다는 안내입니다. 해당 기관 대표번호로 직접 전화해 같은 안내를 했는지 확인해 보시겠어요?",
+         "'계좌안전조치'는 금융감독원이 대표적인 사기 수법으로 안내하는 표현입니다."),
+    ],
+    # ② 인증번호·보안카드 — 출처 C(보안승급 명목 보안카드번호 요구)
+    "verification_code": [
+        ("인증번호나 보안카드 번호를 알려달라고 합니다. 이 번호를 남에게 알려줘도 되는지 은행이나 가족에게 물어봐 주시겠어요?",
+         "인증번호·보안카드는 본인만 쓰는 값이라 어떤 기관도 알려달라고 하지 않습니다."),
+        ("보안을 위해 번호가 필요하다고 합니다. 요청한 곳이 실제 기관인지 대표번호로 직접 확인해 보시겠어요?",
+         "'보안승급'을 명목으로 번호를 요구하는 것은 경찰청이 안내하는 전형적인 수법입니다."),
+    ],
+    # ③ 앱·파일 설치 — 출처 C(악성앱·원격제어앱)
+    "app_install": [
+        ("앱이나 파일을 설치하라고 안내합니다. 설치하기 전에 가족이나 주민센터에 이것이 무엇인지 물어봐 주시겠어요?",
+         "설치를 유도하는 앱은 휴대폰을 원격으로 조작할 수 있게 만드는 경우가 있습니다(경찰청)."),
+        ("설치를 권하는 내용이 있습니다. 일단 멈추고 기관 대표번호로 다시 걸어 확인해 보시겠어요?",
+         "원격제어 앱이 깔리면 통화·문자·금융정보가 그대로 넘어갈 수 있습니다."),
+    ],
+    # ④ 카드정보 — 출처 A(대출빙자형 카드번호·비밀번호·CVC)
+    "card_info": [
+        ("카드 번호나 비밀번호를 알려달라고 합니다. 카드사 대표번호로 직접 전화해 같은 요청을 했는지 확인해 보시겠어요?",
+         "카드번호·비밀번호·CVC 를 묻는 것은 금융감독원이 안내하는 대출빙자형 수법입니다."),
+    ],
+    # ⑥ 대출 빙자 — 출처 A(대출빙자형)
+    "loan_bait": [
+        ("좋은 조건의 대출을 안내하고 있습니다. 해당 금융회사 대표번호로 전화해 실제 상품인지 확인해 보시겠어요?",
+         "정식 금융회사는 문자로 먼저 대출을 권유하지 않습니다."),
     ],
     "account": [
         ("글 안에 계좌번호가 적혀 있습니다. 이 계좌가 기관 공식 누리집에도 같이 안내되어 있는지 확인해 보시겠어요?",
