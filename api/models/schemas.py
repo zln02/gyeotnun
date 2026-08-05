@@ -137,6 +137,13 @@ class TrainingCardResponse(BaseModel):
     answer: str = Field(..., description="정답 item id")
     explanation: str
     estimated_sec: int = Field(300, description="예상 소요 시간(초). 기본 5분")
+    # ★ 2026-08-05 추가. sample_cards.json 에는 source_url 이 처음부터 들어 있었는데
+    #   이 스키마에 필드가 없어 응답에서 조용히 탈락했다. 그래서 사용자가 훈련 카드를
+    #   풀고 나서 근거 원문으로 돌아갈 방법이 없었다(docs/evaluation/judgment_basis.md §4).
+    #   근거 없는 학습은 곁눈이 하지 않기로 한 것이므로 노출한다.
+    #   Optional 인 이유: 카드에 URL 이 없을 수도 있고, 없다고 훈련이 막히면 안 된다.
+    source_url: Optional[str] = Field(
+        None, description="이 카드의 근거 원문 URL. 없으면 화면에서 링크를 감춘다")
 
 
 class WeeklyReportResponse(BaseModel):

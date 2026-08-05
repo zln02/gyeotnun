@@ -31,11 +31,14 @@ import logging
 import math
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
 
 from rank_bm25 import BM25Okapi
+
+from . import scam_taxonomy
 
 log = logging.getLogger("gyeotnun.corpus_index")
 
@@ -636,52 +639,117 @@ def _keyword_weight(keyword: str) -> float:
     겹칠 확률이 낮다는 뜻이라 변별력이 높다고 본다. +1 스무딩을 쓰는 이유는 코퍼스가
     30건 안팎으로 작아서 df=0(전혀 안 나오는 단어)이거나 전체 문서 수 자체가 작을 때도
     나눗셈이 안정적으로 동작하게 하기 위해서다.
+
+    ★ 2026-08-05 결함 수정 - df 를 매칭 규칙과 같은 방식으로 센다.
+      기존에는 df 를 '토큰 단위'로 세면서 매칭은 '부분 문자열'로 했다. 그래서
+      토큰으로는 한 번도 등장하지 않지만 부분 문자열로는 걸리는 단어(예: '앱을',
+      '화면', '하는')가 df=0 이 되어 **최대 가중치 4.951** 을 받았다 - 실제로
+      존재하는 어떤 토큰의 가중치(최대 4.258)보다도 높았다. 희귀할수록 높은
+      점수를 주려던 의도와 정반대로, '사기 코퍼스에 아예 없는 흔한 말'이 가장
+      강한 신호가 되어 버렸다(docs/evaluation/judgment_basis.md).
+      실측: B03 은 조사 '하는'(4.951) 하나로 임계값 5.0 에 육박했다.
     """
-    df = _SCAM_DOC_FREQ.get(keyword, 0)
+    df = _scam_substring_df(keyword)
     return math.log((_SCAM_N_DOCS + 1) / (df + 1)) + 1.0
+
+
+@lru_cache(maxsize=256)
+def _case_categories(case_id: str) -> frozenset:
+    """사기 사례가 '요구하는 행위' 카테고리. 본문이 없으면 빈 집합이다."""
+    case = next((c for c in SCAM_CASES if c.id == case_id), None)
+    if case is None:
+        return frozenset()
+    return frozenset(scam_taxonomy.describe_categories(case._blob))
+
+
+@lru_cache(maxsize=4096)
+def _scam_substring_df(keyword: str) -> int:
+    """매칭에 쓰는 것과 동일한 부분 문자열 규칙으로 문서빈도를 센다."""
+    return sum(1 for c in SCAM_CASES if keyword in c._blob)
+
+
+def _dedup_morph_variants(matched: List[str]) -> List[str]:
+    """조사가 붙은 변형과 원형이 함께 잡힌 경우 하나만 남긴다.
+
+    ★ 2026-08-05 결함 수정 - 중복 계상.
+      extract_keywords() 는 '계좌로'와 조사를 뗀 '계좌'를 **둘 다** 내놓는다.
+      둘 다 사례 본문의 부분 문자열이라 둘 다 점수에 더해졌고, 같은 단어
+      하나가 사실상 두 번 계산됐다. 실측(H05): '계좌로'(4.258) + '계좌'(3.853)
+      = 8.111 로, 단어 하나로 임계값 5.0 을 훌쩍 넘겼다.
+      긴 쪽이 짧은 쪽을 포함하면 같은 어휘로 보고 긴 쪽만 남긴다.
+    """
+    out: List[str] = []
+    for k in sorted(matched, key=len, reverse=True):
+        if not any(k in kept for kept in out):
+            out.append(k)
+    return out
 
 
 def match_scam_cases(text: str, limit: int = 2, min_score: float = 5.0) -> List[ScamCase]:
     """알려진 사기 사례와 대조한다.
 
-    ★ 오매칭 방지 (docs/evaluation/eval_30_report_before_stopword_fix.md §3에서 실측으로 발견된 문제):
-      예전엔 STOPWORDS 없이 '단어 일치 개수 >= 2'로만 판단해서, "안내/지원/내용"처럼
-      어떤 공공 안내문에도 흔한 단어 2개만 겹쳐도 정상 안내문이 사기 사례로 오매칭됐다.
-      지금은 (1) STOPWORDS 를 채점에서 아예 빼고, (2) 남은 키워드는 코퍼스 내 희귀도로
-      가중치를 매겨(_keyword_weight) 합산한다 - 흔한 단어 여러 개보다 희귀한 단어
-      하나가 더 강한 신호가 되게 하기 위해서다.
-    ★ 임계값(min_score=5.0)의 근거: 평가세트 30건 전체로 실측한 결과(코드가 아니라 데이터로
-      정했다), '정상' 10건이 우연히 얻는 최고 점수는 4.43(단어 1개, 예: '복지'/'사업'
-      같은 일반명사)이었고, 실제 사기/경계 사례가 진짜로 맞는 경우는 대부분 6점대 이상
-      부터 시작했다(단어 2개 이상 조합). 4.43과 6.1 사이가 비어 있어 5.0 을 그 사이에
-      놓으면 이 데이터셋 기준 '정상' 오매칭 10건을 전부 걸러내면서 사칭/경계의 진짜 일치는
-      대부분 그대로 잡는다. 코퍼스가 커지면 이 값도 같은 방식(재측정)으로 다시 잡아야 한다.
-    ★ 코퍼스 확장(30→51건, 공공데이터 경보 21건 추가) 후 재검증: 처음엔 179건을 전부
-      더했다가 정상 10건 중 9건이 오판되는 걸 실측으로 발견했다(긴 보도자료 158건이
-      원인 - _SCAM_PATTERN_MAX_CHARS 주석 참고). 그 158건을 빼고 짧은 21건만 남긴
-      51건 기준으로 다시 돌려 보니 점수 분포가 원래(30건) 계산과 사실상 같았다(정상
-      최고점 4.95, 여전히 5.0 아래) - 그래서 임계값은 그대로 5.0을 유지한다.
+    ★★ 2026-08-05 전면 수정 ★★
+      이전 구현은 **어휘 중첩만** 봤다. 그 결과 정상 안내문 H05("기초연금이
+      등록하신 계좌로 입금되며")가 대환대출·통장협박 사례와 매칭돼 '의심'으로
+      오판됐다. '계좌·지급·신청' 같은 행정 어휘는 정상 문서에도 항상 나오기
+      때문이다. 진단 전문: docs/evaluation/judgment_basis.md
+
+      임계값을 올려서 덮지 않았다. 임계값 조정은 증상만 가리고, 올리면
+      사칭 검출이 같이 떨어진다. 대신 판정 축 자체를 바꿨다.
+
+      (1) 수법 카테고리 게이트 - 어휘가 겹쳐도 '요구하는 행위'가 다르면
+          같은 수법이 아니다. 사용자 글이 아무 수법도 요구하지 않으면
+          (= 정상 안내문) 아예 대조하지 않는다.
+            정상 "계좌로 입금되며"      → 요구 없음 → 매칭 0건
+            사칭 "안전계좌로 보내세요"  → 자금이체 요구 → 대조 진행
+      (2) 점수는 어휘 합산이 아니라 **수법 일치도**로 낸다. 어휘 중첩은
+          같은 카테고리 안에서 순위를 가르는 보조 지표로만 쓴다.
+          어휘 합산을 주 지표로 두면, 흔한 행정 어휘가 여러 개 겹친 정상
+          문서가 수법이 정확히 일치하는 사기 사례보다 높은 점수를 받는다.
+      (3) 본문이 없는 레코드는 대조에서 제외한다(아래 주석).
+
+      ※ min_score 는 하위호환용으로 남겨 두되 더 이상 판정에 쓰지 않는다.
+        이 값은 중복 계상(D1)이 있던 시절의 점수 분포에 맞춰 잡힌 값이라,
+        중복을 제거한 지금 그대로 쓰면 사칭까지 걸러 낸다(실측: S02 탈락).
     """
     kws = [k for k in extract_keywords(text) if k not in STOPWORDS]
     if not kws:
         return []
+
+    # ---- (1) 게이트: 사용자 글이 무엇을 '요구'하는가
+    text_cats = scam_taxonomy.detect_categories(text)
+    if not text_cats:
+        return []
+
     scored = []
     for case in SCAM_CASES:
-        matched = [k for k in kws if k in case._blob]
+        # ---- (3) 본문 없는 레코드 제외.
+        #   SCAM_CASES 51건 중 19건이 '담당부서신고대응센터 / 2026-07-24 /
+        #   첨부 이미지 또는 문서 3개' 같은 스크랩 메타데이터뿐이다. 실제
+        #   수법 설명이 없어 어휘가 겹쳐도 근거가 되지 않는다.
+        case_cats = _case_categories(case.id)
+        if not case_cats:
+            continue
+        shared = text_cats & case_cats
+        if not shared:
+            continue
+
+        matched = _dedup_morph_variants([k for k in kws if k in case._blob])
         if not matched:
             continue
-        score = sum(_keyword_weight(k) for k in matched)
-        if score >= min_score:
-            scored.append((score, matched, case))
-    scored.sort(key=lambda x: -x[0])
+        # ---- (2) 1순위 = 수법 일치 개수, 2순위 = 어휘 중첩 가중치
+        lexical = sum(_keyword_weight(k) for k in matched)
+        scored.append(((len(shared), lexical), matched, case))
+    scored.sort(key=lambda x: (-x[0][0], -x[0][1]))
     # ★ 매칭 근거를 로그로 남긴다 - 어떤 단어 때문에 어떤 사례와 연결됐는지, 어느
     #   소스(origin)에서 왔는지 나중에 추적할 수 있어야 한다는 요구사항(재측정 시
     #   오매칭 재발 여부 확인용). relabeled(사람 라벨링) 인지 public_data_warning
     #   (원문 그대로) 인지가 매칭 결과의 신뢰도 해석에 영향을 준다.
-    for score, matched, case in scored[:limit]:
+    for (n_shared, lexical), matched, case in scored[:limit]:
         log.info(
-            "[match_scam] case=%s origin=%s score=%.2f 매칭단어=%s",
-            case.id, case.origin, score, matched,
+            "[match_scam] case=%s origin=%s 수법일치=%d 어휘=%.2f 매칭단어=%s 수법=%s",
+            case.id, case.origin, n_shared, lexical, matched,
+            sorted(text_cats & _case_categories(case.id)),
         )
     return [c for _, _, c in scored[:limit]]
 

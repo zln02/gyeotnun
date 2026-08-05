@@ -170,6 +170,9 @@ TRAINING_TODAY = {
         "'누구나·전원·무조건' 같은 말이 보이면 빠진 조건이 없는지 한 번 더 살펴보세요."
     ),
     "estimated_sec": 300,
+    # ★ 2026-08-05 추가 - sample_cards.json 과 동일한 근거 URL. mock(?mock=1)에서도
+    #   실제 응답과 같은 모양이 나와야 화면 검증이 의미가 있다.
+    "source_url": "https://basicpension.mohw.go.kr/",
 }
 
 # ----------------------------------------- GET /reports/weekly
