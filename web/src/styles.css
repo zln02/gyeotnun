@@ -1011,22 +1011,28 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   --practice-step-text: #1c5340;
   --practice-cta-text: #2bb87c;
   --practice-focus-shadow: rgba(71,216,153,0.24);
-  --practice-answer-believe: #5771f4;
-  --practice-answer-believe-bg: #f8fcf9;
-  --practice-answer-believe-border: #b5dec9;
-  --practice-answer-doubt: #fb5246;
-  --practice-answer-doubt-bg: #fff8f7;
+  --practice-answer-believe-icon-bg: #eaf3ff;
+  --practice-answer-believe-border: #b8d2f1;
+  --practice-answer-doubt-icon-bg: #fff0ee;
   --practice-answer-doubt-border: #edc5c0;
-  --practice-highlight-warn-bg: #fff3c4;
-  --practice-highlight-warn-text: #675316;
+  --practice-answer-correct-bg: #effbf4;
+  --practice-answer-correct-border: #47d899;
+  --practice-answer-wrong-bg: #fff2f0;
+  --practice-answer-wrong-border: #d96860;
+  --practice-highlight-warn-bg: #ffe1de;
+  --practice-highlight-warn-text: #b6463f;
   --practice-highlight-link-bg: #fff0ee;
   --practice-highlight-link-text: #a84f48;
   --practice-hint-bg: #fff8d9;
   --practice-hint-text: #62521a;
   --practice-next-disabled-bg: #dce6df;
   --practice-next-disabled-text: #849188;
-  --practice-retry-bg: #fff8d9;
-  --practice-retry-border: #f0d98a;
+  --practice-feedback-correct-bg: #f4fbf6;
+  --practice-feedback-correct-title: #111111;
+  --practice-feedback-correct-detail: #575757;
+  --practice-feedback-wrong-bg: #fff0ee;
+  --practice-feedback-wrong-title: #b6463f;
+  --practice-feedback-wrong-detail: #8b4b46;
 }
 
 /* ---- 연습 시작 안내 ---- */
@@ -1289,20 +1295,37 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   transition: background 0.18s ease, border-color 0.18s ease, outline-color 0.18s ease, transform 0.12s ease;
 }
 .practice-answer:active { transform: scale(0.97); }
-.practice-answer .glyph { font-size: 44px; font-weight: 900; letter-spacing: -3px; line-height: 1; }
-.practice-answer .label { font-size: 16px; font-weight: 900; letter-spacing: -0.4px; color: #343434; }
-.practice-answer.believe { background: var(--practice-answer-believe-bg); border: 1.5px solid var(--practice-answer-believe-border); }
-.practice-answer.believe .glyph { color: var(--practice-answer-believe); }
-.practice-answer.doubt { background: var(--practice-answer-doubt-bg); border: 1.5px solid var(--practice-answer-doubt-border); }
-.practice-answer.doubt .glyph { color: var(--practice-answer-doubt); }
-.practice-answer.selected { outline: 3px solid currentColor; outline-offset: -3px; }
+.practice-answer-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  transition: background 0.18s ease;
+}
+.practice-answer .label { font-size: 17px; font-weight: 900; letter-spacing: -0.4px; color: #292929; }
+.practice-answer.believe { background: #fff; border: 1.5px solid var(--practice-answer-believe-border); }
+.practice-answer.believe .practice-answer-icon { background: var(--practice-answer-believe-icon-bg); }
+.practice-answer.doubt { background: #fff; border: 1.5px solid var(--practice-answer-doubt-border); }
+.practice-answer.doubt .practice-answer-icon { background: var(--practice-answer-doubt-icon-bg); }
+.practice-answer.correct { background: var(--practice-answer-correct-bg); border-color: var(--practice-answer-correct-border); box-shadow: 0 3px 8px rgba(71,216,153,0.16); }
+.practice-answer.correct .practice-answer-icon { background: var(--practice-answer-correct-border); }
+.practice-answer.wrong { background: var(--practice-answer-wrong-bg); border-color: var(--practice-answer-wrong-border); }
+.practice-answer.wrong .practice-answer-icon { background: var(--practice-answer-wrong-border); }
 .practice-answer:focus-visible { outline: 4px solid var(--warn); outline-offset: 2px; }
 
 /* ---- 진행 중 화면: 선택 후 피드백 ---- */
-.practice-feedback { margin: -4px 0 18px; padding: 14px 16px; border-radius: 16px; font-size: 15px; font-weight: 700; line-height: 1.6; animation: practiceFadeIn 0.28s ease both; }
-.practice-feedback.good { background: var(--fg-surface-tint); border: 1.5px solid var(--fg-primary-border); color: var(--practice-step-text); }
-.practice-feedback.retry { background: var(--practice-retry-bg); border: 1.5px solid var(--practice-retry-border); color: #6b5313; }
+.practice-feedback { display: flex; align-items: flex-start; gap: 11px; margin: -4px 0 18px; padding: 14px 16px; border-radius: 16px; animation: practiceFadeIn 0.28s ease both; }
+.practice-feedback-icon { flex-shrink: 0; margin-top: 2px; }
 .practice-feedback b { display: block; margin-bottom: 4px; font-size: 16px; font-weight: 900; }
+.practice-feedback .detail { margin: 0; font-size: 13px; font-weight: 500; line-height: 1.7; }
+.practice-feedback.correct { background: var(--practice-feedback-correct-bg); }
+.practice-feedback.correct b { color: var(--practice-feedback-correct-title); }
+.practice-feedback.correct .detail { color: var(--practice-feedback-correct-detail); }
+.practice-feedback.wrong { background: var(--practice-feedback-wrong-bg); }
+.practice-feedback.wrong b { color: var(--practice-feedback-wrong-title); }
+.practice-feedback.wrong .detail { color: var(--practice-feedback-wrong-detail); }
 
 /* ---- 진행 중 화면: 다음 단계 ---- */
 .practice-next-btn {
@@ -1342,5 +1365,125 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   .practice-progress-bar,
   .practice-progress-tag,
   .practice-progress-label { transition: none; }
+}
+
+/* ---- 학습 완료 (node 196:1406) ---- */
+.practice-complete { padding-top: 18px; text-align: center; animation: practiceFadeIn 0.32s ease both; }
+.practice-complete-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 14px;
+  border: 1.5px solid var(--practice-card-to);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(49,201,141,0.13);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--practice-cta-text);
+}
+.practice-complete-title { margin: 0 0 8px; font-size: 24px; font-weight: 900; letter-spacing: -0.8px; color: #161616; }
+.practice-complete-sub { margin: 0 0 6px; font-size: 15px; font-weight: 600; color: #5f7469; }
+.practice-complete-hero { display: block; width: 100%; max-width: 260px; height: auto; margin: 0 auto; object-fit: contain; }
+.practice-complete-stats {
+  display: flex;
+  margin: 6px 0 20px;
+  padding: 18px 0;
+  border-radius: 16px;
+  background: var(--fg-primary);
+}
+.practice-complete-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.practice-complete-stat:not(:last-child) { border-right: 1px solid rgba(255,255,255,0.35); }
+.practice-complete-stat b { font-size: 22px; font-weight: 900; letter-spacing: -0.9px; color: #fff; }
+.practice-complete-stat span { font-size: 11px; font-weight: 800; color: #e6fff0; }
+.practice-complete-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; margin-bottom: 22px; text-align: left; }
+.practice-complete-card {
+  padding: 16px;
+  border: 1.5px solid var(--fg-hairline);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(28,83,64,0.06);
+}
+.practice-complete-card-label { margin: 0 0 8px; font-size: 15px; font-weight: 900; color: #222; }
+.practice-complete-card-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.practice-complete-card-count { margin: 0; font-size: 26px; font-weight: 900; color: #161616; letter-spacing: -0.5px; }
+.practice-complete-card-count em { margin-left: 2px; font-size: 15px; font-weight: 800; font-style: normal; color: #5f7469; }
+.practice-complete-card-row img { flex-shrink: 0; }
+.practice-complete-cta {
+  display: flex;
+  width: 100%;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 17px;
+  border: none;
+  background: var(--fg-primary);
+  box-shadow: 0 6px 16px rgba(71,216,153,0.28);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+  font-family: inherit;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+.practice-complete-cta:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* ---- 리워드 (node 272:22) ----
+   Figma 원본은 배지+동전+그라데이션이 하나로 합쳐진 배경 이미지 한 장이지만,
+   화면 높이가 기기마다 달라 고정 좌표로 겹치면 기기별로 어긋난다. 그라데이션은
+   CSS로, 배지 문구는 실제 텍스트로 다시 만들고, 동전만 이미지로 올렸다. */
+.practice-reward {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 44px 24px 40px;
+  background: linear-gradient(180deg, #46d899 0%, #33d48f 42%, #74e1b2 62%, #d4f6e7 88%, #ffffff 100%);
+  overflow-y: auto;
+  animation: practiceFadeIn 0.32s ease both;
+}
+.practice-reward-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 33px;
+  padding: 0 15px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1.5px solid #31c98d;
+  box-shadow: 0 1px 4px rgba(49,201,141,0.13);
+  font-size: 13px;
+  font-weight: 800;
+  color: #249967;
+}
+.practice-reward-coin { width: 175px; height: auto; margin: 64px 0 40px; border-radius: 18px; }
+.practice-reward-body { text-align: center; margin-bottom: 40px; }
+.practice-reward-label { margin: 0; font-size: 16px; font-weight: 700; color: rgba(255,255,255,0.9); }
+.practice-reward-title { margin: 9px 0 0; font-size: 30px; font-weight: 900; letter-spacing: -1.2px; color: #fff; }
+.practice-reward-sub { margin: 9px 0 0; font-size: 15px; font-weight: 600; color: rgba(255,255,255,0.9); }
+.practice-reward-actions { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 360px; margin-top: auto; }
+.practice-reward-btn {
+  display: flex;
+  width: 100%;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-radius: 17px;
+  border: none;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(28,83,64,0.18);
+  color: #249967;
+  font-size: 18px;
+  font-weight: 900;
+  font-family: inherit;
+  cursor: pointer;
+}
+.practice-reward-btn.primary { background: var(--fg-primary); color: #fff; }
+.practice-reward-btn:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .practice-complete,
+  .practice-reward { animation: none; }
 }
 
