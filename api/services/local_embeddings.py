@@ -37,7 +37,8 @@ import numpy as np
 
 log = logging.getLogger("gyeotnun.local_embeddings")
 
-Provider = Literal["e5-small", "ko-sroberta", "bge-m3", "bge-m3-ko", "e5-large", "koe5"]
+Provider = Literal["e5-small", "ko-sroberta", "bge-m3", "bge-m3-ko", "e5-large", "koe5",
+                   "e5-small-ko-v2", "e5-base", "kure-v1"]
 
 _MODEL_NAMES = {
     "e5-small": "intfloat/multilingual-e5-small",
@@ -47,12 +48,17 @@ _MODEL_NAMES = {
     "bge-m3-ko": "dragonkue/BGE-m3-ko",      # 위를 한국어 파인튜닝(같은 아키텍처)
     "e5-large": "intfloat/multilingual-e5-large",
     "koe5": "nlpai-lab/KoE5",                # e5 계열 → 접두어 필수
+    # ---- 2026-08-04 추가: 외부 벤치마크 대시보드에서 1위로 보고된 모델들
+    "e5-small-ko-v2": "dragonkue/multilingual-e5-small-ko-v2",  # Apache-2.0, 384차원
+    "e5-base": "intfloat/multilingual-e5-base",                 # MIT, 768차원
+    "kure-v1": "nlpai-lab/KURE-v1",                             # MIT, 1024차원
 }
 
 # ★ e5 계열은 "query: "/"passage: " 접두어가 필수다(모델 카드 공식 권고).
 #   안 붙이면 성능이 크게 떨어져서 "e5 가 별로다"라는 잘못된 결론이 난다.
 #   bge-m3 계열은 반대로 접두어를 쓰지 않는다(붙이면 오히려 노이즈).
-_NEEDS_E5_PREFIX = {"e5-small", "e5-large", "koe5"}
+#   ※ KURE-v1 은 bge-m3 기반이라 접두어를 쓰지 않는다(모델 카드 확인).
+_NEEDS_E5_PREFIX = {"e5-small", "e5-large", "koe5", "e5-small-ko-v2", "e5-base"}
 
 LOCAL_DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "local_embeddings"
 

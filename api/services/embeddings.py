@@ -38,8 +38,33 @@ from services import corpus_index
 
 log = logging.getLogger("gyeotnun.embeddings")
 
-# ==================================================== 제공자 설정 (Upstage)
-EMBEDDING_PROVIDER = "upstage"
+# ==================================================== 제공자 설정
+# ★ 2026-08-04 전환: upstage(상용 API) → local(로컬 모델).
+#   이 상수 하나만 "upstage" 로 되돌리면 즉시 원복된다 - 아래 Upstage 코드는
+#   지우지 않고 그대로 뒀다(롤백 경로 보존).
+#
+#   전환 근거(docs/evaluation/local_embeddings_report.md, 30건 실측):
+#     지표          Upstage   e5-small-ko-v2
+#     Recall@3        0.65        0.65   (동일)
+#     근거검색        0.867       0.900   (로컬이 더 높음)
+#     기대판단일치율   0.667       0.667   (동일)
+#     정상10건 오판    0/10        0/10   (절대조건 유지)
+#     질의 응답       112ms       141ms
+#   그리고 로컬 후보 5종 중 **유일하게** 경계/정상 유사도가 분리된다
+#   (정상min 0.6820 > 경계max 0.6760). 다른 모델은 역전되어 확신 판정이 불가능했다.
+#
+#   가장 큰 이유는 성능이 아니라 개인정보다 - 질의 텍스트가 외부로 나가지 않는다.
+EMBEDDING_PROVIDER = "local"
+
+# ---- 로컬 제공자 설정
+LOCAL_EMBED_MODEL = "dragonkue/multilingual-e5-small-ko-v2"   # Apache-2.0
+LOCAL_EMBED_DIMENSIONS = 384
+# ★ e5 계열은 "query: "/"passage: " 접두어가 필수다(모델 카드 공식 권고).
+#   안 붙이면 검색 품질이 크게 떨어진다 - 색인과 질의에서 반드시 같은 규약을 쓴다.
+LOCAL_QUERY_PREFIX = "query: "
+LOCAL_PASSAGE_PREFIX = "passage: "
+
+# ---- Upstage 제공자 설정 (롤백용으로 보존)
 EMBEDDING_MODEL_DOCUMENT = "solar-embedding-1-large-passage"   # 색인(문서) 전용
 EMBEDDING_MODEL_QUERY = "solar-embedding-1-large-query"        # 검색(질의) 전용
 EMBEDDING_DIMENSIONS = 4096
@@ -50,7 +75,11 @@ UPSTAGE_EMBED_URL = "https://api.upstage.ai/v1/solar/embeddings"
 #   코퍼스에서 "파생된 출력물"이라 corpus/ 바깥, api/ 밑의 쓰기 가능한 위치에
 #   저장한다(api/ 는 `./api:/app` 로 읽기-쓰기 마운트돼 있다).
 EMBEDDING_DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "embeddings"
-EMBEDDING_INDEX_PATH = EMBEDDING_DATA_DIR / f"embedding_index_{EMBEDDING_PROVIDER}_solar_large.npz"
+_UPSTAGE_INDEX_PATH = EMBEDDING_DATA_DIR / "embedding_index_upstage_solar_large.npz"
+# 로컬 인덱스는 실험 모듈이 만든 파일을 그대로 쓴다(재생성 불필요).
+_LOCAL_INDEX_PATH = (Path(__file__).resolve().parents[1] / "data" / "local_embeddings"
+                     / "local_index_e5-small-ko-v2.npz")
+EMBEDDING_INDEX_PATH = _LOCAL_INDEX_PATH if EMBEDDING_PROVIDER == "local" else _UPSTAGE_INDEX_PATH
 
 # 20건 소량 테스트로 실측(2026-08-02): 청크당 평균 407.6 토큰. 100건씩 묶어도
 # 요청당 약 4만 토큰 수준이라 여유롭다 - 오히려 요청 "횟수"가 많을수록 레이트리밋
@@ -100,14 +129,44 @@ def _embed_upstage(
     raise RuntimeError("Upstage 임베딩 재시도 한도 초과")
 
 
+_local_model = None
+
+
+def _get_local_model():
+    """로컬 임베딩 모델 싱글턴. 최초 1회만 로드한다(약 1.1GB 상주).
+
+    ★ 기동 시점에 로드하지 않고 첫 질의 때 지연 로드한다 - 서버가 뜨는 속도를
+      늦추지 않기 위해서다. 첫 질의만 모델 로드 시간(약 3초)이 더 걸린다.
+    """
+    global _local_model
+    if _local_model is None:
+        import torch
+        from sentence_transformers import SentenceTransformer
+
+        torch.set_num_threads(int(__import__("os").cpu_count() or 1))
+        log.info("[embeddings] 로컬 모델 로드: %s", LOCAL_EMBED_MODEL)
+        _local_model = SentenceTransformer(LOCAL_EMBED_MODEL, device="cpu")
+    return _local_model
+
+
+def _embed_local(texts: List[str], input_type: str) -> Tuple[List[List[float]], int]:
+    """로컬 모델로 임베딩한다. 외부로 나가는 요청이 전혀 없다."""
+    prefix = LOCAL_QUERY_PREFIX if input_type == "query" else LOCAL_PASSAGE_PREFIX
+    vecs = _get_local_model().encode([prefix + t for t in texts], normalize_embeddings=True)
+    return [list(map(float, v)) for v in vecs], 0   # 토큰 과금이 없으므로 0
+
+
 def embed_texts(
     texts: List[str], input_type: str, timeout: float = 60.0, max_retries: int = 5,
 ) -> Tuple[List[List[float]], int]:
     """텍스트 목록을 배치로 나눠 임베딩한다. input_type 은 'document'|'query'.
 
-    ★★ 문서용/질의용 모델을 여기서 정확히 갈라 쓴다 - 색인할 때(document)와
-      검색할 때(query)를 절대 같은 모델로 섞지 않는다(Upstage 공식 문서 경고).
+    ★★ 문서용/질의용을 여기서 정확히 갈라 쓴다 - 색인할 때(document)와
+      검색할 때(query)를 절대 섞지 않는다. Upstage 는 모델 자체가 나뉘어 있고,
+      로컬(e5 계열)은 접두어로 나뉜다. 둘 다 섞으면 검색 품질이 떨어진다.
     """
+    if EMBEDDING_PROVIDER == "local":
+        return _embed_local(texts, input_type)
     if EMBEDDING_PROVIDER != "upstage":
         raise NotImplementedError(f"미지원 임베딩 제공자: {EMBEDDING_PROVIDER}")
     model = EMBEDDING_MODEL_DOCUMENT if input_type == "document" else EMBEDDING_MODEL_QUERY
@@ -197,16 +256,32 @@ class EmbeddingIndex:
             return
         try:
             data = np.load(path, allow_pickle=False)
-            provider = str(data["provider"][0]) if "provider" in data else "unknown"
-            model = str(data["model"][0])
-            dims = int(data["dimensions"][0]) if "dimensions" in data else data["vectors"].shape[1]
 
-            if provider != EMBEDDING_PROVIDER or model != EMBEDDING_MODEL_DOCUMENT or dims != EMBEDDING_DIMENSIONS:
+            # ★ 메타데이터가 0차원 스칼라로 저장된 경우와 1차원 배열인 경우가 둘 다
+            #   있다(만든 도구가 다르다). 어느 쪽이든 값 하나를 꺼내도록 감싼다.
+            def _meta(key, default=None):
+                if key not in data:
+                    return default
+                a = data[key]
+                return a.item() if getattr(a, "ndim", 0) == 0 else a[0]
+
+            provider = str(_meta("provider", "unknown"))
+            model = str(_meta("model", ""))
+            dims = int(_meta("dimensions", data["vectors"].shape[1]))
+
+            # ★ 기대값은 제공자별로 다르다. 로컬 인덱스는 실험 모듈이 만든 것이라
+            #   provider 필드에 모델 별칭(e5-small-ko-v2)이 들어 있다.
+            if EMBEDDING_PROVIDER == "local":
+                want_provider, want_model, want_dims = "e5-small-ko-v2", LOCAL_EMBED_MODEL, LOCAL_EMBED_DIMENSIONS
+            else:
+                want_provider, want_model, want_dims = EMBEDDING_PROVIDER, EMBEDDING_MODEL_DOCUMENT, EMBEDDING_DIMENSIONS
+
+            if provider != want_provider or model != want_model or dims != want_dims:
                 log.warning(
                     "[embeddings] 인덱스 메타데이터 불일치(파일: provider=%s model=%s dim=%s / "
-                    "현재 설정: provider=%s model=%s dim=%s) - 다른 모델로 만든 인덱스는 쓰지 않는다. "
+                    "기대: provider=%s model=%s dim=%s) - 다른 모델로 만든 인덱스는 쓰지 않는다. "
                     "임베딩 검색 0건으로 동작.",
-                    provider, model, dims, EMBEDDING_PROVIDER, EMBEDDING_MODEL_DOCUMENT, EMBEDDING_DIMENSIONS,
+                    provider, model, dims, want_provider, want_model, want_dims,
                 )
                 return
 
@@ -236,7 +311,12 @@ _INDEX = EmbeddingIndex(EMBEDDING_INDEX_PATH)
 #   문서를 항상 돌려주게 되어, '확인 불가' 로 갈 길이 임베딩 경로에서는 구조적으로
 #   막힌다(BM25 를 처음 붙였을 때와 같은 문제 - docs/evaluation/eval_30_report.md
 #   §match_official_docs 임계값 근거와 같은 논리).
-EMBEDDING_MIN_SCORE = 0.45
+#   ★ 2026-08-04 로컬 전환: 모델이 바뀌면 유사도 분포도 달라져 임계값을 그대로
+#     쓸 수 없다. e5-small-ko-v2 로 같은 방식(잡음/정상/경계 3분포)으로 재실측했다.
+#       잡음 최고 0.5490 < 정상 최저 0.6820  → 그 사이 0.6155 를 min_score 로
+#     (Upstage 값 0.45 는 아래에 보존 - 롤백 시 그대로 쓴다)
+_MIN_SCORE_BY_PROVIDER = {"upstage": 0.45, "local": 0.6155}
+EMBEDDING_MIN_SCORE = _MIN_SCORE_BY_PROVIDER[EMBEDDING_PROVIDER]
 
 # ★ 실시간 검색(사용자 요청 경로) 전용 타임아웃 - 인덱싱과 다르다. 실측(10회 반복,
 #   docs/evaluation/hybrid_search_report.md §0-1) 결과 API 왕복이 평균 110.6ms,
@@ -263,7 +343,8 @@ def match_embedding_docs(text: str, limit: int = 2, min_score: float = EMBEDDING
     반환값은 (score, OfficialDoc) 튜플 리스트다. 실패하면 빈 리스트가 아니라
     EmbeddingUnavailableError 를 던진다 - 위 클래스 docstring 참고.
     """
-    if not settings.has_embeddings:
+    # ★ 로컬 제공자는 API 키가 필요 없다 - 키 검사를 건너뛴다.
+    if EMBEDDING_PROVIDER == "upstage" and not settings.has_embeddings:
         raise EmbeddingUnavailableError("UPSTAGE_API_KEY 가 설정되지 않았다")
     if not _INDEX.ready:
         raise EmbeddingUnavailableError("임베딩 인덱스 파일이 없거나 지금 설정과 맞지 않는다")

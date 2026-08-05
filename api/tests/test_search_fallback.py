@@ -61,22 +61,26 @@ def test_embedding_failure_falls_back_to_bm25(caplog):
         "폴백 발생 사실이 로그에 남아야 한다(운영 중 장애 여부를 나중에 추적할 수 있어야 함)"
 
 
-def test_embedding_timeout_specifically_triggers_fallback():
-    """타임아웃(httpx.TimeoutException 계열)도 EmbeddingUnavailableError 로 변환돼
-    같은 폴백 경로를 타는지 확인한다 - embeddings.py 의 실제 예외 변환 로직을 통해서
-    (has_embeddings/인덱스 준비 여부는 이 테스트 환경에 실제로 설정된 값을 그대로
-    쓴다 - 그 두 속성은 읽기 전용 프로퍼티라 모의할 필요도 없다)."""
-    import httpx
-    from config import settings
+def test_embedding_infrastructure_failure_triggers_fallback():
+    """임베딩 계층이 '실제로' 죽었을 때(호출 함수가 예외를 던질 때) BM25 로 넘어가는지
+    확인한다 - EmbeddingUnavailableError 를 직접 던지는 위 테스트와 달리, 여기서는
+    embeddings.py 의 예외 변환 로직을 실제로 통과시킨다.
+
+    ★ 2026-08-04 로컬 임베딩 전환에 맞춰 고쳤다. 전에는 httpx.post 를 모의해
+      네트워크 타임아웃을 흉내 냈는데, 로컬 제공자는 httpx 를 아예 쓰지 않아서
+      그 방식으로는 아무것도 검증하지 못한다(모의가 무시되고 임베딩이 그냥 성공).
+      제공자와 무관하게 '임베딩 호출 자체가 터지는' 상황을 모의하도록 바꿨다.
+    """
     from services import embeddings
 
-    if not settings.has_embeddings or not embeddings._INDEX.ready:
-        pytest.skip("이 테스트 환경에 UPSTAGE_API_KEY/임베딩 인덱스가 없다 - 스킵")
+    if not embeddings._INDEX.ready:
+        pytest.skip("이 테스트 환경에 임베딩 인덱스가 없다 - 스킵")
 
-    def _raise_timeout(*args, **kwargs):
-        raise httpx.ConnectTimeout("모의 타임아웃")
+    def _boom(*args, **kwargs):
+        raise TimeoutError("모의 인프라 장애(타임아웃)")
 
-    with patch("httpx.post", side_effect=_raise_timeout):
+    # embed_texts 는 제공자(upstage/local) 어느 쪽이든 반드시 거쳐 가는 지점이다.
+    with patch("services.embeddings.embed_texts", side_effect=_boom):
         docs, mode, top_score = search.match_official_docs_safe(TEXT)
 
     assert mode == "bm25_fallback"

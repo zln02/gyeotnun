@@ -38,6 +38,7 @@ from typing import List, Optional
 
 from config import MissingKeyError, settings
 from services import corpus_index
+from services import embeddings as embeddings_mod
 
 log = logging.getLogger("gyeotnun.search")
 
@@ -284,7 +285,13 @@ def match_official_docs_safe(text: str, limit: int = 2) -> tuple:
 #   아래면 "근거는 찾았지만(레퍼런스로는 보여주되) 확인됨으로 단정할 만큼
 #   확신하지는 않는다"로 취급해 확인불가로 유보한다 - 검색 성공 여부(참고자료
 #   유무)와 판정 확신도(needs_check로 볼지)를 분리한 것이다.
-CONFIDENT_MATCH_THRESHOLD = 0.52
+#   ★ 2026-08-04 로컬 임베딩 전환에 맞춰 재실측했다. 모델이 바뀌면 유사도 분포가
+#     달라서 0.52 를 그대로 쓰면 판정이 무너진다.
+#       e5-small-ko-v2: 경계 최고 0.6760 < 정상 최저 0.6820 → 사이값 0.6790
+#     ※ 간격이 0.006 으로 좁다(Upstage 는 0.032). 표본 30건 기준이므로, 실사용
+#       데이터가 쌓이면 재보정할 것.
+_CONFIDENT_BY_PROVIDER = {"upstage": 0.52, "local": 0.6790}
+CONFIDENT_MATCH_THRESHOLD = _CONFIDENT_BY_PROVIDER[embeddings_mod.EMBEDDING_PROVIDER]
 
 
 def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
