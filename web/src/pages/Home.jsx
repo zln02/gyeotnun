@@ -247,7 +247,7 @@ export default function Home({ onStarted, onSubmitStart, onFailed, notice, onTra
     //   찍혀서, 제품에서 제일 긴 대기가 우리 지표에는 아예 안 보였다.
     //   → 요청을 보내기 전에 먼저 '확인 중' 화면으로 넘긴다. 이미 만들어 둔
     //     단계 표시가 이제 진짜 오래 걸리는 구간을 덮는다.
-    onSubmitStart()
+    onSubmitStart(payload)
     try {
       // 사진은 올리기 전에 긴 변 1280px 로 줄인다. 인식률에는 영향이 없고
       // (Vision 은 이미지 크기에 거의 무관하다 - imageResize.js 주석 참고)

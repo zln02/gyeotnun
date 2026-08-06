@@ -25,6 +25,7 @@ import { logClick, logError, logEvidenceLinkClick } from '../events.js'
 import VerifyProgress from '../components/VerifyProgress.jsx'
 import mascot from '../assets/verify/mascot.png'
 import icImage from '../assets/verify/ic_image.svg'
+import icPhoto from '../assets/verify/ic_photo.svg'
 import icDoc from '../assets/verify/ic_doc.svg'
 import icDocWhite from '../assets/verify/ic_doc_white.svg'
 import icLink from '../assets/verify/ic_link.svg'
@@ -89,7 +90,7 @@ function ReferenceCard({ reference, onOpen }) {
   )
 }
 
-export default function Question({ checkId, checkData, evidence, onDone }) {
+export default function Question({ checkId, checkData, evidence, photoUrl, onDone }) {
   const [turn, setTurn] = useState(1)
   const [phase, setPhase] = useState('find')        // find | explore | confirm
   const [data, setData] = useState(null)
@@ -225,10 +226,17 @@ export default function Question({ checkId, checkData, evidence, onDone }) {
               곁눈이 여쭤봐요
             </span>
             <p className="verify-confirm-question">{data.question}</p>
-            {/* ★ Figma 원본은 '사진 다시 보기' 였다. 원본 사진은 확인이 끝나면 서버에서
-                지우고(masking.discard_original), 화면에도 남기지 않는 게 곁눈의 약속이라
-                (S2 안내 문구로 사용자에게 그렇게 고지한다) 사진 대신 마스킹된 글을 보여준다. */}
-            {checkData?.extracted_text && (
+            {/* ★ '사진 다시 보기'는 사용자가 방금 고른 그 사진이다. 이 탭 메모리에만
+                있고(App.jsx 의 photoUrl) 서버로 다시 보내지 않는다. 서버가 원본을
+                파기한다는 약속(masking.discard_original)은 서버 보관에 대한 것이라
+                자기 사진을 자기 화면에서 다시 보는 것과 어긋나지 않는다.
+                글로 붙여넣어 사진이 없는 경우에는 마스킹된 글을 대신 보여준다. */}
+            {photoUrl ? (
+              <button type="button" className="verify-recall in-card" onClick={() => { logClick(SCREEN, 'recall_photo'); setSheet('photo') }}>
+                <img src={icPhoto} width="20" height="20" alt="" aria-hidden="true" />
+                <span>사진 다시 보기</span>
+              </button>
+            ) : checkData?.extracted_text && (
               <button type="button" className="verify-recall in-card" onClick={() => { logClick(SCREEN, 'recall_text'); setSheet('text') }}>
                 <img src={icImage} width="20" height="20" alt="" aria-hidden="true" />
                 <span>문자 다시 보기</span>
@@ -271,6 +279,14 @@ export default function Question({ checkId, checkData, evidence, onDone }) {
         </>
       )}
 
+      {sheet === 'photo' && (
+        <Sheet title="올려 주신 사진" onClose={() => setSheet(null)}>
+          <img src={photoUrl} alt="올려 주신 사진" className="verify-sheet-photo" />
+          <p className="verify-sheet-note">
+            이 사진은 이 기기에만 있습니다. 확인이 끝나면 사라집니다.
+          </p>
+        </Sheet>
+      )}
       {sheet === 'text' && (
         <Sheet title="올려 주신 문자" onClose={() => setSheet(null)}>
           <p className="verify-sheet-text">{checkData.extracted_text}</p>

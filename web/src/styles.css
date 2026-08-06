@@ -104,6 +104,9 @@ body {
   background: var(--bg);
   padding: 20px 18px 120px;     /* 하단 여백: 큰 버튼이 가리지 않도록 */
 }
+/* ★ 확인 흐름(확인중·판단·발견·탐색·확인·응답·기록): Figma 프레임에 공용 헤더가
+   없고 Container 여백이 pt 25 / px 22.5 다. 하단 네비도 없어 120px 여백이 불필요. */
+.app.flow { padding: 25px 22.5px 28px; }
 
 /* ------------------------------------------------------ 헤더 */
 .header {
@@ -149,9 +152,6 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 .btn:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
 
 .btn.secondary { background: #fff; color: var(--brand-dark); border-color: var(--brand); }
-.btn.choice    { background: #fff; color: var(--text); border-color: var(--line); justify-content: flex-start; text-align: left; }
-.btn.choice.selected { background: var(--brand-soft); border-color: var(--brand); }
-.btn.ghost     { background: transparent; color: var(--text-sub); border-color: transparent; box-shadow: none; text-decoration: underline; }
 .btn:disabled  { opacity: 0.5; cursor: not-allowed; }
 
 /* ------------------------------------------------------ 카드 */
@@ -162,93 +162,6 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   padding: 20px 18px;
   margin: 0 0 18px;
 }
-
-/* ★★ 신뢰 설계의 핵심 ★★
-   AI가 만든 문장과 '실제로 존재하는 출처'를 시각적으로 완전히 분리한다.
-   같은 흰 카드 안에 섞이면 사용자는 링크까지 AI가 만든 것으로 오해하거나,
-   반대로 AI 문장을 공식 발표로 오해한다. 배경색 + 세로 굵은 선 + 라벨로 구분한다. */
-.ai-block {
-  background: var(--brand-soft);
-  border-left: 8px solid var(--brand);
-  border-radius: 12px;
-  padding: 18px 16px;
-  margin-bottom: 4px;
-}
-.ai-label {
-  display: inline-block;
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--brand-dark);
-  background: #fff;
-  border: 2px solid var(--brand);
-  border-radius: 999px;
-  padding: 3px 12px;
-  margin-bottom: 12px;
-}
-.ai-question { font-size: 23px; font-weight: 800; line-height: 1.6; margin: 0; }
-.ai-why { font-size: 17px; color: var(--brand-dark); margin: 12px 0 0; }
-
-.source-block {
-  background: var(--source-soft);
-  border: 2px dashed var(--source);   /* 점선 = '외부에서 가져온 것'이라는 신호 */
-  border-radius: 12px;
-  padding: 16px;
-  margin-top: 14px;
-}
-.source-label {
-  display: inline-block;
-  font-size: 16px;
-  font-weight: 800;
-  color: #fff;
-  background: var(--source);
-  border-radius: 999px;
-  padding: 3px 12px;
-  margin-bottom: 10px;
-}
-.source-link {
-  display: block;
-  min-height: 56px;                    /* 링크도 터치 타깃 기준을 지킨다 */
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--source);
-  background: #fff;
-  border: 2px solid var(--source);
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-bottom: 10px;
-  text-decoration: underline;
-}
-.source-empty { font-size: 17px; color: var(--warn); font-weight: 700; }
-
-/* ------------------------------------------------------ 확인 결과 배지 (S3 상단)
-   ★ 색만으로 구분하지 않는다 - 아이콘 + 글자 라벨을 항상 함께 쓴다(색각이상 고려).
-   테두리 색은 보조 신호일 뿐, 실제 구분은 아이콘(✅/⚠️/❓)과 글자(확인됨/의심/확인 불가)로 한다. */
-.verdict-badge {
-  border: 3px solid var(--line);
-  border-radius: var(--radius);
-  padding: 16px 18px;
-  margin-bottom: 20px;
-}
-.verdict-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.verdict-icon { font-size: 28px; line-height: 1; }
-.verdict-label { font-size: var(--fs-title); font-weight: 800; }
-.verdict-desc { font-size: var(--fs-body); font-weight: 700; margin: 0 0 6px; }
-.verdict-summary { font-size: 17px; color: var(--text-sub); margin: 0; }
-
-.verdict-badge.tier-ok { background: var(--source-soft); border-color: var(--source); }
-.verdict-badge.tier-ok .verdict-label,
-.verdict-badge.tier-ok .verdict-desc { color: var(--source); }
-
-.verdict-badge.tier-warn { background: var(--warn-soft); border-color: var(--warn); }
-.verdict-badge.tier-warn .verdict-label,
-.verdict-badge.tier-warn .verdict-desc { color: var(--warn); }
-
-.verdict-badge.tier-unknown { background: var(--unknown-soft); border-color: var(--unknown); }
-.verdict-badge.tier-unknown .verdict-label,
-.verdict-badge.tier-unknown .verdict-desc { color: var(--unknown); }
 
 /* ------------------------------------------------------ 신호/배지 */
 .signal {
@@ -285,9 +198,6 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 }
 
 /* ------------------------------------------------------ 진행/로딩 */
-.progress { display: flex; gap: 8px; margin-bottom: 18px; }
-.progress span { flex: 1; height: 10px; background: var(--line); border-radius: 999px; }
-.progress span.on { background: var(--brand); }
 
 .loading { text-align: center; padding: 60px 0; }
 .spinner {
@@ -303,21 +213,8 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 /* ------------------------------------------------------ 업로드
    ★ 2026-08 Figma 톤: S1 첫 화면 자체(모달을 열기 전)도 --fg-* 로 바꿨다 -
    전에는 모달 안쪽만 Figma 톤이고 바깥 화면은 기존 파랑이라 "안 바뀐 것처럼"
-   보였다. .btn.figma-primary/.figma-outline 는 .btn 의 크기(60px·100% 폭·
-   그림자)는 그대로 두고 색만 S1 전용으로 바꾼 변형이다. */
-.upload-box {
-  border: 3px dashed var(--fg-primary-soft);
-  background: var(--fg-surface-tint);
-  border-radius: var(--radius);
-  padding: 26px 18px;
-  text-align: center;
-  margin-bottom: 18px;
-}
-.btn.figma-primary {
-  background: var(--fg-primary);
-  border-color: var(--fg-primary-border);
-  color: #fff;
-}
+   보였다. .btn.figma-outline 는 .btn 의 크기(60px·100% 폭·그림자)는 그대로
+   두고 색만 S1 전용으로 바꾼 변형이다. */
 .btn.figma-outline {
   background: #fff;
   color: var(--fg-ink-mid);
@@ -1629,10 +1526,22 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   margin: 0; font-size: 18px; line-height: 1.75; color: var(--text);
   white-space: pre-wrap; word-break: break-word;
 }
+.verify-sheet-photo {
+  display: block; width: 100%; height: auto; border-radius: 14px;
+  border: 1px solid var(--line);
+}
 .verify-sheet-note { margin: 16px 0 0; font-size: 15px; color: var(--text-sub); }
 
 /* ---------------------------------------------------- 판단 (node 340:459) */
-.judgment { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 24px 0 8px; }
+/* ★ Figma 는 CTA 가 화면 아래쪽(852px 중 589px 지점)에 있다. 내용을 위에 두고
+   버튼을 바닥으로 밀어야 원본과 맞고, 엄지로 누르기도 쉽다. */
+.judgment {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 24px 0 8px;
+  min-height: calc(100vh - 120px);
+  min-height: calc(100dvh - 120px);
+}
+.judgment .judgment-cta { margin-top: auto; }
 .judgment-hero {
   position: relative; width: 178px; height: 178px;
   display: flex; align-items: center; justify-content: center;
@@ -1641,8 +1550,9 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   position: absolute; width: 128px; height: 128px; border-radius: 50%;
   border: 2.3px solid rgba(216, 71, 71, .6); filter: blur(14px);
 }
-.judgment-hero.ok .judgment-hero-ring   { border-color: rgba(36, 153, 103, .6); }
-.judgment-hero.hold .judgment-hero-ring { border-color: rgba(143, 136, 126, .6); }
+.judgment-hero.danger .judgment-hero-ring { border-color: rgba(194, 47, 47, .7); }
+.judgment-hero.ok .judgment-hero-ring     { border-color: rgba(36, 153, 103, .6); }
+.judgment-hero.hold .judgment-hero-ring   { border-color: rgba(217, 119, 6, .6); }
 .judgment-hero-img { position: relative; transform: rotate(7.83deg); }
 .judgment-hero.ok .judgment-hero-img { transform: none; }
 
@@ -1650,19 +1560,25 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   margin: 26px 0 0; font-size: 24px; font-weight: 900;
   letter-spacing: -0.5px; line-height: 1.5; color: #111;
 }
-.judgment-title .accent.warn { color: #d84747; }
-.judgment-title .accent.ok   { color: #249967; }
-.judgment-title .accent.hold { color: var(--fg-ink-mid); }
-.judgment-sub { margin: 12px 0 0; font-size: 17px; line-height: 1.7; color: #444; }
+/* 빨강은 '지금 멈추세요'(계좌·카드번호 검출)와 '확인이 필요한 문자예요'에서만 쓴다.
+   못 찾음은 주황, 찾음은 초록 - 정상 안내문에 빨간 경고가 나가면 안 된다. */
+.judgment-title .accent.danger { color: #C22F2F; }
+.judgment-title .accent.warn   { color: #D84747; }
+.judgment-title .accent.hold   { color: #B45309; }
+.judgment-title .accent.ok     { color: #249967; }
 
-.judgment-tags {
-  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
-  margin: 16px 0 0; padding: 0; list-style: none;
+/* '사실 한 줄' - 무엇을 보고 그렇게 판단했는지. 다음 화면까지 안 가도 알 수 있게. */
+.judgment-fact {
+  display: inline-block; margin: 14px 0 0; padding: 10px 16px;
+  border-radius: 999px; font-size: 17px; font-weight: 700; line-height: 1.6;
+  text-decoration: none;
 }
-.judgment-tag {
-  padding: 4px 11px; border-radius: 999px; background: #5c5c5c; color: #fff;
-  font-size: 13px; font-weight: 900;
-}
+.judgment-fact.danger { background: #FDECEC; color: #A82424; }
+.judgment-fact.warn   { background: #FDEFEF; color: #B33B3B; }
+.judgment-fact.hold   { background: #FDF3E4; color: #8A4408; }
+.judgment-fact.ok     { background: #EAF9F1; color: #176947; }
+.judgment-fact.link { text-decoration: underline; text-underline-offset: 3px; }
+.judgment-fact.link:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
 
 .judgment-cta {
   display: flex; align-items: center; justify-content: center; gap: 10px;
@@ -1670,13 +1586,14 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   border: 0; border-radius: 15px; color: #fff;
   font-size: 20px; font-weight: 700; font-family: inherit; cursor: pointer;
 }
-.judgment-cta.warn { background: #f07879; box-shadow: 0 7px 16px rgba(240, 120, 121, .25); }
-.judgment-cta.ok   { background: var(--fg-primary); box-shadow: 0 7px 16px rgba(71, 216, 153, .25); }
-.judgment-cta.hold { background: var(--fg-ink-mid); box-shadow: 0 7px 16px rgba(87, 87, 87, .2); }
+.judgment-cta.danger { background: #E05252; box-shadow: 0 7px 16px rgba(224, 82, 82, .3); }
+.judgment-cta.warn   { background: #f07879; box-shadow: 0 7px 16px rgba(240, 120, 121, .25); }
+.judgment-cta.hold   { background: #E8952F; box-shadow: 0 7px 16px rgba(232, 149, 47, .28); }
+.judgment-cta.ok     { background: var(--fg-primary); box-shadow: 0 7px 16px rgba(71, 216, 153, .25); }
 .judgment-cta:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
 
 /* ---------------------------------------------------- 응답 (node 493:87) */
-.respond { margin: -16px -16px 0; }
+.respond { margin: -25px -22.5px 0; }
 .respond-head {
   background: var(--fg-primary); padding: 30px 24px 44px;
   display: flex; flex-direction: column; align-items: center; text-align: center;

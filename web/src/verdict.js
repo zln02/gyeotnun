@@ -1,89 +1,96 @@
 /**
- * 확인 결과(evidence) → 화면 표시용 판정 정리
+ * 확인 결과(evidence) → '판단' 화면에 띄울 상태 한 벌
  * 담당: 조희진
  *
- * ★ 원래 Question.jsx 안에만 있던 로직인데, 2026-08 Figma 3차 이식에서
- *   '판단' 화면(S2.5)이 따로 생기면서 두 화면이 같은 판정을 써야 해졌다.
- *   두 곳에 복사하면 반드시 한쪽만 고쳐지므로 여기로 뺀다.
+ * ★★ 왜 4단계인가 (2026-08 리뷰 반영) ★★
+ *   전에는 화면이 하나뿐이라, 빨간 경고 + "확인이 필요한 문자예요" 가
+ *   **정상 안내문에도 그대로 나갔다**. 공식 자료를 잘 찾은 경우까지 빨간
+ *   경고를 띄우는 건 명백한 오작동이다(놀라게 하는 쪽으로 틀리는 것도 틀린 것이다).
+ *   레이아웃은 그대로 두고 색·제목·'사실 한 줄'만 바뀌는 4단계로 나눈다.
+ *
+ *     빨강  지금 멈추세요        ← 계좌·카드번호가 실제로 검출됨
+ *     빨강  확인이 필요한 문자예요  ← 주의 신호가 검출됨
+ *     주황  공식 자료를 못 찾았어요
+ *     초록  공식 자료를 찾았어요
+ *
+ *   빨강은 위 두 개에서만 쓴다.
  *
  * ★★ 표시 정직성 원칙 (docs/evaluation/judgment_basis.md) ★★
  *   서버는 임베딩 유사도로 '관련 문서를 찾을' 뿐, 찾은 문서와 이 글의 내용을
- *   대조하지 않는다. 그러므로 "확인했다"/"다르다"고 쓰지 않는다.
- *   찾은 것까지만 말하고 판단은 사용자에게 넘긴다.
+ *   대조하지 않는다. 그러므로 "확인했다"/"내용이 다르다"고 쓰지 않는다.
+ *   '사실 한 줄'도 **실제로 검출한 것만** 적는다 - 검출하지 않은 것을
+ *   그럴듯하게 적으면 그게 바로 곁눈이 막으려는 짓이다.
  */
 
-/**
- * verdict_hint 하나만 그대로 쓰지 않는 이유
- *   search.py 의 official_source_found / contact_in_image 신호는 severity="info"
- *   (문제 신호 아님)라서, 공식 자료를 찾았을 뿐인데도 partially_matched 가 찍히는
- *   경우가 있다. severity="attention" 이 실제로 있을 때만 '의심'으로 올린다.
- */
-export function verdictTier(evidence) {
-  if (evidence?.verdict_hint === 'no_source_found') return 'unknown'
-  const hasAttentionSignal = (evidence?.signals || []).some((s) => s.severity === 'attention')
-  return hasAttentionSignal ? 'suspicious' : 'confirmed'
+/** 서버가 실제로 내려주는 주의(attention) 신호 키. search.py SIGNAL_RULES 와 1:1. */
+const ATTENTION_KEYS = ['similar_scam_case', 'urgency_pressure', 'condition_omitted']
+
+/** 마스킹 유형 → 사람이 읽는 이름. masking.py 가 실제로 숫자를 찾아낸 것만 들어온다. */
+const MASKED_LABEL = {
+  account: '계좌번호가 적혀 있어요',
+  card: '카드번호가 적혀 있어요',
+  rrn: '주민등록번호가 적혀 있어요',
 }
 
-// 위험 표현 신호 → 사용자에게 보여줄 짧은 이름.
-// ★ 서버 search.py 의 SIGNAL_RULES 키와 1:1 이다. 없는 키는 표시하지 않는다
-//   (지어낸 이름을 붙이지 않기 위해 일부러 폴백을 두지 않았다).
-export const RISK_PHRASE_NAME = {
-  urgency_pressure: '서두르게 만드는 표현',
-  condition_omitted: '조건이 빠졌을 수 있는 표현',
+/** 신호 label 의 첫 문장만 뽑는다(서버 문구가 두 문장짜리라 화면엔 길다). */
+function firstSentence(label) {
+  const s = (label || '').split(/(?<=[.!?])\s/)[0].trim()
+  return s.replace(/입니다\.?$/, '이에요').replace(/습니다\.?$/, '어요')
 }
 
 /**
- * '판단' 화면 상단 태그(회색 알약) 목록.
- *
- * ★★ Figma 원본은 여기에 '제목 의존형'·'과잉 일반화형' 같은 오판유형(ErrorType)을
- *   달아 두었다. 그런데 오판유형은 서버가 **사용자가 행동을 고른 뒤**(S4 verdict,
- *   tagger.py) 태깅한다 - 이 화면(질문 시작 전) 시점에는 존재하지 않는 값이다.
- *   없는 값을 그럴듯하게 지어내면 곁눈이 하지 않기로 한 짓이 되므로,
- *   같은 자리에 **실제로 검출된 신호**를 대신 넣는다. 검출된 게 없으면 비운다.
+ * 화면에 필요한 것 전부를 한 번에 계산한다.
+ * @param evidence  GET /checks/{id}/evidence 응답
+ * @param checkData POST /checks 응답 (masked_items 가 여기 있다)
  */
-export function riskTags(evidence) {
-  const names = (evidence?.signals || [])
-    .filter((s) => s.severity === 'attention' && RISK_PHRASE_NAME[s.key])
-    .map((s) => RISK_PHRASE_NAME[s.key])
-  return [...new Set(names)].slice(0, 2)
-}
-
-/**
- * 배지/제목 아래 한 줄 근거 요약 - 실제 references/signals 에서만 뽑는다.
- */
-export function evidenceSummary(evidence, tier) {
+export function judgmentState(evidence, checkData) {
+  const signals = evidence?.signals || []
   const refs = evidence?.references || []
-  const publishers = [...new Set(refs.map((r) => r.publisher).filter(Boolean))].slice(0, 2).join('·')
+  const maskedItems = checkData?.masked_items || []
 
-  if (tier === 'unknown') {
-    // ★ 참고자료가 남아 있는데 "찾지 못했습니다"라고 하면 화면과 어긋난다
-    //   (아래 목록에는 링크가 그대로 보이기 때문). 유사도가 임계값에 못 미쳐
-    //   '유보'된 상태이지 아무것도 못 찾은 상태가 아니다 - 갈라서 말한다.
-    return refs.length > 0
-      ? '비슷한 자료는 찾았지만, 같은 안내인지는 확인하지 못했습니다.'
-      : '공식 자료에서 같은 이름의 공고나 안내를 찾지 못했습니다.'
+  // ① 계좌·카드번호가 실제로 검출됐다 → 가장 강한 경고.
+  //    masking.py 의 정규식이 문맥까지 보고 잡아낸 '진짜 숫자'라 신뢰도가 높다.
+  const money = maskedItems.find((m) => m.type === 'account' || m.type === 'card')
+  if (money) {
+    return {
+      tier: 'danger',
+      lead: '지금 ', accent: '멈추세요', tail: '',
+      fact: MASKED_LABEL[money.type] || '금융 정보가 적혀 있어요',
+    }
   }
 
-  if (tier === 'suspicious') {
-    // ★ similar_scam_case 신호의 원문 label 은 "...사기 수법과 비슷합니다"처럼
-    //   금지어를 담고 있다. 괄호 안 실제 상세정보는 살리고 표현만 순화한다.
-    const scamSignal = (evidence?.signals || []).find((s) => s.key === 'similar_scam_case')
-    if (scamSignal) {
-      const detail = scamSignal.label.match(/\(([^)]+)\)/)?.[1]
-      return detail
-        ? `이전에 확인된 사례와 비슷한 점이 있어요 (${detail}).`
-        : '이전에 확인된 사례와 비슷한 점이 있어요.'
+  // ② 주의 신호가 있다 → 확인 필요.
+  const attention = signals.find((s) => s.severity === 'attention' && ATTENTION_KEYS.includes(s.key))
+  if (attention) {
+    // ★ similar_scam_case 의 원문 label 은 "...사기 수법과 비슷합니다" 처럼 단정적
+    //   금지어를 담고 있다. 뜻은 살리고 표현만 순화한다.
+    const fact = attention.key === 'similar_scam_case'
+      ? '이전에 확인된 사례와 비슷한 문장이 있어요'
+      : firstSentence(attention.label)
+    return {
+      tier: 'warn',
+      lead: '확인이 ', accent: '필요', tail: '한 문자예요',
+      fact,
     }
-    const names = riskTags(evidence)
-    if (names.length > 0) {
-      return publishers
-        ? `글에 ${names.join('·')}이 있어요. ${publishers} 자료를 직접 확인해 보세요.`
-        : `글에 ${names.join('·')}이 있어요. 한 번 더 확인해 보세요.`
-    }
-    return '확인할 점이 남아 있어요.'
   }
 
-  return publishers
-    ? `${publishers}의 관련 자료를 찾았어요. 직접 확인해 보세요.`
-    : '공식 자료에서 관련 안내를 찾았어요. 직접 확인해 보세요.'
+  // ③ 공식 자료를 못 찾았다.
+  if (evidence?.verdict_hint === 'no_source_found' && refs.length === 0) {
+    return {
+      tier: 'hold',
+      lead: '공식 자료를 ', accent: '못 찾았', tail: '어요',
+      fact: '기관 대표번호로 확인해 보세요',
+    }
+  }
+
+  // ④ 관련 자료를 찾았다. '사실 한 줄'은 실제로 찾은 문서의 도메인을 그대로 보여준다.
+  //    (내용이 같은지까지는 확인하지 않았으므로 "맞습니다"라고 쓰지 않는다.)
+  let host = ''
+  try { host = refs[0]?.url ? new URL(refs[0].url).hostname.replace(/^www\./, '') : '' } catch { /* noop */ }
+  return {
+    tier: 'ok',
+    lead: '공식 자료를 ', accent: '찾았', tail: '어요',
+    fact: host ? `원문 보기 → ${host}` : '아래에서 원문을 직접 확인해 보세요',
+    factUrl: refs[0]?.url || '',
+  }
 }
