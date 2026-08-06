@@ -74,8 +74,22 @@ export function judgmentState(evidence, checkData) {
     }
   }
 
-  // ③ 공식 자료를 못 찾았다.
-  if (evidence?.verdict_hint === 'no_source_found' && refs.length === 0) {
+  // ③ 백엔드가 '확신할 공식 근거 없음'(no_source_found)을 줬다.
+  //    ★ verdict_hint 를 우선한다 - refs 가 있어도 초록(찾았어요)으로 올리지 않는다.
+  //      (표시 임계값 우회 방지, 2026-08-06) 예전에는 refs.length===0 일 때만 여기로
+  //      왔고, no_source_found 인데 refs 가 있으면 ④ 초록으로 떨어져 "찾았습니다"가
+  //      나갔다(배민 문자 → NIA 문서 오매칭). refs 유무로 '문구만' 나눈다.
+  if (evidence?.verdict_hint === 'no_source_found') {
+    if (refs.length > 0) {
+      let host = ''
+      try { host = refs[0]?.url ? new URL(refs[0].url).hostname.replace(/^www\./, '') : '' } catch { /* noop */ }
+      return {
+        tier: 'hold',
+        lead: '비슷한 자료는 ', accent: '찾았', tail: '지만',
+        fact: host ? `같은 안내인지는 확인하지 못했어요 · 원문 ${host}` : '같은 안내인지는 확인하지 못했어요',
+        factUrl: refs[0]?.url || '',
+      }
+    }
     return {
       tier: 'hold',
       lead: '공식 자료를 ', accent: '못 찾았', tail: '어요',

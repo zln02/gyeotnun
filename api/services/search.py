@@ -360,7 +360,13 @@ def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
         official_confident = official_top_score is not None and official_top_score >= CONFIDENT_MATCH_THRESHOLD
     else:  # bm25_fallback 이거나 애초에 매칭이 없었던 경우
         official_confident = bool(matched_official)
-    has_confident_source = official_confident or bool(matched_evidence) or bool(matched_scam)
+    # ★ matched_evidence(근거_검증표)는 min_score=1 키워드 매칭이라 흔한 단어 하나로도
+    #   걸린다(예: "이용" → NIA 디지털정보격차 통계). 유사도 확신 검증을 못 거치므로
+    #   '확신 있는 근거'에서 제외하고 references(참고자료)로만 남긴다 - 표시 임계값
+    #   우회로 배민 문자에 NIA 문서가 "찾았습니다"로 나가던 오매칭을 막는다.
+    #   (2026-08-06 안전수정. 평가셋 30건·홀드아웃 판정 불변 확인 후 적용. 0.679·
+    #   match_evidence.min_score 는 건드리지 않는다.)
+    has_confident_source = official_confident or bool(matched_scam)
 
     if not refs:
         # ★ 확인 불가가 기본값이다. 출처를 못 찾았을 때 '가짜'라고 단정하지 않고
