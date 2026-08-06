@@ -14,7 +14,7 @@
  *   이미 자리잡은 4단계 문구와 달라 덮어쓰지 않았다. API 호출(getEvidence)·
  *   최소 노출 시간(2초)·장기 대기 안내·오류 처리 로직은 그대로다.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getEvidence } from '../api.js'
 import { logClick, logError } from '../events.js'
 import mascotImg from '../assets/checking/mascot.png'
@@ -36,29 +36,48 @@ const STEP_INTERVAL_MS = 1300
 const LONG_WAIT_MS = 10000
 const LONG_WAIT_MESSAGE = '생각보다 시간이 걸리고 있어요. 실제 자료를 자세히 살펴보는 중입니다. 조금만 더 기다려 주세요.'
 
+// ★★ 2026-08 실측으로 걷어낸 것 ★★
+//   전에는 evidence 응답을 받은 뒤 **무조건 2000ms 를 더 기다렸다**. "너무 빨리
+//   넘어가면 제대로 본 게 맞나 불안해한다"는 이유였는데, 이제 이 화면은 업로드가
+//   시작되기 전부터 떠 있다(Home.start 가 요청 전에 넘긴다). 사진 경로는 이미
+//   수 초간 이 화면에 머물기 때문에 덧붙일 이유가 사라졌다 - 전체 대기의 16%가
+//   순수한 장식이었다.
+//   대신 '붙여넣은 글' 경로처럼 정말 순식간(evidence 실측 약 170ms)에 끝나는
+//   경우에만 최소 노출 시간을 둔다. 기준점도 응답 시각이 아니라 **화면 진입 시각**이다.
+const MIN_VISIBLE_MS = 900
+
 export default function Checking({ checkId, checkData, onReady, onError }) {
   const [step, setStep] = useState(0)
   const [error, setError] = useState('')
   const [longWait, setLongWait] = useState(false)
+  const enteredAtRef = useRef(Date.now())
 
+  // 단계 표시는 checkId 가 아직 없어도(= 업로드·OCR 중) 곧바로 돈다.
+  // 이 구간이 실제로 가장 길기 때문에 여기서부터 덮어야 의미가 있다.
   useEffect(() => {
-    setStep(0)
-    setLongWait(false)
+    enteredAtRef.current = Date.now()
     // 마지막 단계에 닿으면 멈춘다 - 끝까지 다 확인했다는 느낌을 주고 계속
     // 순환하며 불안하게 만들지 않는다(실제 완료는 아래 getEvidence 가 결정).
     const t = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), STEP_INTERVAL_MS)
     const longWaitTimer = setTimeout(() => setLongWait(true), LONG_WAIT_MS)
+    return () => { clearInterval(t); clearTimeout(longWaitTimer) }
+  }, [])
+
+  useEffect(() => {
+    // 업로드가 끝나야 check_id 가 생긴다. 그전에는 기다리기만 한다.
+    if (!checkId) return
     let cancelled = false
+    let timer
     ;(async () => {
       try {
         const ev = await getEvidence(checkId)
-        // 최소 2초는 보여 준다 — 너무 빨리 넘어가면 "제대로 본 게 맞나" 불안해한다
-        setTimeout(() => { if (!cancelled) onReady(ev) }, 2000)
+        const remaining = Math.max(0, MIN_VISIBLE_MS - (Date.now() - enteredAtRef.current))
+        timer = setTimeout(() => { if (!cancelled) onReady(ev) }, remaining)
       } catch (e) {
         if (!cancelled) { setError(e.message); logError(SCREEN, e.code || 'evidence_fetch_failed') }
       }
     })()
-    return () => { cancelled = true; clearInterval(t); clearTimeout(longWaitTimer) }
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [checkId])
 
   if (error) {

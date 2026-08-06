@@ -29,6 +29,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { createCheck, getDisplayName, setDisplayName } from '../api.js'
+import { downscaleImage } from '../imageResize.js'
 import { logClick, logError } from '../events.js'
 import { withCode } from '../errorCodes.js'
 import BottomNav from '../components/BottomNav.jsx'
@@ -191,13 +192,15 @@ function PointBanner() {
   )
 }
 
-export default function Home({ onStarted, onTraining }) {
+export default function Home({ onStarted, onSubmitStart, onFailed, notice, onTraining }) {
   const fileRef = useRef(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  // ★ notice: 업로드가 실패해 '확인 중' 화면에서 홈으로 되돌아온 경우, App 이
+  //   실패 안내를 들려 보낸다. 홈이 새로 마운트되므로 초기값으로 받아야 한다.
+  const [error, setError] = useState(notice?.kind === 'error' ? notice.message : '')
   // status:"failed" 는 네트워크 오류가 아니라 서버가 "처리는 됐지만 못 읽었다"고
   // 알려 준 정상 응답이다(10MB 초과, 사진 인식 실패 등). catch 가 아니라 여기서 구분한다.
-  const [failMessage, setFailMessage] = useState('')
+  const [failMessage, setFailMessage] = useState(notice?.kind === 'fail' ? notice.message : '')
 
   // ---- 사진 모달 상태 ----
   const [photoOpen, setPhotoOpen] = useState(false)
@@ -236,23 +239,38 @@ export default function Home({ onStarted, onTraining }) {
     setBusy(true)
     setError('')
     setFailMessage('')
+    // ★★ 2026-08 실측으로 고친 것 ★★
+    //   전에는 createCheck 가 끝날 때까지 홈 화면에 그대로 머물렀다. 그런데 사진
+    //   경로는 업로드 + Vision OCR 만으로 4~15초가 걸린다(OCR 단독 평균 3.67초).
+    //   그동안 화면에 아무 변화가 없어서 "눌렀는데 반응이 없다"며 다시 누르거나
+    //   나가 버리는 일이 있었다. 게다가 S2 진입 계측이 업로드가 끝난 뒤에야
+    //   찍혀서, 제품에서 제일 긴 대기가 우리 지표에는 아예 안 보였다.
+    //   → 요청을 보내기 전에 먼저 '확인 중' 화면으로 넘긴다. 이미 만들어 둔
+    //     단계 표시가 이제 진짜 오래 걸리는 구간을 덮는다.
+    onSubmitStart()
     try {
-      const data = await createCheck(payload)
+      // 사진은 올리기 전에 긴 변 1280px 로 줄인다. 인식률에는 영향이 없고
+      // (Vision 은 이미지 크기에 거의 무관하다 - imageResize.js 주석 참고)
+      // 모바일 업링크 시간만 줄어든다.
+      const body = payload.image
+        ? { ...payload, image: await downscaleImage(payload.image) }
+        : payload
+      const data = await createCheck(body)
       if (data.status === 'failed') {
         const code = data.error_code || 'SYS-000'
-        setFailMessage(withCode(data.message || '처리하지 못했습니다. 글로 직접 입력해 주세요.', code))
         logError(SCREEN, code)
+        onFailed({ kind: 'fail', message: withCode(data.message || '처리하지 못했습니다. 글로 직접 입력해 주세요.', code) })
         return
       }
       onStarted(data)
     } catch (e) {
       // ★ e.message 는 api.js 의 handle()/safeFetch() 가 이미 "(오류 코드: XX-000)" 를
       //   덧붙여 준 상태다 - 화면에 별도로 코드를 또 붙이지 않는다.
-      setError(e.message)
       logError(SCREEN, e.code || 'SYS-000')
-    } finally {
-      setBusy(false)
+      onFailed({ kind: 'error', message: e.message })
     }
+    // ★ finally 로 busy 를 되돌리지 않는다. 성공이든 실패든 이 화면을 떠나고,
+    //   실패 시엔 홈이 새로 마운트되므로 busy 는 자연히 false 로 시작한다.
   }
 
   // ★ 카카오톡 등에서 '공유 → 곁눈'으로 들어온 경우: sw.js 가 이미지를 캐시에 넣고

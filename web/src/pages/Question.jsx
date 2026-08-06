@@ -1,159 +1,105 @@
 /**
- * S3 - 질문 카드  ★ 곁눈의 핵심 화면
+ * S3 - 확인 흐름 (발견 → 탐색 → 확인)  ★ 곁눈의 핵심 화면
  * 담당: 조희진 (화면) / 김태희 (질문 내용)
+ * Figma node 428:312(발견) / 483:191(탐색) / 428:568(확인)
  *
- * ★★ 이 화면의 설계 원칙 ★★
- * 1) AI가 만든 문장과 실제 출처를 **시각적으로 완전히 분리**한다.
- *    - AI 질문  : 파란 배경 + 왼쪽 굵은 세로선 + "곁눈이 여쭤봐요" 라벨
- *    - 실제 출처: 초록 점선 테두리 + "실제 자료" 라벨 + 누를 수 있는 링크 버튼
- *    섞어 놓으면 사용자는 링크까지 AI가 지어낸 것으로 의심하거나,
- *    반대로 AI 문장을 공식 발표로 오해한다. 둘 다 신뢰를 무너뜨린다.
- * 2) 한 화면에 질문은 하나만.
- * 3) 답변은 타이핑 없이 버튼으로. 시니어에게 자유 입력은 큰 장벽이다.
- * 4) '다음' 버튼에 화살표만 쓰지 않고 글자를 함께 쓴다.
+ * ★★ 2026-08 Figma 3차 개편: 한 화면에 다 넣던 것을 3단계로 쪼갰다 ★★
+ *   이전 화면은 [AI 질문 + 실제 출처 목록 + 답변 보기]가 한 화면에 세로로
+ *   쌓여 있었다. 시니어 사용성 테스트에서 스크롤 중간의 출처 링크를 그냥
+ *   지나쳐 버리고 바로 답변 버튼부터 누르는 일이 잦았다(공식 출처 확인률이
+ *   낮게 나온 원인). Figma 가 이를 세 화면으로 나눴고, 그대로 따랐다.
+ *     발견 - 무엇을 봤는지만 읽는다 (답변 버튼 없음)
+ *     탐색 - 공식 자료를 열어 본다 (여기서만 링크가 보인다)
+ *     확인 - 그제서야 답을 고른다
+ *   한 화면에 할 일 하나. 이게 이 개편의 전부다.
+ *
+ * ★ 유지되는 설계 원칙
+ *   1) AI가 만든 문장과 실제 출처를 시각적으로 완전히 분리한다.
+ *   2) 한 화면에 질문은 하나만.
+ *   3) 답변은 타이핑 없이 버튼으로.
+ *   4) '다음' 버튼에 화살표만 쓰지 않고 글자를 함께 쓴다.
  */
 import { useEffect, useRef, useState } from 'react'
 import { getQuestion } from '../api.js'
 import { logClick, logError, logEvidenceLinkClick } from '../events.js'
+import VerifyProgress from '../components/VerifyProgress.jsx'
+import mascot from '../assets/verify/mascot.png'
+import icImage from '../assets/verify/ic_image.svg'
+import icDoc from '../assets/verify/ic_doc.svg'
+import icDocWhite from '../assets/verify/ic_doc_white.svg'
+import icLink from '../assets/verify/ic_link.svg'
+import icArrowNext from '../assets/verify/ic_arrow_next.svg'
 
 const SCREEN = 'S3'
 
 // 실제 API 는 질문 검증(2단 가드레일)이 재시도되면 턴마다 몇 초~10여 초씩 걸릴 수
-// 있다(Checking.jsx 의 S2 화면과 같은 이유). S2 에는 이 안내가 있었는데 S3 의
-// 턴 전환 로딩에는 없어서, 느린 턴에서 화면이 멈춘 것처럼 보여 사용자가 다시
-// 시도하다 이탈하는 사례가 실제로 있었다(2026-08-01 실사용 로그에서 확인) - 같은
-// 패턴을 S3 에도 그대로 적용한다.
+// 있다. 이 시간을 넘기면 화면이 멈춘 게 아니라는 걸 알려 준다(2026-08-01 실사용
+// 로그에서 느린 턴에 사용자가 다시 시도하다 이탈한 사례가 확인됐다).
 const LONG_WAIT_MS = 10000
 const LONG_WAIT_MESSAGE = '생각보다 시간이 걸리고 있어요. 더 정확한 질문을 만들고 있습니다. 조금만 더 기다려 주세요.'
 
-/**
- * 확인 결과 배지 (S3 상단, 질문보다 먼저 보여준다)
- * ★ verdict_hint 하나만 그대로 옮기지 않는다. search.py 의 official_source_found /
- *   contact_in_image 신호는 severity="info"(문제 신호 아님)라서, 공식 자료를 찾았을
- *   뿐인데도 partially_matched 가 찍히는 경우가 있다. severity="attention" 신호가
- *   실제로 있을 때만 '의심'으로 올리고, 그 외엔 verdict_hint 의 no_source_found 여부로
- *   '확인 불가' 를 가른다 - verdict_hint 와 signals 를 함께 봐야 정확하다.
- */
-const VERDICT_TIERS = {
-  confirmed: {
-    label: '확인됨',
-    icon: '✅',
-    // ★ '확인됐습니다' → '찾았습니다' (2026-08-05). 서버는 임베딩 유사도로 관련
-    //   문서를 검색할 뿐, 문서 내용과 이 글을 대조하지 않는다. 대조하지 않은 것을
-    //   확인했다고 쓰면 사용자가 우리를 과신한다
-    //   (docs/evaluation/judgment_basis.md §1 - 내용 불일치로 나온 판정 0건).
-    desc: '공식 자료를 찾았습니다. 아래에서 직접 확인해 보세요.',
-    className: 'tier-ok',
-  },
-  suspicious: {
-    label: '의심',
-    icon: '⚠️',
-    desc: '확인할 점이 남아 있습니다.',
-    className: 'tier-warn',
-  },
-  unknown: {
-    label: '확인 불가',
-    icon: '❓',
-    desc: '공식 자료에서 확인하지 못했습니다.',
-    className: 'tier-unknown',
-  },
-}
-
-function verdictTier(evidence) {
-  if (evidence?.verdict_hint === 'no_source_found') return 'unknown'
-  const hasAttentionSignal = (evidence?.signals || []).some((s) => s.severity === 'attention')
-  return hasAttentionSignal ? 'suspicious' : 'confirmed'
-}
-
-// 위험 표현 신호 → 사용자에게 보여줄 짧은 이름.
-// ★ 서버 search.py 의 SIGNAL_RULES 키와 1:1 이다. 새 신호가 생기면 여기도 채운다
-//   (없는 키는 아래에서 일반 문구로 안전하게 떨어진다).
-const RISK_PHRASE_NAME = {
-  urgency_pressure: '서두르게 만드는 표현',
-  condition_omitted: '조건이 빠졌을 수 있는 표현',
-}
-
-/**
- * 배지 아래 한 줄 근거 요약 - 실제 references/signals 에서만 뽑는다(지어내지 않는다).
- *
- * ★★ 2026-08-05 문구 교체 ★★
- *   이전에는 위험 표현만 검출된 경우 "{기관} 자료와 다른 점이 있어 확인이
- *   필요합니다" 를 내보냈다. **사실이 아니다.** 서버는 찾은 문서와 이 글의
- *   내용을 비교하지 않으므로 '다른 점'을 알 수 없다. 실제로 검출한 것은
- *   '긴급'·'마감' 같은 낱말 하나였다(실측: S05·B06 두 건이 이 문구를 받았다).
- *   → 검출한 것을 그대로 말한다: 어떤 표현이 있었는지.
- *   진단 전문: docs/evaluation/judgment_basis.md
- */
-function evidenceSummary(evidence, tier) {
-  const refs = evidence?.references || []
-  const publishers = [...new Set(refs.map((r) => r.publisher).filter(Boolean))].slice(0, 2).join('·')
-
-  if (tier === 'unknown') {
-    // ★ 참고자료가 남아 있는데도 "찾지 못했습니다"라고 하면 화면과 어긋난다.
-    //   아래 source-block 에는 링크가 그대로 표시되기 때문이다(실측: B01~B05·
-    //   H02·H05 7건). 유사도가 확신 임계값에 못 미쳐 '유보'된 상태이지
-    //   아무것도 못 찾은 상태가 아니다 - 두 경우를 갈라서 말한다.
-    return refs.length > 0
-      ? '비슷한 자료는 찾았지만, 같은 안내인지는 확인하지 못했습니다.'
-      : '공식 자료에서 같은 이름의 공고나 안내를 찾지 못했습니다.'
-  }
-
-  if (tier === 'suspicious') {
-    // ★ similar_scam_case 신호의 원문 label 은 "...사기 수법과 비슷합니다"처럼
-    //   금지어를 그대로 담고 있다. 괄호 안 실제 상세정보(특징/오판유형)는 그대로 살리고
-    //   표현만 순화한다 - 데이터를 지어내지 않으면서 단정적 단어만 피한다.
-    const scamSignal = (evidence?.signals || []).find((s) => s.key === 'similar_scam_case')
-    if (scamSignal) {
-      const detail = scamSignal.label.match(/\(([^)]+)\)/)?.[1]
-      return detail
-        ? `이전에 확인된 사례와 비슷한 점이 있습니다 (${detail}).`
-        : '이전에 확인된 사례와 비슷한 점이 있습니다.'
-    }
-    // 사기 사례 매칭은 없고 위험 표현만 검출된 경우 - 무엇이 검출됐는지 그대로 말한다.
-    const names = (evidence?.signals || [])
-      .filter((s) => s.severity === 'attention' && RISK_PHRASE_NAME[s.key])
-      .map((s) => RISK_PHRASE_NAME[s.key])
-    const uniq = [...new Set(names)]
-    if (uniq.length > 0) {
-      return publishers
-        ? `글에 ${uniq.join('·')}이 있습니다. ${publishers} 자료를 아래에서 직접 확인해 보세요.`
-        : `글에 ${uniq.join('·')}이 있습니다. 한 번 더 확인해 보세요.`
-    }
-    return '확인할 점이 남아 있습니다.'
-  }
-
-  // ★ '같은 내용을 확인했습니다' → '관련 자료를 찾았습니다'.
-  //   내용 동일성을 검증한 적이 없다(§1). 찾은 것까지만 말하고 확인은 사용자에게 넘긴다.
-  return publishers
-    ? `${publishers}의 관련 자료를 찾았습니다. 아래에서 직접 확인해 보세요.`
-    : '공식 자료에서 관련 안내를 찾았습니다. 아래에서 직접 확인해 보세요.'
-}
-
-function VerdictBadge({ evidence }) {
-  const tier = verdictTier(evidence)
-  const t = VERDICT_TIERS[tier]
+/** 바닥에서 올라오는 '다시 보기' 시트 - 화면을 떠나지 않고 원문을 확인시킨다. */
+function Sheet({ title, onClose, children }) {
   return (
-    <div className={`verdict-badge ${t.className}`}>
-      <div className="verdict-head">
-        <span className="verdict-icon" aria-hidden="true">{t.icon}</span>
-        <span className="verdict-label">{t.label}</span>
+    <div className="verify-sheet-backdrop" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="verify-sheet">
+        <div className="verify-sheet-head">
+          <h3>{title}</h3>
+          <button type="button" className="verify-sheet-close" onClick={onClose}>닫기</button>
+        </div>
+        <div className="verify-sheet-body">{children}</div>
       </div>
-      <p className="verdict-desc">{t.desc}</p>
-      <p className="verdict-summary">{evidenceSummary(evidence, tier)}</p>
     </div>
   )
 }
 
-export default function Question({ checkId, evidence, onDone }) {
+/** 공식 자료 카드 1건 (탐색 단계 / '안내문 다시 보기' 시트 공용) */
+function ReferenceCard({ reference, onOpen }) {
+  return (
+    <div className="verify-ref">
+      <div className="verify-ref-head">
+        <span className="verify-ref-badge" aria-hidden="true">
+          <img src={icDocWhite} width="15" height="15" alt="" />
+        </span>
+        <div className="verify-ref-title">
+          <p className="verify-ref-name">{reference.title}</p>
+          {/* ★ Figma 의 '공식 안내 요약'(본문 3줄 요약) 자리다. 서버 Reference 스키마에는
+              요약 필드가 없어(models/schemas.py) 지어내지 않고, 실제로 가진 값인
+              발행기관·발행일만 적는다. 요약이 필요하면 백엔드 계약부터 늘려야 한다. */}
+          {(reference.publisher || reference.published_at) && (
+            <p className="verify-ref-meta">
+              {reference.publisher}
+              {reference.publisher && reference.published_at && ' · '}
+              {reference.published_at}
+            </p>
+          )}
+        </div>
+      </div>
+      <a
+        className="verify-ref-link"
+        href={reference.url}
+        target="_blank"
+        rel="noreferrer"
+        onClick={() => onOpen(reference.url)}
+      >
+        <img src={icLink} width="19" height="19" alt="" aria-hidden="true" />
+        <span>공식 안내 보러가기</span>
+      </a>
+    </div>
+  )
+}
+
+export default function Question({ checkId, checkData, evidence, onDone }) {
   const [turn, setTurn] = useState(1)
+  const [phase, setPhase] = useState('find')        // find | explore | confirm
   const [data, setData] = useState(null)
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [longWait, setLongWait] = useState(false)
-  // ★ 실제 API 는 응답이 겹칠 만큼 느릴 수 있다(React.StrictMode 의 개발 중 이펙트
-  //   이중 실행도 같은 상황을 만든다). 가장 최근 요청의 응답만 반영하고,
-  //   먼저 보낸 요청이 나중에 도착해도 화면을 덮어쓰지 않게 막는다.
+  const [sheet, setSheet] = useState(null)          // 'text' | 'refs' | null
+  // ★ 실제 API 는 응답이 겹칠 만큼 느릴 수 있다(React.StrictMode 의 이펙트 이중
+  //   실행도 같은 상황을 만든다). 가장 최근 요청의 응답만 반영한다.
   const requestIdRef = useRef(0)
 
   async function load(nextTurn, reply) {
@@ -167,7 +113,7 @@ export default function Question({ checkId, evidence, onDone }) {
     }, LONG_WAIT_MS)
     try {
       const result = await getQuestion(checkId, nextTurn, reply)
-      if (myRequestId !== requestIdRef.current) return   // 더 최신 요청이 이미 나갔다 - 이 응답은 버린다
+      if (myRequestId !== requestIdRef.current) return   // 더 최신 요청이 나갔다 - 버린다
       setData(result)
     } catch (e) {
       if (myRequestId !== requestIdRef.current) return
@@ -181,118 +127,161 @@ export default function Question({ checkId, evidence, onDone }) {
 
   useEffect(() => { load(1, null) }, [checkId])
 
+  // 질문에 딸린 출처 URL → evidence.references 의 상세 정보와 연결.
+  // ★ 질문이 출처를 지정하지 않은 턴에는 evidence 전체 목록으로 떨어진다 -
+  //   '탐색' 단계는 보여줄 자료가 있어야 의미가 있기 때문.
+  const refsFromQuestion = (data?.evidence_refs || [])
+    .map((u) => evidence?.references?.find((r) => r.url === u))
+    .filter(Boolean)
+  const refs = (refsFromQuestion.length > 0 ? refsFromQuestion : (evidence?.references || [])).slice(0, 3)
+
+  function openRef(url) {
+    // ★ '공식 출처 확인률' 지표의 원천 - URL 원문 대신 도메인만 남긴다.
+    let domain = 'unknown'
+    try { domain = new URL(url).hostname } catch { /* noop */ }
+    logEvidenceLinkClick(SCREEN, domain)
+  }
+
+  function goExplore() { logClick(SCREEN, 'to_explore'); setPhase('explore') }
+  function goConfirm() { logClick(SCREEN, 'to_confirm'); setPhase('confirm') }
+
   function next() {
     if (data?.is_final) return onDone()
     const n = turn + 1
     setTurn(n)
+    setPhase('find')
     load(n, selected)
   }
 
-  // 질문에 딸린 출처 URL → evidence.references 의 상세 정보(기관명·자료명·발행일)와 연결
-  const refs = (data?.evidence_refs || []).map((u) => {
-    const found = evidence?.references?.find((r) => r.url === u)
-    return found || { url: u, title: u, publisher: '', published_at: '' }
-  })
-
-  // ★ 결과(배지)를 먼저, 질문은 그 다음 - 로딩/에러 중에도 배지는 계속 보여준다
   if (loading) {
     return (
-      <>
-        {evidence && <VerdictBadge evidence={evidence} />}
+      <div className="verify">
+        <VerifyProgress current="find" />
         <div className="loading">
           <div className="spinner" role="status" aria-live="polite" />
           <p className="lead">{longWait ? LONG_WAIT_MESSAGE : '질문을 준비하고 있어요'}</p>
         </div>
-      </>
+      </div>
     )
   }
+
   if (error) {
     return (
-      <>
-        {evidence && <VerdictBadge evidence={evidence} />}
+      <div className="verify">
+        <VerifyProgress current="find" />
         <div className="error-box">{error}</div>
-      </>
+      </div>
     )
   }
 
   return (
-    <>
-      {evidence && <VerdictBadge evidence={evidence} />}
-      <div className="progress" aria-label={`3단계 중 ${turn}단계`}>
-        {[1, 2, 3].map((i) => <span key={i} className={i <= turn ? 'on' : ''} />)}
-      </div>
-      <p className="sub" style={{ marginBottom: 14 }}>{turn}번째 질문 (모두 3개)</p>
+    <div className="verify">
+      <VerifyProgress current={phase} />
+      <p className="verify-turn">{turn}번째 확인 (모두 3개)</p>
 
-      {/* ========== ① AI가 만든 문장 영역 (파란색) ========== */}
-      <div className="ai-block">
-        <span className="ai-label">🤖 곁눈이 여쭤봐요</span>
-        <p className="ai-question">{data.question}</p>
-        {data.why && <p className="ai-why">{data.why}</p>}
-      </div>
+      {/* ================= ① 발견 - 무엇을 봤는지만 읽는다 ================= */}
+      {phase === 'find' && (
+        <>
+          <section className="verify-find">
+            <img src={mascot} width="62" height="62" alt="" aria-hidden="true" className="verify-find-mascot" />
+            <p className="verify-find-question">{data.question}</p>
+            {data.why && <p className="verify-find-why">{data.why}</p>}
+            {checkData?.extracted_text && (
+              <button type="button" className="verify-recall" onClick={() => { logClick(SCREEN, 'recall_text'); setSheet('text') }}>
+                <img src={icImage} width="18" height="18" alt="" aria-hidden="true" />
+                <span>문자를 다시 보고싶어요</span>
+              </button>
+            )}
+          </section>
+          <button type="button" className="verify-cta" onClick={goExplore}>공식 안내 확인하기</button>
+        </>
+      )}
 
-      {/* ========== ② 실제 출처 영역 (초록색, 점선) ==========
-          여기 있는 링크는 AI가 지어낸 것이 아니라 검색으로 확보한 실제 주소다.
-          서버의 validate_question() 이 허용 목록 밖의 링크를 미리 제거한다. */}
-      <div className="source-block">
-        <span className="source-label">🔗 실제 자료 (직접 눌러 확인)</span>
-        {refs.length > 0 ? (
-          refs.map((r) => (
-            <a
-              key={r.url}
-              className="source-link"
-              href={r.url}
-              target="_blank"
-              rel="noreferrer"
-              onClick={() => {
-                // ★ '공식 출처 확인률' 지표의 원천 - URL 원문 대신 도메인만 남긴다
-                //   (URL 은 공개된 정부 자료 링크라 개인정보는 아니지만, target 길이
-                //   제한도 있고 도메인만으로 충분히 분석 가능하다).
-                let domain = 'unknown'
-                try { domain = new URL(r.url).hostname } catch { /* noop */ }
-                logEvidenceLinkClick(SCREEN, domain)
-              }}
-            >
-              <span aria-hidden="true">📄</span>
-              <span>
-                {r.title}
-                {(r.publisher || r.published_at) && (
-                  <>
-                    <br />
-                    <small>
-                      {r.publisher}
-                      {r.publisher && r.published_at && ' · '}
-                      {r.published_at}
-                    </small>
-                  </>
-                )}
-              </span>
-            </a>
-          ))
-        ) : (
-          <p className="source-empty">
-            공식 자료에서 같은 내용을 찾지 못했습니다.
-            찾지 못했다는 것 자체가 한 번 더 확인해 볼 신호입니다.
-          </p>
-        )}
-      </div>
-
-      {/* ========== ③ 답변 보기 ========== */}
-      <div style={{ marginTop: 24 }}>
-        {data.options?.map((o) => (
-          <button
-            key={o.id}
-            className={`btn choice ${selected === o.id ? 'selected' : ''}`}
-            onClick={() => { logClick(SCREEN, 'choice_option'); setSelected(o.id) }}
-          >
-            <span aria-hidden="true">{selected === o.id ? '✅' : '⬜'}</span> {o.label}
+      {/* ================= ② 탐색 - 공식 자료를 열어 본다 ================= */}
+      {phase === 'explore' && (
+        <>
+          <section className="verify-explore">
+            {refs.length > 0 ? (
+              refs.map((r) => <ReferenceCard key={r.url} reference={r} onOpen={openRef} />)
+            ) : (
+              <p className="verify-empty">
+                공식 자료에서 같은 내용을 찾지 못했습니다.
+                찾지 못했다는 것 자체가 한 번 더 확인해 볼 신호입니다.
+              </p>
+            )}
+          </section>
+          <button type="button" className="verify-cta" onClick={goConfirm}>
+            {refs.length > 0 ? '안내 내용을 확인했어요' : '다음으로 넘어갈게요'}
           </button>
-        ))}
-      </div>
+        </>
+      )}
 
-      {/* ★ 화살표만 있는 버튼 금지 — '다음' 글자를 반드시 병기 */}
-      <button className="btn" disabled={!selected} onClick={() => { logClick(SCREEN, data.is_final ? 'finish' : 'next_turn'); next() }}>
-        {data.is_final ? '다 확인했어요' : '다음 →'}
-      </button>
-    </>
+      {/* ================= ③ 확인 - 그제서야 답을 고른다 ================= */}
+      {phase === 'confirm' && (
+        <>
+          <section className="verify-confirm">
+            <span className="verify-confirm-chip">
+              <img src={mascot} width="27" height="27" alt="" aria-hidden="true" />
+              곁눈이 여쭤봐요
+            </span>
+            <p className="verify-confirm-question">{data.question}</p>
+            {/* ★ Figma 원본은 '사진 다시 보기' 였다. 원본 사진은 확인이 끝나면 서버에서
+                지우고(masking.discard_original), 화면에도 남기지 않는 게 곁눈의 약속이라
+                (S2 안내 문구로 사용자에게 그렇게 고지한다) 사진 대신 마스킹된 글을 보여준다. */}
+            {checkData?.extracted_text && (
+              <button type="button" className="verify-recall in-card" onClick={() => { logClick(SCREEN, 'recall_text'); setSheet('text') }}>
+                <img src={icImage} width="20" height="20" alt="" aria-hidden="true" />
+                <span>문자 다시 보기</span>
+              </button>
+            )}
+            {refs.length > 0 && (
+              <button type="button" className="verify-recall in-card" onClick={() => { logClick(SCREEN, 'recall_refs'); setSheet('refs') }}>
+                <img src={icDoc} width="19" height="19" alt="" aria-hidden="true" />
+                <span>안내문 다시 보기</span>
+              </button>
+            )}
+          </section>
+
+          <div className="verify-options" role="radiogroup" aria-label="답변 고르기">
+            {data.options?.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                role="radio"
+                aria-checked={selected === o.id}
+                className={`verify-option${selected === o.id ? ' selected' : ''}`}
+                onClick={() => { logClick(SCREEN, 'choice_option'); setSelected(o.id) }}
+              >
+                <span className="verify-radio" aria-hidden="true" />
+                <span>{o.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* ★ 화살표만 있는 버튼 금지 — '다음' 글자를 반드시 병기 */}
+          <button
+            type="button"
+            className="verify-cta"
+            disabled={!selected}
+            onClick={() => { logClick(SCREEN, data.is_final ? 'finish' : 'next_turn'); next() }}
+          >
+            <span>{data.is_final ? '다 확인했어요' : '다음'}</span>
+            {!data.is_final && <img src={icArrowNext} width="23" height="23" alt="" aria-hidden="true" />}
+          </button>
+        </>
+      )}
+
+      {sheet === 'text' && (
+        <Sheet title="올려 주신 문자" onClose={() => setSheet(null)}>
+          <p className="verify-sheet-text">{checkData.extracted_text}</p>
+          <p className="verify-sheet-note">전화번호·계좌번호 같은 개인정보는 가려 둔 상태입니다.</p>
+        </Sheet>
+      )}
+      {sheet === 'refs' && (
+        <Sheet title="공식 안내" onClose={() => setSheet(null)}>
+          {refs.map((r) => <ReferenceCard key={r.url} reference={r} onOpen={openRef} />)}
+        </Sheet>
+      )}
+    </div>
   )
 }
