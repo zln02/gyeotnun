@@ -21,23 +21,86 @@ from dataclasses import dataclass, field
 from typing import List, Tuple
 
 # --------------------------------------------------------------- 정규식 정의
-# 한국 휴대폰/일반전화: 010-1234-5678, 01012345678, 010 1234 5678, 02-123-4567
+# 한국 휴대폰/일반전화:
+# - 기존 휴대폰·지역번호와 070
+# - 숫자만, 일반 공백, 하이픈, 점, 앞자리 괄호, 하이픈 주변 공백
+# - 슬래시와 그룹 사이 줄바꿈은 제외
+PHONE_PREFIX_PATTERN = r"(?:01[016789]|070|0[2-6][0-5]?)"
 PHONE_RE = re.compile(
-    r"(?<![\d-])(01[016789]|0[2-6][0-5]?)[-.\s]?(\d{3,4})[-.\s]?(\d{4})(?![\d-])"
+    r"(?<![0-9A-Za-z_])"
+    r"(?:\((?P<paren_prefix>" + PHONE_PREFIX_PATTERN + r")\)|"
+    r"(?P<plain_prefix>" + PHONE_PREFIX_PATTERN + r"))"
+    r"[ \t]*[-.]?[ \t]*(\d{3,4})"
+    r"[ \t]*[-.]?[ \t]*(\d{4})"
+    r"(?![0-9A-Za-z_])"
+)
+PHONE_POSITIVE_CONTEXT_RE = re.compile(
+    r"연\s*락(?:\s*처)?|전\s*화(?:\s*번\s*호)?|문의|휴대\s*전화|"
+    r"보낸\s*사람\s*번호|상담\s*받을\s*번호",
+    re.IGNORECASE,
+)
+PHONE_NEGATIVE_CONTEXT_RE = re.compile(
+    r"버전|모델(?:\s*번호)?|제품|빌드|문서|페이지|우편\s*번호|코드",
+    re.IGNORECASE,
+)
+PHONE_CONTEXT_WINDOW = 20
+
+# 주민등록번호:
+# 표준 하이픈, 구분자 없음, 일반 공백, 하이픈 주변 공백, 점, 슬래시,
+# 그룹 사이 한 번의 줄바꿈을 지원한다.
+RRN_RE = re.compile(
+    r"(?<![0-9A-Za-z_-])"
+    r"(\d{6})[ \t]*[-./\r\n]?[ \t]*([1-4]\d{6})"
+    r"(?![0-9A-Za-z_])"
 )
 
-# 주민등록번호: 900101-1234567 (전화보다 먼저 처리해야 오탐이 없다)
-RRN_RE = re.compile(r"(?<!\d)(\d{6})[-\s]?([1-4]\d{6})(?!\d)")
+# 카드번호:
+# 15자리(4-6-5), 16자리(4-4-4-4), 19자리(4-4-4-4-3), 구분자 없는
+# 15·16·19자리를 지원한다. 구분자는 일반 공백 또는 하이픈만 허용하며
+# 한 번호 안에서는 같은 구분자만 사용한다. 점·슬래시·줄바꿈은 제외한다.
+CARD_RE = re.compile(
+    r"(?<![0-9A-Za-z_-])(?:"
+    r"\d{4}(?P<sep19>[ -])\d{4}(?P=sep19)\d{4}(?P=sep19)\d{4}(?P=sep19)\d{3}"
+    r"|\d{4}(?P<sep16>[ -])\d{4}(?P=sep16)\d{4}(?P=sep16)\d{4}"
+    r"|\d{4}(?P<sep15>[ -])\d{6}(?P=sep15)\d{5}"
+    r"|\d{19}|\d{16}|\d{15}"
+    r")(?![0-9A-Za-z_-])"
+)
+CARD_POSITIVE_CONTEXT_RE = re.compile(
+    r"카\s*드(?:\s*번\s*호)?|결제(?:\s*카드|\s*수단)?|CARD(?:\s*NO\.?)?",
+    re.IGNORECASE,
+)
+CARD_NEGATIVE_CONTEXT_RE = re.compile(
+    r"계좌(?:\s*번호)?|입금|송금|예금주|은행|account|"
+    r"택배|제품(?:\s*키)?|문서(?:\s*번호)?|체크섬|쿠폰|빌드|표\s*번호",
+    re.IGNORECASE,
+)
+CARD_CONTEXT_WINDOW = 24
 
-# 카드번호: 1234-5678-9012-3456
-CARD_RE = re.compile(r"(?<!\d)(\d{4})[-\s]?(\d{4})[-\s]?(\d{4})[-\s]?(\d{4})(?!\d)")
+# 계좌 후보는 처리 순서상 주민번호·카드·전화번호를 제거한 뒤 검사한다.
+# 연속형 10~16자리 또는 2~4개 숫자 그룹을 수집하고, 실제 마스킹은 아래의
+# 단순 문맥 존재 검사에서 결정한다.
+ACCOUNT_RE = re.compile(
+    r"(?<![0-9A-Za-z])(?:"
+    r"\d{10,16}"
+    r"|"
+    r"\d{2,6}(?:[ \t./\-\r\n]+\d{2,8}){1,3}"
+    r")(?![0-9A-Za-z])"
+)
 
-# 계좌번호: 은행마다 자릿수가 달라 '2~3개 하이픈 그룹 + 총 10~14자리' 로 잡는다.
-# 예) 123-456-789012, 110-123-456789, 1002-345-678901
-ACCOUNT_RE = re.compile(r"(?<![\d-])(\d{2,6})-(\d{2,6})-(\d{4,8})(?![\d-])")
-
-# '계좌', '입금' 등 문맥어가 붙은 연속 숫자(하이픈 없는 계좌) 보조 규칙
-ACCOUNT_CONTEXT_RE = re.compile(r"(계좌|입금|송금|account)\s*[:：]?\s*(\d{10,16})(?!\d)")
+# 기존 상수 이름과 두 캡처 그룹 계약은 외부 호환성을 위해 보존한다.
+ACCOUNT_CONTEXT_RE = re.compile(
+    r"(계좌|입금|송금|account)\s*[:：]?\s*(\d{10,16})(?!\d)",
+    re.IGNORECASE,
+)
+ACCOUNT_KEYWORD_RE = re.compile(
+    r"계좌(?:\s*번호)?|입금|송금|예금주|은행|account",
+    re.IGNORECASE,
+)
+ACCOUNT_MIN_DIGITS = 10
+ACCOUNT_MAX_DIGITS = 16
+ACCOUNT_CONTEXT_WINDOW = 24
+RRN_LIKE_ACCOUNT_RE = re.compile(r"^\d{6}\s*-\s*[1-4]\d{6}$")
 
 
 @dataclass
@@ -57,6 +120,127 @@ def _add(items: dict, kind: str, hint: str) -> None:
         items[kind]["count"] += 1
     else:
         items[kind] = {"type": kind, "original_hint": hint, "count": 1}
+
+
+def _has_context(
+    pattern: re.Pattern,
+    source: str,
+    start: int,
+    end: int,
+    window: int,
+) -> bool:
+    """후보 주변에 문맥어가 존재하는지만 확인한다. 거리는 계산하지 않는다."""
+    left = max(0, start - window)
+    right = min(len(source), end + window)
+    return bool(pattern.search(source[left:right]))
+
+
+def _luhn_valid(digits: str) -> bool:
+    """카드 후보의 체크섬을 보조 신호로 검사한다."""
+    total = 0
+    parity = len(digits) % 2
+    for index, char in enumerate(digits):
+        digit = int(char)
+        if index % 2 == parity:
+            digit *= 2
+            if digit > 9:
+                digit -= 9
+        total += digit
+    return total % 10 == 0
+
+
+def _mask_card_candidates(text: str, found: dict) -> str:
+    source = text
+
+    def replace(match: re.Match) -> str:
+        raw = match.group(0)
+        digits = "".join(char for char in raw if char.isdigit())
+        has_positive = _has_context(
+            CARD_POSITIVE_CONTEXT_RE,
+            source,
+            match.start(),
+            match.end(),
+            CARD_CONTEXT_WINDOW,
+        )
+        has_negative = _has_context(
+            CARD_NEGATIVE_CONTEXT_RE,
+            source,
+            match.start(),
+            match.end(),
+            CARD_CONTEXT_WINDOW,
+        )
+
+        # 거리를 쓰지 않는 정책: 카드 문맥이 있으면 개인정보 보호를 우선하고,
+        # 카드 문맥 없이 부정 문맥만 있으면 일반 식별자로 남긴다.
+        if has_positive:
+            _add(found, "card", "****-****-****-****")
+            return "****-****-****-****"
+        if has_negative:
+            return raw
+
+        # 문맥이 없으면 표준 그룹 모양 또는 Luhn 통과를 보조 근거로 쓴다.
+        if " " in raw or "-" in raw or _luhn_valid(digits):
+            _add(found, "card", "****-****-****-****")
+            return "****-****-****-****"
+        return raw
+
+    return CARD_RE.sub(replace, source)
+
+
+def _mask_phone_candidates(text: str, found: dict) -> str:
+    source = text
+
+    def replace(match: re.Match) -> str:
+        has_positive = _has_context(
+            PHONE_POSITIVE_CONTEXT_RE,
+            source,
+            match.start(),
+            match.end(),
+            PHONE_CONTEXT_WINDOW,
+        )
+        has_negative = _has_context(
+            PHONE_NEGATIVE_CONTEXT_RE,
+            source,
+            match.start(),
+            match.end(),
+            PHONE_CONTEXT_WINDOW,
+        )
+
+        # 거리를 쓰지 않는 정책: 전화 문맥이 있으면 마스킹하고, 전화 문맥 없이
+        # 부정 문맥만 있으면 일반 번호로 남긴다.
+        if not has_positive and has_negative:
+            return match.group(0)
+
+        prefix = match.group("paren_prefix") or match.group("plain_prefix")
+        _add(found, "phone", f"{prefix}-****-****")
+        return f"{prefix}-****-****"
+
+    return PHONE_RE.sub(replace, source)
+
+
+def _mask_account_candidates(text: str, found: dict) -> str:
+    source = text
+
+    def replace(match: re.Match) -> str:
+        raw = match.group(0)
+        digit_count = sum(char.isdigit() for char in raw)
+        if not (ACCOUNT_MIN_DIGITS <= digit_count <= ACCOUNT_MAX_DIGITS):
+            return raw
+        if RRN_LIKE_ACCOUNT_RE.fullmatch(raw):
+            return raw
+        if not _has_context(
+            ACCOUNT_KEYWORD_RE,
+            source,
+            match.start(),
+            match.end(),
+            ACCOUNT_CONTEXT_WINDOW,
+        ):
+            return raw
+
+        _add(found, "account", "***-***-******")
+        return "***-***-******"
+
+    return ACCOUNT_RE.sub(replace, source)
 
 
 def mask_text(text: str) -> MaskResult:
@@ -81,32 +265,13 @@ def mask_text(text: str) -> MaskResult:
     out = RRN_RE.sub(_rrn, out)
 
     # 2) 카드번호
-    def _card(m: re.Match) -> str:
-        _add(found, "card", "****-****-****-****")
-        return "****-****-****-****"
-
-    out = CARD_RE.sub(_card, out)
+    out = _mask_card_candidates(out, found)
 
     # 3) 전화번호 (계좌보다 먼저: 010-1234-5678 이 계좌 패턴에 먹히지 않도록)
-    def _phone(m: re.Match) -> str:
-        _add(found, "phone", f"{m.group(1)}-****-****")
-        return f"{m.group(1)}-****-****"
+    out = _mask_phone_candidates(out, found)
 
-    out = PHONE_RE.sub(_phone, out)
-
-    # 4) 계좌번호 (하이픈 형)
-    def _acct(m: re.Match) -> str:
-        _add(found, "account", "***-***-******")
-        return "***-***-******"
-
-    out = ACCOUNT_RE.sub(_acct, out)
-
-    # 5) 계좌번호 (문맥어 + 연속 숫자형)
-    def _acct_ctx(m: re.Match) -> str:
-        _add(found, "account", "***-***-******")
-        return f"{m.group(1)} ***-***-******"
-
-    out = ACCOUNT_CONTEXT_RE.sub(_acct_ctx, out)
+    # 4) 계좌번호
+    out = _mask_account_candidates(out, found)
 
     return MaskResult(text=out, masked_items=list(found.values()))
 
