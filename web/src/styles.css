@@ -1652,3 +1652,41 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 }
 .record-btn.primary { background: var(--fg-primary); border-color: var(--fg-primary); color: #fff; margin-top: 30px; }
 .record-btn:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* ============================================================
+   요청 지연·실패 안내 (2026-08)
+   ★ 타임아웃 30초. 사진 1건이 실측 12초, 질문 생성이 최대 14초라
+     정상 요청도 10초를 넘기는 게 정상이다 - 짧게 잡으면 멀쩡한 요청을 끊는다.
+   ★ 어르신은 '끝나지 않는 화면'을 고장으로 읽고 앱을 닫는다. 그래서
+     (1) 기다리는 중에도 그만둘 수 있고 (2) 끊기면 다시 시도를 준다.
+   ============================================================ */
+.checking-fail {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 40px 0 8px;
+}
+.checking-fail-icon { display: block; opacity: .9; }
+.checking-fail-title {
+  margin: 22px 0 0; font-size: 23px; font-weight: 900; line-height: 1.55;
+  color: var(--text); white-space: pre-line;   /* 문구의 줄바꿈을 그대로 살린다 */
+}
+.checking-fail-msg {
+  margin: 14px 0 0; font-size: 17px; line-height: 1.7; color: var(--text-sub);
+}
+.checking-fail-code { margin: 10px 0 0; font-size: 14px; color: var(--fg-ink-soft); }
+.checking-fail .verify-cta { margin-top: 34px; }
+.checking-fail-quit {
+  width: 100%; min-height: 56px; margin-top: 12px;
+  background: #fff; border: 1px solid var(--line); border-radius: 15px;
+  color: var(--text-sub); font-size: 18px; font-weight: 700; font-family: inherit;
+  cursor: pointer;
+}
+.checking-fail-quit:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* 로딩 중 '그만두기' - 눈에 띄되 주 동작(기다리기)을 밀어내지 않게 약하게 둔다 */
+.checking2-cancel {
+  display: block; margin: 28px auto 0; min-height: 48px; padding: 0 22px;
+  background: transparent; border: 1px solid var(--line); border-radius: 14px;
+  color: var(--text-sub); font-size: 16px; font-weight: 700; font-family: inherit;
+  cursor: pointer;
+}
+.checking2-cancel:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }

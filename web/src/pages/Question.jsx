@@ -20,7 +20,7 @@
  *   4) '다음' 버튼에 화살표만 쓰지 않고 글자를 함께 쓴다.
  */
 import { useEffect, useRef, useState } from 'react'
-import { getQuestion } from '../api.js'
+import { getQuestion, TIMEOUT_CODE, CANCELLED_CODE } from '../api.js'
 import { logClick, logError, logEvidenceLinkClick } from '../events.js'
 import VerifyProgress from '../components/VerifyProgress.jsx'
 import mascot from '../assets/verify/mascot.png'
@@ -90,40 +90,57 @@ function ReferenceCard({ reference, onOpen }) {
   )
 }
 
-export default function Question({ checkId, checkData, evidence, photoUrl, onDone }) {
+export default function Question({ checkId, checkData, evidence, photoUrl, onDone, onCancel }) {
   const [turn, setTurn] = useState(1)
   const [phase, setPhase] = useState('find')        // find | explore | confirm
   const [data, setData] = useState(null)
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)   // { message, code }
   const [longWait, setLongWait] = useState(false)
   const [sheet, setSheet] = useState(null)          // 'text' | 'refs' | null
   // ★ 실제 API 는 응답이 겹칠 만큼 느릴 수 있다(React.StrictMode 의 이펙트 이중
   //   실행도 같은 상황을 만든다). 가장 최근 요청의 응답만 반영한다.
   const requestIdRef = useRef(0)
+  const abortRef = useRef(null)
+  // 시간 초과 뒤 '다시 시도' 를 누르면 같은 턴을 그대로 다시 요청한다.
+  const lastArgsRef = useRef({ turn: 1, reply: null })
 
   async function load(nextTurn, reply) {
     const myRequestId = ++requestIdRef.current
+    lastArgsRef.current = { turn: nextTurn, reply }
     setLoading(true)
-    setError('')
+    setError(null)
     setSelected(null)
     setLongWait(false)
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     const longWaitTimer = setTimeout(() => {
       if (myRequestId === requestIdRef.current) setLongWait(true)
     }, LONG_WAIT_MS)
     try {
-      const result = await getQuestion(checkId, nextTurn, reply)
+      const result = await getQuestion(checkId, nextTurn, reply, { signal: controller.signal })
       if (myRequestId !== requestIdRef.current) return   // 더 최신 요청이 나갔다 - 버린다
       setData(result)
     } catch (e) {
       if (myRequestId !== requestIdRef.current) return
-      setError(e.message)
+      if (e.code === CANCELLED_CODE) return              // 사용자가 그만뒀다
+      setError({ message: e.message, code: e.code })
       logError(SCREEN, e.code || 'dialogue_fetch_failed')
     } finally {
       clearTimeout(longWaitTimer)
       if (myRequestId === requestIdRef.current) setLoading(false)
     }
+  }
+
+  // 화면을 벗어날 때 진행 중인 요청을 끊는다(응답이 늦게 와서 되살아나지 않게).
+  useEffect(() => () => abortRef.current?.abort(), [])
+
+  function cancel() {
+    logClick(SCREEN, 'cancel_waiting')
+    abortRef.current?.abort()
+    onCancel?.()
   }
 
   useEffect(() => { load(1, null) }, [checkId])
@@ -161,16 +178,35 @@ export default function Question({ checkId, checkData, evidence, photoUrl, onDon
         <div className="loading">
           <div className="spinner" role="status" aria-live="polite" />
           <p className="lead">{longWait ? LONG_WAIT_MESSAGE : '질문을 준비하고 있어요'}</p>
+          {/* 기다리는 중에도 빠져나갈 길을 남긴다 */}
+          <button type="button" className="checking2-cancel" onClick={cancel}>그만두기</button>
         </div>
       </div>
     )
   }
 
   if (error) {
+    const timedOut = error.code === TIMEOUT_CODE
     return (
       <div className="verify">
         <VerifyProgress current="find" />
-        <div className="error-box">{error}</div>
+        <div className="checking-fail" role="alert">
+          <img src={mascot} width="72" height="72" alt="" aria-hidden="true" className="checking-fail-icon" />
+          <h2 className="checking-fail-title">
+            {timedOut ? '시간이 오래 걸리고 있어요.\n다시 해보시겠어요?' : '질문을 준비하지 못했어요'}
+          </h2>
+          {timedOut
+            ? <p className="checking-fail-code">({error.code})</p>
+            : <p className="checking-fail-msg">{error.message}</p>}
+          <button
+            type="button"
+            className="verify-cta"
+            onClick={() => { logClick(SCREEN, 'retry_after_timeout'); load(lastArgsRef.current.turn, lastArgsRef.current.reply) }}
+          >
+            다시 시도하기
+          </button>
+          <button type="button" className="checking-fail-quit" onClick={cancel}>그만두고 처음으로</button>
+        </div>
       </div>
     )
   }

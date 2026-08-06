@@ -8,9 +8,11 @@
  *   시니어는 브라우저 뒤로가기로 흐름이 깨지면 크게 혼란스러워한다.
  *   화면 수가 적어 단순 state 전환이 오히려 안전하다.
  */
-import { useEffect, useState } from 'react'
-import { USE_MOCK } from './api.js'
-import { logScreenEnter, logScreenLeave } from './events.js'
+import { useEffect, useRef, useState } from 'react'
+import { USE_MOCK, createCheck, CANCELLED_CODE } from './api.js'
+import { downscaleImage } from './imageResize.js'
+import { logScreenEnter, logScreenLeave, logError } from './events.js'
+import { withCode } from './errorCodes.js'
 import Home from './pages/Home.jsx'
 import Checking from './pages/Checking.jsx'
 import Judgment from './pages/Judgment.jsx'
@@ -48,6 +50,16 @@ export default function App() {
    *   사진을 자기 화면에서 다시 보는 것은 그 약속과 무관하다.
    */
   const [photoUrl, setPhotoUrl] = useState(null)
+  /**
+   * ★★ 확인 요청을 App 이 직접 보내는 이유 (2026-08 타임아웃 작업) ★★
+   *   요청은 Home 에서 보내고 화면은 바로 '확인 중'으로 넘겼더니, 요청 주인인
+   *   Home 이 이미 언마운트된 뒤라 타임아웃이 나도 '다시 시도'를 붙일 데가
+   *   없었다. 요청 소유권을 흐름 컨트롤러인 여기로 올려서, 확인 중 화면이
+   *   취소·재시도를 그대로 조작할 수 있게 한다.
+   */
+  const [submitError, setSubmitError] = useState(null)
+  const abortRef = useRef(null)
+  const payloadRef = useRef(null)
 
   useEffect(() => {
     const code = SCREEN_CODE[screen]
@@ -66,12 +78,61 @@ export default function App() {
   }
 
   const goHome = () => {
+    abortRef.current?.abort()      // 진행 중인 요청이 있으면 확실히 끊는다
+    abortRef.current = null
+    setSubmitError(null)
     setScreen('home')
     setCheckId(null)
     setCheckData(null)
     setEvidence(null)
     setNotice(null)
     replacePhoto(null)
+  }
+
+  /** 확인 1건을 보낸다. 화면은 요청 전에 먼저 넘어간다(대기 구간을 로딩이 덮도록). */
+  async function runCheck(payload) {
+    payloadRef.current = payload
+    setNotice(null)
+    setSubmitError(null)
+    setCheckId(null)
+    setCheckData(null)
+    setEvidence(null)
+    // 사용자가 방금 고른 원본 사진을 이 탭 메모리에만 붙들어 둔다
+    // ('사진 다시 보기'용). 서버로 다시 보내지 않는다.
+    replacePhoto(payload?.image || null)
+    setScreen('checking')
+
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    try {
+      // 사진은 올리기 전에 긴 변 1280px 로 줄인다. 인식률에는 영향이 없고
+      // (Vision 은 이미지 크기에 거의 무관하다) 업로드 시간만 줄어든다.
+      const body = payload.image
+        ? { ...payload, image: await downscaleImage(payload.image) }
+        : payload
+      if (controller.signal.aborted) return
+      const data = await createCheck(body, { signal: controller.signal })
+      if (controller.signal.aborted) return
+      if (data.status === 'failed') {
+        // 네트워크 오류가 아니라 서버가 "처리는 됐지만 못 읽었다"고 알려 준
+        // 정상 응답이다(10MB 초과, 인식 실패 등) - 홈으로 돌려보내 안내한다.
+        const code = data.error_code || 'SYS-000'
+        logError('S1', code)
+        setNotice({ kind: 'fail', message: withCode(data.message || '처리하지 못했습니다. 글로 직접 입력해 주세요.', code) })
+        setScreen('home')
+        return
+      }
+      setCheckData(data)
+      setCheckId(data.check_id)
+    } catch (e) {
+      if (e.code === CANCELLED_CODE) return    // 사용자가 그만뒀다 - goHome 이 처리했다
+      logError('S1', e.code || 'SYS-000')
+      // ★ 홈으로 튕겨내지 않는다. 확인 중 화면에 그대로 두고 '다시 시도'를 준다 -
+      //   사진을 다시 고르게 만드는 건 어르신에게 큰 부담이다.
+      setSubmitError({ message: e.message, code: e.code })
+    }
   }
 
   const isFlow = FLOW_SCREENS.has(screen)
@@ -93,24 +154,9 @@ export default function App() {
       {screen === 'home' && (
         <Home
           notice={notice}
-          /* ★ 업로드 요청을 보내기 **전에** 확인 중 화면으로 넘긴다. 사진 경로는
-               업로드 + OCR 만으로 4~15초가 걸리는데, 예전엔 그 내내 홈 화면이
-               그대로 떠 있어 아무 반응이 없는 것처럼 보였다. */
-          onSubmitStart={(payload) => {
-            setNotice(null)
-            setCheckId(null)
-            setCheckData(null)
-            setEvidence(null)
-            // 사용자가 방금 고른 원본 사진을 이 탭 메모리에만 붙들어 둔다
-            // ('사진 다시 보기'용). 서버로 다시 보내지 않는다.
-            replacePhoto(payload?.image || null)
-            setScreen('checking')
-          }}
-          onStarted={(data) => {
-            setCheckData(data)
-            setCheckId(data.check_id)
-          }}
-          onFailed={(n) => { setNotice(n); setScreen('home') }}
+          /* 요청은 App 이 보낸다(runCheck). 화면은 요청 전에 '확인 중'으로 넘어가
+             업로드+OCR 대기(실측 4~15초)를 로딩 표시가 덮는다. */
+          onSubmit={runCheck}
           onTraining={() => setScreen('training')}
         />
       )}
@@ -119,6 +165,9 @@ export default function App() {
         <Checking
           checkId={checkId}
           checkData={checkData}
+          submitError={submitError}
+          onRetrySubmit={() => runCheck(payloadRef.current)}
+          onCancel={goHome}
           onReady={(ev) => {
             setEvidence(ev)
             setScreen('judgment')
@@ -142,6 +191,7 @@ export default function App() {
           evidence={evidence}
           photoUrl={photoUrl}
           onDone={() => setScreen('decision')}
+          onCancel={goHome}
         />
       )}
 

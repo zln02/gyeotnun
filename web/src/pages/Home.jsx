@@ -28,8 +28,7 @@
  *   한 번 물어보고, 이후엔 헤더 제목을 눌러 언제든 다시 바꿀 수 있게 했다.
  */
 import { useEffect, useRef, useState } from 'react'
-import { createCheck, getDisplayName, setDisplayName } from '../api.js'
-import { downscaleImage } from '../imageResize.js'
+import { getDisplayName, setDisplayName } from '../api.js'
 import { logClick, logError } from '../events.js'
 import { withCode } from '../errorCodes.js'
 import BottomNav from '../components/BottomNav.jsx'
@@ -192,7 +191,7 @@ function PointBanner() {
   )
 }
 
-export default function Home({ onStarted, onSubmitStart, onFailed, notice, onTraining }) {
+export default function Home({ onSubmit, notice, onTraining }) {
   const fileRef = useRef(null)
   const [busy, setBusy] = useState(false)
   // ★ notice: 업로드가 실패해 '확인 중' 화면에서 홈으로 되돌아온 경우, App 이
@@ -235,42 +234,17 @@ export default function Home({ onStarted, onSubmitStart, onFailed, notice, onTra
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function start(payload) {
+  /**
+   * ★ 실제 요청은 App 이 보낸다(onSubmit).
+   *   이 화면은 요청을 보내자마자 '확인 중' 화면으로 바뀌면서 언마운트되는데,
+   *   요청 주인이 여기 있으면 타임아웃 뒤 '다시 시도'·'그만두기'를 붙일 데가
+   *   없어진다(이미 사라진 컴포넌트라서). 그래서 요청 소유권만 App 으로 옮겼다.
+   */
+  function start(payload) {
     setBusy(true)
     setError('')
     setFailMessage('')
-    // ★★ 2026-08 실측으로 고친 것 ★★
-    //   전에는 createCheck 가 끝날 때까지 홈 화면에 그대로 머물렀다. 그런데 사진
-    //   경로는 업로드 + Vision OCR 만으로 4~15초가 걸린다(OCR 단독 평균 3.67초).
-    //   그동안 화면에 아무 변화가 없어서 "눌렀는데 반응이 없다"며 다시 누르거나
-    //   나가 버리는 일이 있었다. 게다가 S2 진입 계측이 업로드가 끝난 뒤에야
-    //   찍혀서, 제품에서 제일 긴 대기가 우리 지표에는 아예 안 보였다.
-    //   → 요청을 보내기 전에 먼저 '확인 중' 화면으로 넘긴다. 이미 만들어 둔
-    //     단계 표시가 이제 진짜 오래 걸리는 구간을 덮는다.
-    onSubmitStart(payload)
-    try {
-      // 사진은 올리기 전에 긴 변 1280px 로 줄인다. 인식률에는 영향이 없고
-      // (Vision 은 이미지 크기에 거의 무관하다 - imageResize.js 주석 참고)
-      // 모바일 업링크 시간만 줄어든다.
-      const body = payload.image
-        ? { ...payload, image: await downscaleImage(payload.image) }
-        : payload
-      const data = await createCheck(body)
-      if (data.status === 'failed') {
-        const code = data.error_code || 'SYS-000'
-        logError(SCREEN, code)
-        onFailed({ kind: 'fail', message: withCode(data.message || '처리하지 못했습니다. 글로 직접 입력해 주세요.', code) })
-        return
-      }
-      onStarted(data)
-    } catch (e) {
-      // ★ e.message 는 api.js 의 handle()/safeFetch() 가 이미 "(오류 코드: XX-000)" 를
-      //   덧붙여 준 상태다 - 화면에 별도로 코드를 또 붙이지 않는다.
-      logError(SCREEN, e.code || 'SYS-000')
-      onFailed({ kind: 'error', message: e.message })
-    }
-    // ★ finally 로 busy 를 되돌리지 않는다. 성공이든 실패든 이 화면을 떠나고,
-    //   실패 시엔 홈이 새로 마운트되므로 busy 는 자연히 false 로 시작한다.
+    onSubmit(payload)
   }
 
   // ★ 카카오톡 등에서 '공유 → 곁눈'으로 들어온 경우: sw.js 가 이미지를 캐시에 넣고
