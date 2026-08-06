@@ -22,20 +22,31 @@ router = APIRouter(prefix="/checks", tags=["checks"])
 # 메모리 임시 저장소 (해커톤용). TODO(박진영): DB 세션으로 교체.
 _MEMORY_STORE: dict[str, dict] = {}
 
+# ★ 소유자로 인정하지 않는 값. create_check 의 device_id 기본값이 "anonymous" 라,
+#   이를 소유자로 허용하면 "anonymous" 를 보내는 누구나 서로의 기록을 읽는 구멍이 된다.
+#   정상 프론트는 항상 실제 UUID(deviceId())를 보내므로 이 거부는 정상 흐름을 깨지 않는다.
+_NON_OWNER_IDS = {"", "anonymous"}
+
 
 def require_owner(check_id: str, device_id: Optional[str]) -> dict:
     """이 check_id 기록의 소유자만 통과시킨다 (IDOR 방지).
 
     저장 시 함께 넣어 둔 device_id 와 요청자의 device_id 를 대조한다.
-    ★ '없는 id / 남의 id / device_id 미제공' 세 경우를 **모두 같은 404 로** 거부한다.
-      구분하면 check_id 존재 여부가 새어나가기 때문이다(의도적으로 하나로 합침).
+    ★ '없는 id / 남의 id / device_id 미제공 / 익명 소유자·요청자' 를 **모두 같은
+      404 로** 거부한다. 구분하면 check_id 존재 여부가 새어나가기 때문이다.
     ★ 한계: device_id 는 프론트가 보내는 값이라 위조 가능하다. 이 최소 수정은
       "아무 id 나 넣으면 남의 기록이 나오는" 접근 통제 부재만 막는다. 서명 토큰·
       세션 발급 같은 근본 인증은 별도 과제다(docs/security 참조).
     """
     stored = _MEMORY_STORE.get(check_id)
     owner = stored.get("device_id") if stored else None
-    if not device_id or stored is None or owner != device_id:
+    if (
+        not device_id
+        or device_id in _NON_OWNER_IDS      # 요청자가 익명값을 내밀면 거부
+        or stored is None
+        or owner in _NON_OWNER_IDS          # 익명으로 만들어진 기록은 아무도 못 읽음
+        or owner != device_id
+    ):
         raise HTTPException(
             status_code=404,
             detail={

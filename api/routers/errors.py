@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from models.db import ErrorLog, Event, get_db
 from models.schemas import ErrorCodeItem, ErrorSummaryItem, ErrorSummaryResponse
+from routers._common import AdminTokenHeader, require_operator
 from services.error_codes import ERROR_CODES, get_error_code
 
 router = APIRouter(prefix="/errors", tags=["errors"])
@@ -29,11 +30,19 @@ router = APIRouter(prefix="/errors", tags=["errors"])
 
 @router.get("/codes", response_model=list[ErrorCodeItem], summary="오류 코드 전체 정의 (단일 소스)")
 async def codes():
+    # ★ 공개 유지: 프론트가 오류 문구 단일 소스로 이걸 받아 쓴다(web/src/errorCodes.js).
+    #   개인정보·집계가 아니라 정적 코드표라 인증 대상이 아니다.
     return ERROR_CODES
 
 
 @router.get("/summary", response_model=ErrorSummaryResponse, summary="오류 코드별 집계")
-async def summary(db: Session = Depends(get_db)):
+async def summary(
+    db: Session = Depends(get_db),
+    x_admin_token: str | None = AdminTokenHeader,
+):
+    # ★ 운영자 전용. events/summary 와 같은 부류의 무인증 집계라 같은 게이트를 건다.
+    #   ADMIN_TOKEN 미설정 시 닫힘(404). 프론트 호출부 없음(백엔드만 고치면 됨).
+    require_operator(x_admin_token)
     server_rows = db.query(ErrorLog).all()
     client_rows = db.query(Event).filter(Event.event_type == "error").all()
 
