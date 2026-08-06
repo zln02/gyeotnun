@@ -62,6 +62,9 @@ class Settings:
     #   .env 또는 compose environment 에 OCR_PROVIDER=vision 넣고 백엔드 재시작.
     #   Vision 코드·키는 services/ocr.py 에 그대로 보존한다.
     OCR_PROVIDER: str = os.getenv("OCR_PROVIDER", "local")
+    # 기동 직후 무거운 로컬 모델(임베딩·OCR)을 백그라운드로 미리 로드할지.
+    # 끄면 첫 요청이 콜드스타트를 떠안는다(실측 임베딩 10.2초·OCR 9.7초). PREWARM=0 으로 해제.
+    PREWARM: bool = (os.getenv("PREWARM", "1") not in ("0", "false", "False"))
 
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     NAVER_CLIENT_ID: str = os.getenv("NAVER_CLIENT_ID", "")

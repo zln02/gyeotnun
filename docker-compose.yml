@@ -11,6 +11,9 @@ services:
   api:
     build: ./api
     container_name: gyeotnun-api
+    # ★ 재부팅·크래시 시 자동 복구(2026-08-06 점검: api/db 가 restart=no 라
+    #   호스트 재부팅 후 서비스가 안 올라오는 상태였다). nginx 와 동일 정책.
+    restart: unless-stopped
     ports:
       # ★ 127.0.0.1 로만 바인딩한다. 0.0.0.0 이면 nginx 를 우회해 인터넷에서
       #   직접 :8000 으로 API 를 두드릴 수 있게 된다. 로컬 개발(vite 프록시,
@@ -51,6 +54,7 @@ services:
   db:
     image: postgres:16-alpine
     container_name: gyeotnun-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: gyeotnun
       POSTGRES_PASSWORD: gyeotnun     # 로컬 전용 값. 운영에서는 반드시 시크릿으로 주입할 것.

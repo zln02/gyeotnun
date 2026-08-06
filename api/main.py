@@ -92,3 +92,51 @@ async def _startup() -> None:
         init_db()
     except Exception as e:  # noqa: BLE001
         print(f"[startup] DB 초기화 생략: {e} (mock 플로우에는 영향 없음)")
+
+    _start_prewarm()
+
+
+def _start_prewarm() -> None:
+    """무거운 로컬 모델을 백그라운드로 미리 로드한다 (2026-08-06 지연 점검).
+
+    왜 필요한가 - 실측: 컨테이너 재시작 후 **첫 사용자**만 큰 대기를 떠안았다.
+      임베딩 첫 질의 10.2초(이후 0.14초) / 로컬 OCR 첫 장 9.7초(이후 0.6초).
+      모델을 게으르게 로드해서 생기는 콜드스타트이지 검색·인식이 느린 게 아니다.
+    ★ 백그라운드 스레드로 돌린다 - startup 을 막으면 헬스체크·기동이 그만큼 늦어진다.
+      실패해도 서비스는 그대로 뜬다(다음 요청에서 예전처럼 지연 로드될 뿐이다).
+    ★ 끄려면 PREWARM=0 (설정 한 줄). 메모리가 빠듯한 환경을 위한 탈출구다.
+    """
+    if not settings.PREWARM:
+        _log.info("[prewarm] PREWARM=0 - 미리 로드하지 않는다")
+        return
+
+    import threading
+
+    def _run() -> None:
+        import time
+
+        # 1) 임베딩 모델 (근거 검색 경로)
+        try:
+            t0 = time.perf_counter()
+            from services import embeddings
+
+            embeddings.match_embedding_docs("워밍업")
+            _log.info("[prewarm] 임베딩 준비 완료 %.1fs", time.perf_counter() - t0)
+        except Exception as e:  # noqa: BLE001 - 워밍업 실패가 서비스를 막으면 안 된다
+            _log.warning("[prewarm] 임베딩 준비 실패(무시): %s", e)
+
+        # 2) 로컬 OCR 모델 (OCR_PROVIDER=local 일 때만)
+        if settings.OCR_PROVIDER == "local":
+            try:
+                t0 = time.perf_counter()
+                import numpy as np
+
+                from services import ocr
+
+                # 흰 이미지 1장으로 가중치까지 완전히 초기화한다(디스크 기록 없음).
+                ocr._get_paddle().predict(input=np.full((64, 160, 3), 255, dtype=np.uint8))
+                _log.info("[prewarm] 로컬 OCR 준비 완료 %.1fs", time.perf_counter() - t0)
+            except Exception as e:  # noqa: BLE001
+                _log.warning("[prewarm] 로컬 OCR 준비 실패(무시): %s", e)
+
+    threading.Thread(target=_run, name="prewarm", daemon=True).start()

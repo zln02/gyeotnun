@@ -50,7 +50,13 @@ def test_detect_media_type_unknown_returns_none():
 
 
 def test_missing_key_raises_missing_key_error(monkeypatch):
-    """★ 키가 없으면 미인식이 아니라 501로 변환될 예외를 던진다 (설정 문제이므로)."""
+    """★ Vision 경로에서 키가 없으면 미인식이 아니라 501로 변환될 예외를 던진다.
+
+    ★ 2026-08-06: OCR_PROVIDER=local(기본)이면 이미지가 외부로 나가지 않아 키 자체가
+      필요 없다 - 그때 예외를 던지지 않는 것이 올바른 동작이다. 이 테스트는 Vision
+      경로의 계약을 검증하는 것이므로 제공자를 vision 으로 고정하고 확인한다.
+    """
+    monkeypatch.setattr(ocr.settings, "OCR_PROVIDER", "vision")
     monkeypatch.setattr(ocr.settings, "ANTHROPIC_API_KEY", "")
     with pytest.raises(MissingKeyError):
         ocr.extract_from_image(b"\xff\xd8\xff\xe0dummy")
