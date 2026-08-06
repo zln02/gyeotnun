@@ -31,10 +31,11 @@ services:
       HOME: /app/data/paddle_home
       PADDLE_PDX_CACHE_HOME: /app/data/paddle_home/.paddlex
       PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: "True"
-      # ★ OCR 제공자. 되돌리려면 이 값을 vision 으로 바꾸고 재시작(한 줄).
-      #   2026-08-06: 로컬 전환 검증에서 사칭 신호 9/10(S08, 공백 누락)로 10/10 유지
-      #   기준 미달 → 지시대로 Vision 으로 롤백. 정상 오판은 0(절대조건은 충족).
-      OCR_PROVIDER: vision
+      # ★ OCR 제공자. 되돌리려면 이 값을 vision 으로 바꾸고 재시작(한 줄, 실측 6초).
+      #   2026-08-06: 로컬 전환 후 S08(한글↔영문 공백 누락) 때문에 사칭 9/10 였으나
+      #   경계 공백 보정(ocr._restore_boundary_spaces) 추가로 10/10 회복·정상 오판 0
+      #   → local 채택. 문제 재발 시 vision 으로 한 줄 롤백.
+      OCR_PROVIDER: local
     volumes:
       - ./api:/app                # 개발 중 핫리로드용
       - ./corpus:/corpus:ro       # 공공데이터 코퍼스 (읽기 전용)

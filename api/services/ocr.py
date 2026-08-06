@@ -17,6 +17,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -142,6 +143,17 @@ LOCAL_OCR_REC = "korean_PP-OCRv5_mobile_rec"
 
 _paddle_ocr = None
 
+# ★ PaddleOCR 한국어 인식 모델은 한글↔영문/숫자 경계에서 공백을 떨어뜨리는 경향이 있다
+#   (예: "환급 신청nhis-refund24.com"). 검증에서 사칭 S08 이 이 공백 하나로 사칭 신호가
+#   억제돼 9/10 로 떨어졌다. 경계에 공백을 되살리면 10/10 로 회복되고 정상 오판 0·정확도
+#   불변(0.951→0.950). 일반 규칙이라 특정 이미지에 맞춘 튜닝이 아니다.
+_HANGUL_LATIN = re.compile(r"([가-힣])([A-Za-z0-9])")
+_LATIN_HANGUL = re.compile(r"([A-Za-z0-9])([가-힣])")
+
+
+def _restore_boundary_spaces(text: str) -> str:
+    return _LATIN_HANGUL.sub(r"\1 \2", _HANGUL_LATIN.sub(r"\1 \2", text))
+
 
 def _get_paddle():
     """PaddleOCR 싱글턴(임베딩의 로컬 모델 싱글턴과 같은 구조). 최초 1회 로드."""
@@ -213,6 +225,7 @@ def _extract_local(image_bytes: bytes) -> ExtractResult:
     except Exception:  # noqa: BLE001 - 필터 실패 시 정규식 후처리로 폴백
         kept = texts
     text = local_ocr._strip_ui_noise("\n".join(kept))     # 상태바·시각 등 UI 잡음 제거
+    text = _restore_boundary_spaces(text)                 # 한글↔영문 경계 공백 보정(S08)
     if not text:
         return ExtractResult(text="", status="failed")
     log.info("[ocr:local] 인식 성공: %d자", len(text))
