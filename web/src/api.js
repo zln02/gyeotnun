@@ -118,21 +118,24 @@ export async function createCheck({ image, link, text }) {
 }
 
 /* ------------------------------------------------------------------ S2 */
-/** GET /checks/{id}/evidence — 근거 수집 결과 */
+/** GET /checks/{id}/evidence — 근거 수집 결과
+ *  ★ device_id 를 함께 보낸다: 이 확인 건을 만든 기기만 조회할 수 있다(IDOR 방지). */
 export async function getEvidence(checkId) {
-  return getJSON(`/checks/${checkId}/evidence`)
+  return getJSON(`/checks/${checkId}/evidence?device_id=${encodeURIComponent(deviceId())}`)
 }
 
 /* ------------------------------------------------------------------ S3 */
-/** POST /checks/{id}/dialogue — 다음 확인 질문 1개 */
+/** POST /checks/{id}/dialogue — 다음 확인 질문 1개
+ *  ★ device_id 를 함께 보낸다(소유권 확인). */
 export async function getQuestion(checkId, turn, userReply = null) {
-  return postJSON(`/checks/${checkId}/dialogue`, { turn, user_reply: userReply })
+  return postJSON(`/checks/${checkId}/dialogue`, { turn, user_reply: userReply, device_id: deviceId() })
 }
 
 /* ------------------------------------------------------------------ S4 */
-/** POST /checks/{id}/verdict — 사용자 판단 기록 + 오판유형 태깅 */
+/** POST /checks/{id}/verdict — 사용자 판단 기록 + 오판유형 태깅
+ *  ★ device_id 를 함께 보낸다(소유권 확인). */
 export async function submitVerdict(checkId, decision, reasonTags = []) {
-  return postJSON(`/checks/${checkId}/verdict`, { decision, reason_tags: reasonTags })
+  return postJSON(`/checks/${checkId}/verdict`, { decision, reason_tags: reasonTags, device_id: deviceId() })
 }
 
 /* ------------------------------------------------------------------ S5 */

@@ -24,7 +24,12 @@ async def weekly(mock: int = MockFlag, device_id: str = Query("anonymous")):
     if use_mock(mock):
         return WeeklyReportResponse(**fixtures.WEEKLY_REPORT)
 
-    # TODO(박진영): taggings / training_cards 집계 쿼리로 교체
+    # ⚠️ 보안(IDOR): 아래 TODO 를 구현할 때 device_id 로 그 사용자의 기록을 조회하게
+    #    되는데, 지금처럼 요청 파라미터 device_id 를 그대로 신뢰하면 남의 device_id 를
+    #    넣어 타인의 주간 리포트를 보는 IDOR 가 된다. checks 의 require_owner 처럼
+    #    소유권(또는 그 이상의 인증)을 반드시 먼저 건 뒤 집계할 것. 현재는 스텁이라
+    #    전부 0 을 돌려주므로 유출이 없다 - 구현 전까지 이 경고를 지우지 말 것.
+    # TODO(박진영): taggings / training_cards 집계 쿼리로 교체 (위 보안 경고 먼저 처리)
     now = _dt.date.today()
     iso = now.isocalendar()
     return WeeklyReportResponse(

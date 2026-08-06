@@ -48,6 +48,10 @@ class Settings:
     APP_ENV: str = os.getenv("APP_ENV", "local")
     DATABASE_URL: str = os.getenv("DATABASE_URL", "") or f"sqlite:///{REPO_DIR / 'gyeotnun.db'}"
     MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB") or 10)
+    # 운영자 전용 집계 엔드포인트(GET /events/summary) 보호용 공유 비밀.
+    # ★ 비어 있으면(기본) 해당 엔드포인트는 닫힌다(404). 서명 토큰/세션이 아니라
+    #   단순 환경변수 게이트다 - .env 에 ADMIN_TOKEN 을 넣고 X-Admin-Token 헤더로 호출한다.
+    ADMIN_TOKEN: str = os.getenv("ADMIN_TOKEN", "")
 
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     NAVER_CLIENT_ID: str = os.getenv("NAVER_CLIENT_ID", "")

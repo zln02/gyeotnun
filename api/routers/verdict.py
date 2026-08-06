@@ -12,7 +12,7 @@ from fastapi import APIRouter
 from mocks import fixtures
 from models.schemas import VerdictRequest, VerdictResponse
 from routers._common import MockFlag, not_implemented, use_mock
-from routers.checks import _MEMORY_STORE
+from routers.checks import require_owner
 from services import search, tagger
 
 router = APIRouter(prefix="/checks", tags=["verdict"])
@@ -31,9 +31,10 @@ async def record_verdict(check_id: str, body: VerdictRequest, mock: int = MockFl
         data["check_id"] = check_id
         return VerdictResponse(**data)
 
-    stored: dict = {}
+    # ★ IDOR 방지: 소유자만 통과. try 밖에서 검사한다 - 여기서 나는 404(HTTPException)를
+    #   아래 except 가 501 로 삼키면 안 되기 때문이다.
+    stored = require_owner(check_id, body.device_id)
     try:
-        stored = _MEMORY_STORE.get(check_id, {})
         text = stored.get("masked_text", "")
         signals = search.detect_signals(text)                     # 키 불필요 (규칙 기반)
         error_type, confidence = tagger.tag_error_type_llm(text, signals, decision=body.decision)

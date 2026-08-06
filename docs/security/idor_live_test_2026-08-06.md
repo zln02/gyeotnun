@@ -111,3 +111,76 @@ if not stored:
 
 > 지시는 "실제로 시도해 확인"까지였다. 코드는 수정하지 않았다. 고칠지 여부와
 > 인증 방식(세션 토큰 vs 서명 device_id)은 지시를 기다린다.
+
+---
+
+## 수정 적용 (2026-08-06) — 최소 수정, 새 인증 체계 없음
+
+### 무엇을 고쳤나
+
+`evidence`/`dialogue`/`verdict` 세 엔드포인트에서 저장된 `device_id` 와 요청자의
+`device_id` 를 대조하고, **불일치·미제공·없는 id 를 모두 같은 404 로 거부**한다.
+공통 함수 하나로 처리한다.
+
+```python
+# api/routers/checks.py
+def require_owner(check_id, device_id):
+    stored = _MEMORY_STORE.get(check_id)
+    owner = stored.get("device_id") if stored else None
+    if not device_id or stored is None or owner != device_id:
+        raise HTTPException(status_code=404, detail={
+            "error": "not_found", "code": "ST-001",
+            "message": "요청하신 확인 내역을 찾을 수 없습니다."})
+    return stored
+```
+
+- `evidence`(GET): `device_id` 쿼리 파라미터 추가.
+- `dialogue`/`verdict`(POST): `DialogueRequest`/`VerdictRequest` 스키마에 `device_id` 추가.
+- verdict 는 `require_owner` 를 try **밖**에서 호출한다 — 404(HTTPException)가
+  기존 `except Exception` 에 잡혀 501 로 바뀌는 것을 막기 위해서다.
+- 없는 id 가 501 을 반환하던 것을 404 로 정리했다(존재 여부를 흘리지 않는 동일 응답).
+- 프론트(`web/src/api.js`)는 세 호출에 `deviceId()`(localStorage UUID)를 함께 보낸다.
+  이 3줄이 없으면 소유자 본인도 404 가 되어 앱이 깨지므로 함께 수정했다.
+- `?mock=1` 데모 경로는 고정 픽스처만 반환하고 실데이터를 안 건드리므로 검사 대상이
+  아니다(mock 으로는 남의 기록이 나올 수 없다).
+
+### 검증 결과 (실제 요청)
+
+| 시나리오 | evidence | dialogue | verdict |
+|---|---|---|---|
+| 소유자 본인 | **200** | **200** | **200** |
+| 타인 device_id | **404** | **404** | **404** |
+| device_id 미제공 | **404** | **404** | **404** |
+| 없는 id | **404** | **404** | **404** |
+
+없는 id·타인·미제공의 **응답 본문이 완전히 동일**(`ST-001` 동일 메시지) → check_id
+존재 여부가 새어나가지 않음. pytest **79 passed**. 평가셋 30건은 `collect_evidence`
+직접 경로라 이 변경과 무관하며 사칭 10/10·정상 오판 0·홀드아웃 실패 0 그대로.
+
+### events/summary
+
+`ADMIN_TOKEN`(환경변수) 게이트를 걸었다. **미설정이면 기본 닫힘(404)**. 서명 토큰·
+세션 발급이 아니라 단순 공유 비밀 대조다. 현재 `.env` 에 없으므로 지금은 완전히
+닫혀 있다 — 운영자는 `.env` 에 `ADMIN_TOKEN` 을 넣고 `X-Admin-Token` 헤더로 호출한다.
+(호출부가 프론트·테스트 어디에도 없어 닫아도 깨지는 것이 없다.)
+
+### reports/weekly
+
+지금은 0만 돌려주는 스텁이라 유출 없음. **구현 시 IDOR 가 된다는 경고 주석**을
+`TODO` 위에 남겼다. 코드는 구현하지 않았다.
+
+### 남은 한계 (제출 후 과제)
+
+**`device_id` 는 프론트가 보내는 값이라 위조 가능하다.** 공격자가 피해자의
+`device_id`(예: 기기 UUID)를 알아내면 여전히 통과한다. 이 최소 수정이 막는 것은
+"아무 check_id 나 넣으면 남의 기록이 나오는" **접근 통제 부재**뿐이다. `check_id`
+(40비트 난수)에 더해 이제 `device_id` 까지 알아야 하므로 문턱은 크게 올라갔지만,
+근본 해법(서버 발급 세션 등)은 별도 과제로 남긴다 — 지시대로 새 인증 체계는 만들지
+않았다. 또한 `create_check` 의 `device_id` 기본값 `"anonymous"` 로 만들어진 건은
+`"anonymous"` 를 보내는 누구에게나 열린다(프론트는 항상 실제 UUID 를 보내므로
+정상 경로에선 발생하지 않음). 이 두 가지를 근본 인증 도입 시 함께 처리해야 한다.
+
+### 스코프 밖 관찰 (건드리지 않음)
+
+`GET /errors/summary` 도 인증 없이 집계를 노출한다(events/summary 와 같은 부류).
+이번 지시 범위(events/summary)에 없어 수정하지 않았다. 같은 방식의 게이트가 필요하다.

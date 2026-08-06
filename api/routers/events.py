@@ -24,15 +24,31 @@ import hashlib
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
+from config import settings
 from models.db import Event, get_db
 from models.schemas import EventAckResponse, EventIn, EventSummaryResponse
 from services.incident_log import log_incident
 
 router = APIRouter(prefix="/events", tags=["events"])
 log = logging.getLogger("gyeotnun.events")
+
+
+def _require_operator(x_admin_token: str | None) -> None:
+    """운영자 전용 게이트. settings.ADMIN_TOKEN 이 비어 있으면(기본) 항상 닫는다.
+
+    ★ 이 집계는 인증 없이 전 세션 통계를 노출하던 곳이라, 접근 제한이 필요하다.
+      서명 토큰·세션 발급 체계가 아니라 단순 공유 비밀(환경변수) 대조다.
+      실패 시 존재 사실을 흘리지 않도록 404 로 응답한다(401/403 이 아니라).
+    """
+    expected = settings.ADMIN_TOKEN
+    if not expected or x_admin_token != expected:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "not_found", "code": "ST-001", "message": "요청하신 자료를 찾을 수 없습니다."},
+        )
 
 _ALLOWED_SCREENS = ("S1", "S2", "S3", "S4", "S5")
 _ALLOWED_EVENT_TYPES = {"screen_enter", "screen_leave", "click", "evidence_link_click", "error"}
@@ -112,11 +128,17 @@ async def create_event(body: EventIn, db: Session = Depends(get_db)):
     response_model=EventSummaryResponse,
     summary="집계 - 화면별 체류시간/이탈률/클릭수/근거링크 클릭률 (8/5 사용성 테스트용)",
 )
-async def summary(db: Session = Depends(get_db)):
+async def summary(
+    db: Session = Depends(get_db),
+    x_admin_token: str | None = Header(None, alias="X-Admin-Token"),
+):
     """세션 단위로 재구성해 집계한다. 표본이 적은 사용성 테스트 규모(하루치, 참가자
     수십 명 이하)를 가정하고 DB 에서 전부 읽어 파이썬으로 계산한다 - SQL 윈도우
     함수보다 느리지만, 이 규모에서는 차이가 없고 계산 과정이 훨씬 읽기 쉽다.
+
+    ★ 운영자 전용. ADMIN_TOKEN 미설정 시 닫힌다(위 _require_operator 참조).
     """
+    _require_operator(x_admin_token)
     rows = db.query(Event).order_by(Event.session_id, Event.created_at).all()
 
     sessions: dict[str, list[Event]] = {}

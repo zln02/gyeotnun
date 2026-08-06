@@ -82,6 +82,9 @@ class DialogueRequest(BaseModel):
     """POST /api/v1/checks/{check_id}/dialogue 요청."""
     turn: int = Field(1, ge=1, le=5, description="현재 몇 번째 질문인지 (1부터)")
     user_reply: Optional[str] = Field(None, description="직전 질문에 대한 사용자의 답(첫 턴은 null)")
+    # ★ 소유권 확인용: 이 check_id 를 만든 기기의 device_id 와 일치해야 한다(IDOR 방지).
+    #   위조 가능한 값이라는 한계는 문서에 기록돼 있다 - 새 인증 체계는 뒤에 다룬다.
+    device_id: Optional[str] = Field(None, description="이 확인 건을 만든 기기 식별자")
 
 
 class DialogueOption(BaseModel):
@@ -112,6 +115,8 @@ class VerdictRequest(BaseModel):
     ★ decision 은 사용자가 고른다. AI가 대신 고르지 않는다."""
     decision: Decision
     reason_tags: List[str] = Field(default_factory=list, description="사용자가 고른 이유 태그")
+    # ★ 소유권 확인용(IDOR 방지) - DialogueRequest.device_id 와 같은 목적.
+    device_id: Optional[str] = Field(None, description="이 확인 건을 만든 기기 식별자")
 
 
 class VerdictResponse(BaseModel):

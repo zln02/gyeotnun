@@ -15,7 +15,7 @@ from config import MissingKeyError
 from mocks import fixtures
 from models.schemas import DialogueRequest, DialogueResponse
 from routers._common import MockFlag, not_implemented, use_mock
-from routers.checks import _MEMORY_STORE
+from routers.checks import require_owner
 from services import prompt_chain, search
 
 router = APIRouter(prefix="/checks", tags=["dialogue"])
@@ -36,9 +36,7 @@ async def next_question(check_id: str, body: DialogueRequest, mock: int = MockFl
         data["evidence_refs"] = checked.evidence_refs
         return DialogueResponse(**data)
 
-    stored = _MEMORY_STORE.get(check_id)
-    if not stored:
-        raise not_implemented(RuntimeError(f"check_id={check_id} 를 찾을 수 없습니다."), "ST-001", screen="S3")
+    stored = require_owner(check_id, body.device_id)   # ★ IDOR 방지: 소유자만 통과
 
     history = stored.setdefault("history", [])
     if body.user_reply:
