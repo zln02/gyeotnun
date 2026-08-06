@@ -23,5 +23,11 @@ numpy==2.2.1                     # 임베딩 벡터 연산(코사인 유사도)
 torch==2.5.1
 sentence-transformers==3.3.1
 
+# 로컬 OCR (OCR_PROVIDER=local, 기본). 이미지를 외부로 보내지 않는 오프라인 OCR.
+#   구성은 튜닝 실험 baseline(모바일 검출기+문서전처리off+mkldnn on+말풍선필터).
+#   모델 캐시는 api/data/paddle_home 에 있다(마운트). OCR_PROVIDER=vision 이면 미사용.
+paddlepaddle==3.0.0
+paddleocr==3.7.0
+
 # dev
 pytest==8.3.4

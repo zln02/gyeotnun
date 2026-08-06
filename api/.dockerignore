@@ -1,0 +1,7 @@
+# 런타임에 ./api:/app 마운트가 /app 을 통째로 덮으므로, 이미지에 코드/데이터를
+# 굽는 것은 실행에 불필요하다. 특히 data/(11GB 모델 캐시)를 빼 빌드/export 를 줄인다.
+data/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+*.log

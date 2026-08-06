@@ -57,6 +57,12 @@ class Settings:
     # 막기 위한 것이다. 0 이하면 삭제를 건너뛴다.
     RETENTION_DAYS: int = int(os.getenv("RETENTION_DAYS") or 90)
 
+    # OCR 제공자: local(PaddleOCR, 오프라인·이미지 외부 미전송) / vision(Claude Vision).
+    # ★ 임베딩(EMBEDDING_PROVIDER)과 같은 구조. 기본값 local. 되돌리기는 이 한 줄:
+    #   .env 또는 compose environment 에 OCR_PROVIDER=vision 넣고 백엔드 재시작.
+    #   Vision 코드·키는 services/ocr.py 에 그대로 보존한다.
+    OCR_PROVIDER: str = os.getenv("OCR_PROVIDER", "local")
+
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     NAVER_CLIENT_ID: str = os.getenv("NAVER_CLIENT_ID", "")
     NAVER_CLIENT_SECRET: str = os.getenv("NAVER_CLIENT_SECRET", "")

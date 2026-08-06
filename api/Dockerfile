@@ -10,6 +10,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# ★ 로컬 OCR(PaddleOCR→opencv) 런타임 시스템 라이브러리. pip 레이어 뒤에 두어
+#   paddle 재설치 없이 이 레이어만 추가되게 한다(libGL.so.1 등 누락 방지).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgl1 libglib2.0-0 libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY . .
 
 EXPOSE 8000

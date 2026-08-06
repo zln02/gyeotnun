@@ -155,10 +155,12 @@ def _chat_background_luma(im) -> float:
     return statistics.median([_luma(im.getpixel((x, min(y, h - 1)))) for y in ys])
 
 
-def _keep_bubble_boxes(image_path, boxes) -> list[str]:
+def _keep_bubble_boxes(image, boxes) -> list[str]:
     """검출 박스 중 '말풍선 안'으로 보이는 것만 남긴다.
 
     boxes: easyocr readtext(detail=1) 결과 [(bbox, text, conf), ...]
+    image: 파일 경로(실험용) 또는 PIL.Image(프로덕션 인메모리 경로). ★ 프로덕션
+      OCR 은 원본 이미지를 디스크에 쓰지 않으므로 PIL.Image 를 그대로 받는다.
 
     ★ 왜 목록(발신자명 사전)이 아니라 위치·색으로 거르는가: 발신자명·대화방 이름은
       캡처마다 달라서 목록으로 관리할 수 없다. 반면 카카오톡 화면 구조(상단 상태바·
@@ -166,7 +168,7 @@ def _keep_bubble_boxes(image_path, boxes) -> list[str]:
     """
     from PIL import Image
 
-    im = Image.open(image_path).convert("RGB")
+    im = image.convert("RGB") if isinstance(image, Image.Image) else Image.open(image).convert("RGB")
     w, h = im.size
     chat_luma = _chat_background_luma(im) or 1.0
     kept = []
