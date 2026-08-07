@@ -8,8 +8,11 @@
 - created_at 은 naive UTC(models.db._now = datetime.utcnow())라 컷오프도 UTC 로 맞춘다.
 - 멱등하다: 여러 번 돌려도 안전하고, 지울 게 없으면 0 을 남긴다.
 
-실행: (컨테이너 안)  python tools/purge_old_records.py
-      (호스트 cron) sudo docker compose exec -T api python tools/purge_old_records.py
+실행: (컨테이너 안)  python -m tools.purge_old_records
+      (호스트 cron) sudo docker compose exec -T api python -m tools.purge_old_records
+      ★ 반드시 -m 으로 실행할 것. 파일 경로로 실행하면 sys.path 가 /app/tools 가 되어
+        `from config import ...` 가 ModuleNotFoundError 로 죽는다(2026-08-07 까지
+        04:00 cron 이 이 이유로 매일 실패했다).
 """
 from __future__ import annotations
 
@@ -51,5 +54,8 @@ def purge(retention_days: int | None = None) -> dict[str, int]:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     result = purge()
-    print(f"[purge] 보관 {settings.RETENTION_DAYS}일 초과 삭제 완료: "
+    # 실행 시각을 함께 남긴다 - purge.log 는 append 방식이라 시각이 없으면
+    # 어제 04:00 실행분과 오늘 수동 실행분을 구분할 수 없다.
+    now = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    print(f"[purge] {now} 보관 {settings.RETENTION_DAYS}일 초과 삭제 완료: "
           f"events={result.get('events', 0)}건, error_logs={result.get('error_logs', 0)}건")
