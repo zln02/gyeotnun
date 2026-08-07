@@ -27,6 +27,7 @@ import { getWeeklyReport } from '../api.js'
 import { logClick, logError } from '../events.js'
 import BottomNav from '../components/BottomNav.jsx'
 
+import waitMascot from '../assets/checking/mascot.png'
 import icBack from '../assets/training/ic_back.svg'
 import icHomeQuit from '../assets/training/ic_home_quit.svg'
 import icHint from '../assets/training/ic_hint.svg'
@@ -503,7 +504,15 @@ export default function Training({ onHome }) {
     )
   }
   if (!report) {
-    return <div className="loading"><div className="spinner" /><p className="lead">이번 주 기록을 가져오고 있어요</p></div>
+    return (
+      <div className="wait" role="status" aria-live="polite">
+        <div className="wait-icon-wrap">
+          <span className="wait-glow" aria-hidden="true" />
+          <img src={waitMascot} width="80" height="80" alt="" aria-hidden="true" className="wait-icon" />
+        </div>
+        <p className="wait-text">이번 주 기록을 가져오고 있어요</p>
+      </div>
+    )
   }
 
   const ERROR_TYPE_LABEL = {

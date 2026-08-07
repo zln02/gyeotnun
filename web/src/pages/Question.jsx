@@ -175,9 +175,12 @@ export default function Question({ checkId, checkData, evidence, photoUrl, onDon
     return (
       <div className="verify">
         <VerifyProgress current="find" />
-        <div className="loading">
-          <div className="spinner" role="status" aria-live="polite" />
-          <p className="lead">{longWait ? LONG_WAIT_MESSAGE : '질문을 준비하고 있어요'}</p>
+        <div className="wait" role="status" aria-live="polite">
+          <div className="wait-icon-wrap">
+            <span className="wait-glow" aria-hidden="true" />
+            <img src={mascot} width="80" height="80" alt="" aria-hidden="true" className="wait-icon" />
+          </div>
+          <p className="wait-text">{longWait ? LONG_WAIT_MESSAGE : '질문을 준비하고 있어요'}</p>
           {/* 기다리는 중에도 빠져나갈 길을 남긴다 */}
           <button type="button" className="checking2-cancel" onClick={cancel}>그만두기</button>
         </div>
