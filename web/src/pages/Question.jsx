@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { getQuestion } from '../api.js'
 import { logClick, logError, logEvidenceLinkClick } from '../events.js'
+import confirmedIndicator from '../assets/check-flow/result-confirmed.svg'
+import suspiciousIndicator from '../assets/check-flow/result-suspicious.svg'
+import unknownIndicator from '../assets/check-flow/result-unknown.svg'
 import resultIndicator from '../assets/check-flow/official-source-indicator.png'
 import resultArrow from '../assets/check-flow/arrow-right.svg'
 import questionMascot from '../assets/check-flow/question-mascot.png'
@@ -28,15 +31,22 @@ const VERDICT_TIERS = {
     label: '함께 확인',
     desc: '공식 자료와 비교해 볼 내용이 있어요.',
     className: 'tier-warn',
-    title: '함께 확인할 점이 있어요',
-    subtitle: '공식 자료를 하나씩 살펴봐요',
+    title: '확인이 필요한 문자에요',
+    subtitle: '정부 주소가 아닌 링크가 적혀있어요',
+  },
+  warning: {
+    label: '추가 경고',
+    desc: '추가로 확인할 내용이 있어요.',
+    className: 'tier-warn',
+    title: '지금 바로 멈추세요',
+    subtitle: '계좌 번호가 적혀있어요',
   },
   unknown: {
     label: '추가 확인',
     desc: '공식 자료에서 같은 내용을 바로 확인하지 못했어요.',
     className: 'tier-unknown',
-    title: '공식 자료를 더 찾아봐요',
-    subtitle: '확인할 수 있는 단서를 함께 살펴봐요',
+    title: '공식 자료를 못 찾았어요',
+    subtitle: '기관 대표번호로 확인해 보세요',
   },
 }
 
@@ -118,15 +128,28 @@ function FlowProgress({ activeStep, steps = FLOW_STEPS }) {
 function ResultStage({ evidence, loading, onContinue }) {
   const tier = verdictTier(evidence)
   const copy = VERDICT_TIERS[tier]
+  const resultIcon = tier === 'confirmed'
+    ? confirmedIndicator
+    : tier === 'unknown'
+      ? unknownIndicator
+      : suspiciousIndicator
 
   return (
-    <section className="check-flow check-flow--result" aria-labelledby="check-result-title">
+    <section className={`check-flow check-flow--result check-flow--result-${tier}`} aria-labelledby="check-result-title">
       <div className="check-flow__result-visual" aria-hidden="true">
         <span />
-        <img src={resultIndicator} alt="" />
+        <img src={resultIcon} alt="" />
       </div>
       <div className="check-flow__result-copy">
-        <h2 id="check-result-title">{copy.title}</h2>
+        <h2 id="check-result-title">
+          {tier === 'warning'
+            ? <>지금 <span className="check-flow__result-title-accent">바로</span> 멈추세요</>
+            : tier === 'suspicious'
+              ? <>확인이 <span className="check-flow__result-title-accent">필요</span>한 문자에요</>
+              : tier === 'unknown'
+                ? <>공식 자료를 <span className="check-flow__result-title-accent">못</span> 찾았어요</>
+                : copy.title}
+        </h2>
         <p>{copy.subtitle}</p>
       </div>
       {loading && <p className="check-flow__pending" role="status">질문을 준비하고 있어요.</p>}
