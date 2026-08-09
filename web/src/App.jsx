@@ -26,6 +26,7 @@ export default function App() {
   const [checkId, setCheckId] = useState(null)
   const [checkData, setCheckData] = useState(null)
   const [evidence, setEvidence] = useState(null)
+  const isCheckFlow = screen === 'question' || screen === 'decision'
 
   useEffect(() => {
     const code = SCREEN_CODE[screen]
@@ -41,11 +42,15 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <header className="header">
-        <h1>곁눈</h1>
-        <span className="tagline">함께 확인해요</span>
-      </header>
+    <div className={`app${screen === 'home' ? ' app--home' : ''}${screen === 'training' ? ' app--training' : ''}${isCheckFlow ? ' app--check-flow' : ''}`}>
+      {/* ★ 2026-08 홈 화면 Figma 이식(2차): S1은 자체 헤더(HomeHeader, 알림 버튼
+          포함)를 갖게 돼 이 공용 헤더와 겹친다 - S1에서만 숨긴다. S2~S5는 그대로. */}
+      {screen !== 'home' && screen !== 'training' && !isCheckFlow && (
+        <header className="header">
+          <h1>곁눈</h1>
+          <span className="tagline">함께 확인해요</span>
+        </header>
+      )}
 
       {/* 개발/시연 중 어떤 모드인지 항상 보이게 한다 (팀 내부용 표시) */}
       {USE_MOCK && <div className="mock-flag">데모 모드 (mock=1) — 고정 응답으로 동작 중</div>}
@@ -76,6 +81,7 @@ export default function App() {
       {screen === 'question' && (
         <Question
           checkId={checkId}
+          checkData={checkData}
           evidence={evidence}
           onDone={() => setScreen('decision')}
         />

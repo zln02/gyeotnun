@@ -1,79 +1,112 @@
-/**
- * S4 - 판단 기록
- * 담당: 조희진 (화면) / 장지석 (태깅)
- *
- * ★ 여기서 고르는 것은 '진짜/가짜'가 아니라 '내가 어떻게 할지' 이다.
- *   진위를 고르게 하면 결국 사용자에게 판정을 강요하는 셈이 된다.
- *   곁눈은 행동(따라한다 / 안 한다 / 미룬다 / 물어본다)을 고르게 한다.
- * ★ 결과 문구는 절대 비난하지 않는다. 확인한 행동 자체를 칭찬한다.
- */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { submitVerdict } from '../api.js'
 import { logClick, logError } from '../events.js'
+import surveyMascot from '../assets/check-flow/decision-mascot.svg'
+import surveyAvoid from '../assets/check-flow/survey-avoid.png'
+import surveyLearnMore from '../assets/check-flow/survey-learn-more.png'
+import surveyAskFamily from '../assets/check-flow/survey-ask-family.png'
+import surveyFollowAnyway from '../assets/check-flow/survey-follow-anyway.png'
+import recordCheck from '../assets/check-flow/record-check.png'
 
 const SCREEN = 'S4'
 
 const DECISIONS = [
-  { id: 'not_apply', label: '이번엔 따라하지 않을래요', icon: '🙅' },
-  { id: 'hold',      label: '조금 더 알아보고 정할게요', icon: '⏸️' },
-  { id: 'ask_family',label: '가족에게 한번 물어볼게요', icon: '👨‍👩‍👧' },
-  { id: 'apply',     label: '그래도 따라해 보려고요',   icon: '👍' },
+  { id: 'not_apply', label: '따라하지 않을래요', image: surveyAvoid },
+  { id: 'hold', label: '조금 더 알아볼래요', image: surveyLearnMore },
+  { id: 'ask_family', label: '가족에게 물어볼래요', image: surveyAskFamily },
+  { id: 'apply', label: '그래도 따라할래요', image: surveyFollowAnyway },
 ]
 
 const ERROR_TYPE_LABEL = {
   title_dependent: '제목만 보고 판단하기 쉬운 글',
-  authority_impersonation: '기관 이름이 앞세워진 글',
+  authority_impersonation: '기관 이름을 닮게 꾸민 글',
   number_condition: '숫자와 조건이 빠진 글',
-  overgeneralization: '한 가지를 전부로 넓힌 글',
+  overgeneralization: '한 가지를 모두에게 넓힌 글',
 }
 
 export default function Decision({ checkId, onTraining, onHome }) {
   const [result, setResult] = useState(null)
+  const [selected, setSelected] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' })
+  }, [])
+
   async function choose(decision) {
+    setSelected(decision)
     setBusy(true)
     setError('')
     try {
       setResult(await submitVerdict(checkId, decision))
-    } catch (e) {
-      setError(e.message)
-      logError(SCREEN, e.code || 'verdict_submit_failed')
+    } catch (error) {
+      setError(error.message)
+      logError(SCREEN, error.code || 'verdict_submit_failed')
     } finally {
       setBusy(false)
     }
   }
 
   if (result) {
+    const category = ERROR_TYPE_LABEL[result.tagged_error_type] || '확인이 필요한 글'
     return (
-      <>
-        <h2>기록해 두었어요</h2>
-        <div className="card">
-          <span className="badge">{ERROR_TYPE_LABEL[result.tagged_error_type] || '확인이 필요한 글'}</span>
-          <p className="lead" style={{ marginTop: 14 }}>{result.message}</p>
+      <section className="decision-record" aria-labelledby="decision-record-title">
+        <div className="decision-record__visual" aria-hidden="true">
+          <span />
+          <img src={recordCheck} alt="" />
         </div>
-        <button className="btn" onClick={() => { logClick(SCREEN, 'to_training'); onTraining() }}>오늘의 5분 연습 하러 가기</button>
-        <button className="btn secondary" onClick={() => { logClick(SCREEN, 'to_home'); onHome() }}>처음으로 돌아가기</button>
-      </>
+        <h2 id="decision-record-title">응답을 <strong>기록</strong>해 두었어요</h2>
+        <article className="decision-record__message">
+          <span>{category}</span>
+          <p>{result.message}</p>
+        </article>
+        <div className="decision-record__actions">
+          <button type="button" onClick={() => { logClick(SCREEN, 'to_training'); onTraining() }}>오늘의 5분 연습 시작하기</button>
+          <button type="button" onClick={() => { logClick(SCREEN, 'to_home'); onHome() }}>홈 화면으로 돌아가기</button>
+        </div>
+      </section>
     )
   }
 
   return (
-    <>
-      <h2>어떻게 하시겠어요?</h2>
-      <p className="sub">
-        정답은 없습니다. 지금 마음이 가는 대로 골라 주세요.
-        고르신 내용은 다음 연습을 만드는 데만 씁니다.
-      </p>
+    <section className="decision-flow" aria-labelledby="decision-title">
+      <div className="decision-flow__hero">
+        <span className="decision-flow__mascot"><img src={surveyMascot} alt="" /></span>
+        <p>곁눈과 함께 확인한 정보</p>
+        <h2 id="decision-title">어떻게 해보고 싶으신가요?</h2>
+      </div>
 
-      {error && <div className="error-box">{error}</div>}
+      <div className="decision-flow__panel">
+        <p className="decision-flow__notice">
+          <span>정답은 없습니다</span>
+          <span>응답은 더 좋은 연습을 만들기 위해 활용됩니다</span>
+        </p>
 
-      {DECISIONS.map((d) => (
-        <button key={d.id} className="btn choice" disabled={busy} onClick={() => { logClick(SCREEN, `decision_${d.id}`); choose(d.id) }}>
-          <span aria-hidden="true">{d.icon}</span> {d.label}
-        </button>
-      ))}
-    </>
+        {error && <div className="error-box">{error}</div>}
+
+        <div className="decision-flow__options" role="radiogroup" aria-label="앞으로 하고 싶은 행동">
+          {DECISIONS.map((decision) => {
+            const isSelected = selected === decision.id
+            return (
+              <button
+                className={isSelected ? 'is-selected' : ''}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                disabled={busy}
+                key={decision.id}
+                onClick={() => { logClick(SCREEN, `decision_${decision.id}`); choose(decision.id) }}
+              >
+                <span className="decision-flow__check" aria-hidden="true" />
+                <img src={decision.image} alt="" aria-hidden="true" />
+                <span>{decision.label}</span>
+              </button>
+            )
+          })}
+        </div>
+        {busy && <p className="decision-flow__pending" role="status">응답을 기록하고 있어요.</p>}
+      </div>
+    </section>
   )
 }
