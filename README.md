@@ -12,7 +12,7 @@
 
 시니어가 카카오톡·유튜브에서 받은 의심스러운 정보를 **사진 한 장 또는 링크**로 올리면,
 AI가 **진위를 판정하지 않고** 스스로 확인할 수 있는 **질문을 하나씩** 던져 판단을 돕습니다.
-판단이 끝나면 **오판유형을 태깅**해, 다음 날 **5분 훈련**으로 연결합니다.
+판단이 끝나면 **확인 취약 유형을 태깅**해, 다음 날 **5분 훈련**으로 연결합니다.
 
 ### 왜 판정하지 않는가
 
@@ -36,7 +36,7 @@ S2 확인 중     OCR → 개인정보 마스킹 → 공공데이터 대조 → 
    ↓
 S3 질문 카드   ★ AI 질문(파란 영역) + 실제 출처 링크(초록 영역)를 시각적으로 분리
    ↓
-S4 판단 기록   '진짜/가짜'가 아니라 '내가 어떻게 할지'를 고른다 → 오판유형 태깅
+S4 판단 기록   '진짜/가짜'가 아니라 '내가 어떻게 할지'를 고른다 → 확인 취약 유형 태깅
    ↓
 S5 훈련/리포트 5분 훈련 카드 + 주간 리포트(가족 공유)
 ```
@@ -142,7 +142,7 @@ Base URL: 로컬 `http://localhost:8000/api/v1` · 배포 `https://gyeotnun.duck
 | `POST` | `/checks` | multipart(image·link·text + device_id) 업로드 → 텍스트 추출 + 마스킹 | 박진 |
 | `GET` | `/checks/{id}/evidence` | 공공데이터 대조 + 검색 결과 | 김유리 |
 | `POST` | `/checks/{id}/dialogue` | 확인 질문 1개 생성 (판정 억제) | 김태희 |
-| `POST` | `/checks/{id}/verdict` | 사용자 판단 기록 + 오판유형 태깅 | 장지석 |
+| `POST` | `/checks/{id}/verdict` | 사용자 판단 기록 + 확인 취약 유형 태깅 | 장지석 |
 | `GET` | `/training/today` | 오늘의 5분 훈련 카드 | 장지석 |
 | `GET` | `/reports/weekly` | 주간 리포트 | 박진영 |
 | `POST` | `/onboarding/diagnosis` | 첫 실행 3문항 진단 | 장지석 |
@@ -256,7 +256,7 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 | `users` | 비회원 사용자 (device 해시, 취약 유형, 연속 일수) |
 | `checks` | 확인 요청 1건 (**마스킹 텍스트만** 저장) |
 | `evidence` | 검색·대조 결과 (verdict_hint, signals, references) |
-| `taggings` | 사용자 판단 + 오판유형 태깅 |
+| `taggings` | 사용자 판단 + 확인 취약 유형 태깅 |
 | `training_cards` | 5분 훈련 카드 |
 | `corpus` | 공공데이터 577건 |
 | `weekly_reports` | 주간 리포트 스냅샷 |
@@ -314,7 +314,7 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 
 **동작함 (키 없이)**
 - 전 엔드포인트 `?mock=1` 응답 · `validate_question()` 판정 억제 검증 ·
-  텍스트 마스킹(전화/계좌/주민/카드) · 규칙 기반 신호 탐지 · 오판유형 태깅 ·
+  텍스트 마스킹(전화/계좌/주민/카드) · 규칙 기반 신호 탐지 · 확인 취약 유형 태깅 ·
   샘플 훈련카드 3장 · 프론트 5개 화면 전체 플로우
 
 **동작함 (ANTHROPIC_API_KEY 필요, `?mock=0`)**
@@ -327,6 +327,9 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
   근거 검색     e5-small-ko-v2 (자체 서버)
   질문 생성     Claude API
   ```
+- 근거 검색: `dragonkue/multilingual-e5-small-ko-v2`(384차원) 임베딩 + BM25
+  자동 폴백. 평가 세트 실측 근거 검색 성공률 15/18건(83.3%),
+  잘못된 근거 제시 0건 (`services/search.py`, `services/corpus_index.py`)
 - 질문 생성: Claude(`claude-sonnet-5`)로 실제 호출 + 재생성 루프 + 프롬프트 캐싱
   (`services/prompt_chain.py`)
 - 근거 대조: `근거_검증표`/`평가세트`/`사례_재라벨링표` CSV 로컬 인덱스 대조 +
@@ -352,7 +355,7 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
     임베딩 단독보다 나은 지표가 없어 미채택했지만, 코드는 삭제하지 않고 남겨 뒀다.
     비교표는
     [`docs/evaluation/hybrid_search_report.md`](docs/evaluation/hybrid_search_report.md).
-- 오판유형 태깅: Claude 프롬프팅 기반 분류(`services/tagger.py` `tag_error_type_llm`),
+- 확인 취약 유형 태깅: Claude 프롬프팅 기반 분류(`services/tagger.py` `tag_error_type_llm`),
   실패 시 규칙 기반으로 자동 폴백
 - PWA: 아이콘·Web Share Target·service worker 적용, 설치 조건 실측 통과
 - **배포: <https://gyeotnun.duckdns.org> 로 실제 서비스 중.** 자세한 내용은
@@ -360,8 +363,7 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 
 **TODO (담당자별)**
 - 박진: 링크 본문 추출, 얼굴 블러
-- 김유리: 네이버 검색 API 연동(현재는 로컬 CSV 대조까지). 임베딩 검색은 채택·
-  프로덕션 적용 완료(위 항목 참고)
+- 김유리: 네이버 검색 API 연동
 - 김태희: 프롬프트 튜닝(질문 길이 등)
 - 장지석: 공공데이터 577건 수집·변환, 코퍼스→훈련카드 자동 생성
 - 조희진: iOS 대체 경로 실기기 테스트(Share Target 은 Android Chrome 전용)
