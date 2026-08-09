@@ -17,6 +17,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -133,8 +134,114 @@ def extract_from_text(text: str) -> ExtractResult:
     )
 
 
+# ============================================================ 로컬 OCR (PaddleOCR)
+# ★ 튜닝 실험 결론(docs/evaluation/paddleocr_tuning.md): baseline 이 최선.
+#   구성 = 모바일 검출기 + 문서 전처리 off + mkldnn on + 말풍선 필터.
+#   전처리 4종(deskew/clahe/denoise/upscale)·box_thresh 0.4 는 넣지 않는다(기각·짧은 이력).
+LOCAL_OCR_DET = "PP-OCRv5_mobile_det"
+LOCAL_OCR_REC = "korean_PP-OCRv5_mobile_rec"
+
+_paddle_ocr = None
+
+# ★ PaddleOCR 한국어 인식 모델은 한글↔영문/숫자 경계에서 공백을 떨어뜨리는 경향이 있다
+#   (예: "환급 신청nhis-refund24.com"). 검증에서 사칭 S08 이 이 공백 하나로 사칭 신호가
+#   억제돼 9/10 로 떨어졌다. 경계에 공백을 되살리면 10/10 로 회복되고 정상 오판 0·정확도
+#   불변(0.951→0.950). 일반 규칙이라 특정 이미지에 맞춘 튜닝이 아니다.
+#   ★ 숫자는 경계에서 제외한다(2026-08-06 회귀): 숫자를 포함하면 "매달40만원" 이
+#     "매달 40 만원" 으로 쪼개져 **금액 표현이 깨진다**(테스트 픽스처에서 발견).
+#     한국어는 숫자+한글이 한 단어로 붙는 게 정상이고(40만원·12월·65세), 되살려야 할
+#     공백은 URL·영문 도메인 앞이므로 **영문자 경계만** 대상으로 한다.
+_HANGUL_LATIN = re.compile(r"([가-힣])([A-Za-z])")
+_LATIN_HANGUL = re.compile(r"([A-Za-z])([가-힣])")
+
+
+def _restore_boundary_spaces(text: str) -> str:
+    return _LATIN_HANGUL.sub(r"\1 \2", _HANGUL_LATIN.sub(r"\1 \2", text))
+
+
+def _get_paddle():
+    """PaddleOCR 싱글턴(임베딩의 로컬 모델 싱글턴과 같은 구조). 최초 1회 로드."""
+    global _paddle_ocr
+    if _paddle_ocr is None:
+        from paddleocr import PaddleOCR
+
+        _paddle_ocr = PaddleOCR(
+            lang="korean",
+            text_detection_model_name=LOCAL_OCR_DET,
+            text_recognition_model_name=LOCAL_OCR_REC,
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
+            use_textline_orientation=False,
+            enable_mkldnn=True,
+            cpu_threads=4,
+        )
+    return _paddle_ocr
+
+
+def _extract_local(image_bytes: bytes) -> ExtractResult:
+    """PaddleOCR 로 메신저 캡처 본문을 뽑는다.
+
+    ★ 원본 이미지는 메모리에서만 다루고 디스크에 쓰지 않는다(Vision 경로와 동일 원칙).
+      bytes → ndarray 로 디코드해 predict 하고, 말풍선 필터는 in-memory PIL 로 건다.
+    ★ 반환 형식(ExtractResult: text/detected_domain/status)은 Vision 과 완전히 동일하다
+      - 응답 계약이 바뀌지 않으므로 프론트 변경이 필요 없다.
+    실패 의미: 형식 미지원/본문 없음 → status="failed"(정상 결과). 모델 로드·추론 자체가
+      실패하면 예외를 던져 501 로 변환(서비스가 시도조차 못한 경우).
+    """
+    import cv2
+    import numpy as np
+    from PIL import Image
+
+    from services import local_ocr
+
+    if _detect_media_type(image_bytes) is None:
+        log.warning("[ocr:local] 지원하지 않는 이미지 형식")
+        return ExtractResult(text="", status="failed")
+    arr = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+    if arr is None:
+        return ExtractResult(text="", status="failed")
+
+    try:
+        res = _get_paddle().predict(input=arr)
+    except Exception as e:  # noqa: BLE001 - 로드/추론 실패는 서비스가 시도조차 못한 경우
+        raise RuntimeError(f"로컬 OCR(PaddleOCR) 추론 실패: {e}") from e
+
+    if not res:
+        return ExtractResult(text="", status="failed")
+    r = res[0]
+    texts = r.get("rec_texts", []) or []
+    scores = r.get("rec_scores", []) or []
+    polys = None
+    for key in ("rec_polys", "dt_polys", "rec_boxes"):
+        v = r.get(key)
+        if v is not None and len(v):
+            polys = v
+            break
+    boxes = []
+    for i, t in enumerate(texts):
+        p = polys[i] if polys is not None and i < len(polys) else [[0, 0]] * 4
+        conf = float(scores[i]) if i < len(scores) else 1.0
+        boxes.append(([[float(pt[0]), float(pt[1])] for pt in p], t, conf))
+
+    pil = Image.fromarray(cv2.cvtColor(arr, cv2.COLOR_BGR2RGB))
+    try:
+        kept = local_ocr._keep_bubble_boxes(pil, boxes)   # 말풍선 필터(위치·배경밝기)
+    except Exception:  # noqa: BLE001 - 필터 실패 시 정규식 후처리로 폴백
+        kept = texts
+    text = local_ocr._strip_ui_noise("\n".join(kept))     # 상태바·시각 등 UI 잡음 제거
+    text = _restore_boundary_spaces(text)                 # 한글↔영문 경계 공백 보정(S08)
+    if not text:
+        return ExtractResult(text="", status="failed")
+    log.info("[ocr:local] 인식 성공: %d자", len(text))
+    return ExtractResult(text=text, detected_domain=detect_domain(text), status="extracted")
+
+
 def extract_from_image(image_bytes: bytes) -> ExtractResult:
-    """카카오톡 등 메신저 캡처에서 Claude Vision(멀티모달)으로 본문 텍스트만 뽑는다.
+    """카카오톡 등 메신저 캡처에서 본문 텍스트만 뽑는다.
+
+    ★ OCR_PROVIDER=local(기본) → PaddleOCR(오프라인, 이미지 외부 미전송).
+      OCR_PROVIDER=vision → 아래 Claude Vision 경로(코드·키 그대로 보존).
+    아래 docstring·코드는 Vision 경로 설명이다.
 
     별도 OCR 서비스(Google Vision 등)를 쓰지 않는다. ANTHROPIC_API_KEY 하나로
     처리한다(질문 생성과 같은 키). 원본 바이트는 base64 로 인코딩해 요청 본문에
@@ -151,6 +258,9 @@ def extract_from_image(image_bytes: bytes) -> ExtractResult:
     의미 없는 상태) 예외를 던져 501 로 변환되게 한다 - 이건 인식 실패가 아니라
     서비스가 시도조차 못 한 경우이기 때문이다.
     """
+    if settings.OCR_PROVIDER == "local":
+        return _extract_local(image_bytes)
+
     if not settings.has_llm:
         raise MissingKeyError("ANTHROPIC_API_KEY", owner="박진")
 

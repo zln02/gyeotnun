@@ -82,6 +82,9 @@ class DialogueRequest(BaseModel):
     """POST /api/v1/checks/{check_id}/dialogue 요청."""
     turn: int = Field(1, ge=1, le=5, description="현재 몇 번째 질문인지 (1부터)")
     user_reply: Optional[str] = Field(None, description="직전 질문에 대한 사용자의 답(첫 턴은 null)")
+    # ★ 소유권 확인용: 이 check_id 를 만든 기기의 device_id 와 일치해야 한다(IDOR 방지).
+    #   위조 가능한 값이라는 한계는 문서에 기록돼 있다 - 새 인증 체계는 뒤에 다룬다.
+    device_id: Optional[str] = Field(None, description="이 확인 건을 만든 기기 식별자")
 
 
 class DialogueOption(BaseModel):
@@ -112,6 +115,8 @@ class VerdictRequest(BaseModel):
     ★ decision 은 사용자가 고른다. AI가 대신 고르지 않는다."""
     decision: Decision
     reason_tags: List[str] = Field(default_factory=list, description="사용자가 고른 이유 태그")
+    # ★ 소유권 확인용(IDOR 방지) - DialogueRequest.device_id 와 같은 목적.
+    device_id: Optional[str] = Field(None, description="이 확인 건을 만든 기기 식별자")
 
 
 class VerdictResponse(BaseModel):
@@ -137,6 +142,13 @@ class TrainingCardResponse(BaseModel):
     answer: str = Field(..., description="정답 item id")
     explanation: str
     estimated_sec: int = Field(300, description="예상 소요 시간(초). 기본 5분")
+    # ★ 2026-08-05 추가. sample_cards.json 에는 source_url 이 처음부터 들어 있었는데
+    #   이 스키마에 필드가 없어 응답에서 조용히 탈락했다. 그래서 사용자가 훈련 카드를
+    #   풀고 나서 근거 원문으로 돌아갈 방법이 없었다(docs/evaluation/judgment_basis.md §4).
+    #   근거 없는 학습은 곁눈이 하지 않기로 한 것이므로 노출한다.
+    #   Optional 인 이유: 카드에 URL 이 없을 수도 있고, 없다고 훈련이 막히면 안 된다.
+    source_url: Optional[str] = Field(
+        None, description="이 카드의 근거 원문 URL. 없으면 화면에서 링크를 감춘다")
 
 
 class WeeklyReportResponse(BaseModel):

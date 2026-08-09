@@ -24,9 +24,11 @@
   --text-sub: #454B54;          /* 약 9:1 — 보조 텍스트도 AAA 유지 */
   --line: #E6E2DA;
 
-  --brand: #1B4D8F;             /* 곁눈 파랑 */
-  --brand-dark: #113463;
-  --brand-soft: #E8F0FB;        /* AI 질문 카드 배경 */
+  /* ★ 2026-08 제거: 옛 곁눈 파랑(--brand/#1B4D8F 계열). Figma 이식이 끝나
+     쓰는 곳이 한 군데도 남지 않았다. 토큰만 남겨 두면 새 코드가 무심코 다시
+     끌어다 써서 화면 하나만 파랗게 되는 일이 반복된다(실제로 스피너·헤더·
+     입력창 포커스가 그렇게 남아 있었다). 초록 계열은 --fg-primary(밝은 민트,
+     배경·막대용)와 --source(진초록, 글자·버튼용 대비 7:1)를 쓸 것. */
 
   /* ---- Figma 디자인 이식 토큰 (2026-08, 곁눈(figma) 내보내기의 home.tsx/
      loading.tsx 손글씨 부분에서 실측한 값) ----
@@ -51,7 +53,8 @@
   --fg-surface: #FAFAFA;         /* 옅은 회백색 배경 */
   --fg-surface-tint: #F8FFFB;    /* 옅은 초록빛 안내 배경 */
 
-  --source: #1F6B3E;            /* 근거(출처) 초록 */
+  --source: #1F6B3E;            /* 근거(출처) 초록 - 흰 배경 대비 약 7:1 (AAA) */
+  --source-dark: #14522F;       /* 위 초록의 테두리용 한 단계 어두운 톤 */
   --source-soft: #E6F4EC;       /* 출처 블록 배경 */
 
   --warn: #8A5300;
@@ -80,11 +83,59 @@
   --btn-h: 60px;                /* ★ 56px 이상 */
   --radius: 14px;
   --shadow: 0 3px 0 rgba(0,0,0,0.18);
+
+  /* ============================================================
+     반응형 기준값 (2026-08)
+     문제: Figma 원본은 393px 고정 프레임인데 앱 기둥을 520px 까지 늘려
+     두어서, 태블릿·데스크톱에서는 카드가 설계보다 37% 넓게 퍼지고("늘어남")
+     320px 기기에서는 히어로 제목이 3줄로 무너졌다. 기기마다 다른 화면이
+     나오던 원인이 이 한 겹뿐인 폭 처리였다.
+
+     원칙: 폭은 '가장 큰 폰(430px)'에서 멈춘다. 그 이상 넓은 화면에서는
+     기둥을 늘리는 대신 가운데 세워 두고 앱처럼 보이게 한다. 좌우 여백만
+     화면 폭을 따라 유동적으로 움직인다.
+     ============================================================ */
+  --app-max: 430px;             /* iPhone Pro Max 폭. 설계 기준(393)보다 넓히지 않는다 */
+  --gutter: clamp(14px, 4.6vw, 20px);      /* 393px 에서 18px = 기존 값 */
+  --gutter-flow: clamp(15px, 5.7vw, 22.5px); /* 확인 흐름은 Figma Container 여백 22.5 */
+
+  /* 노치·홈 인디케이터. index.html 에 viewport-fit=cover 를 걸어 두고도
+     여태 한 곳도 반영하지 않아, 아이폰에서 헤더가 상태바에 물리고 하단
+     네비가 홈 바 아래로 잠겼다. */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+
+  /* 하단 고정 네비 - 콘텐츠 아래 여백을 이 값들로 계산해야 가려지지 않는다.
+     FAB 가 네비 위로 45px 솟아 있어서 네비 높이만 빼면 모자란다. */
+  --nav-h: 93.5px;
+  --nav-gap-b: 16px;
+  --fab-size: 68px;
+  --fab-rise: 45px;
+  --nav-space: calc(var(--nav-h) + var(--nav-gap-b) + var(--fab-rise));
+
+  --flow-pad-t: calc(25px + var(--safe-t));
+  --flow-pad-b: calc(28px + var(--safe-b));
 }
 
-* { box-sizing: border-box; -webkit-tap-highlight-color: rgba(27,77,143,0.2); }
+/* 짧은 화면(SE 1세대 568px 등): 네비 93.5 + FAB 45 = 138px 이 세로의 1/4을
+   먹어 확인 카드를 덮었다. 세로가 좁은 기기에서만 네비를 줄인다. */
+@media (max-height: 700px) {
+  :root {
+    --nav-h: 74px;
+    --nav-gap-b: 10px;
+    --fab-rise: 38px;
+    /* ★ --fab-size 는 줄이지 않는다. 58px 로 줄였더니 "바로 확인" 두 줄이
+       원 밖으로 잘렸다. 이 파일 맨 위 규칙상 아이콘만 남길 수는 없다. */
+  }
+}
+
+/* 탭 하이라이트도 옛 파랑이라, 안드로이드에서는 무엇을 눌러도 파랗게 번쩍였다 */
+* { box-sizing: border-box; -webkit-tap-highlight-color: rgba(71,216,153,0.28); }
 
 html, body, #root { height: 100%; }
+/* 주소창이 접혔다 펴지는 모바일 브라우저에서 100vh 는 '가장 큰' 높이라
+   실제 보이는 영역보다 커진다. dvh 를 아는 브라우저는 dvh 를 쓴다. */
+@supports (height: 100dvh) { html, body, #root { height: 100dvh; } }
 
 body {
   margin: 0;
@@ -98,24 +149,47 @@ body {
 }
 
 .app {
-  max-width: 520px;
+  width: 100%;
+  max-width: var(--app-max);
   margin: 0 auto;
   min-height: 100%;
   background: var(--bg);
-  padding: 20px 18px 120px;     /* 하단 여백: 큰 버튼이 가리지 않도록 */
+  /* 하단 여백은 네비+FAB 실제 높이에서 뽑는다. 예전엔 120px 로 박아 두어
+     FAB(네비 위 45px)에 마지막 줄이 물렸다. */
+  padding: calc(20px + var(--safe-t)) var(--gutter) calc(var(--nav-space) + var(--safe-b));
 }
+
+/* 폰보다 넓은 화면(태블릿·데스크톱): 기둥을 늘리지 않고 가운데 세워 둔 뒤
+   테두리와 그림자로 '앱 창'처럼 보이게 한다. 늘리면 Figma 비율이 깨진다. */
+@media (min-width: 560px) {
+  body { background: #EDEDE8; }
+  .app { box-shadow: 0 0 0 1px var(--line), 0 24px 70px rgba(0, 0, 0, 0.10); }
+}
+/* ★ 확인 흐름(확인중·판단·발견·탐색·확인·응답·기록): Figma 프레임에 공용 헤더가
+   없고 Container 여백이 pt 25 / px 22.5 다. 하단 네비도 없어 120px 여백이 불필요. */
+.app.flow { padding: var(--flow-pad-t) var(--gutter-flow) var(--flow-pad-b); }
 
 /* ------------------------------------------------------ 헤더 */
 .header {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 8px 0 18px;
-  border-bottom: 3px solid var(--brand);
-  margin-bottom: 22px;
+  padding: 8px 0 14px;
+  /* ★ 2026-08: 굵은 파란 밑줄(--brand 3px)이 옛 디자인의 마지막 흔적이었다.
+     이 헤더가 남는 곳은 훈련(S5)뿐인데, 그 아래는 전부 Figma 초록 톤이라
+     헤더만 다른 앱처럼 보였다. 홈 헤더(.home-title)와 같은 먹색 + 얇은
+     구분선으로 맞춘다. */
+  border-bottom: 1px solid var(--fg-hairline);
+  margin-bottom: 20px;
 }
-.header h1 { font-size: var(--fs-title); margin: 0; color: var(--brand); font-weight: 800; }
-.header .tagline { font-size: 16px; color: var(--text-sub); }
+.header h1 {
+  font-size: var(--fs-title);
+  margin: 0;
+  color: var(--fg-ink-title);
+  font-weight: 900;
+  letter-spacing: -0.7px;
+}
+.header .tagline { font-size: 16px; font-weight: 700; color: var(--home2-muted); }
 
 /* ------------------------------------------------------ 타이포 */
 h2 { font-size: var(--fs-title); line-height: 1.45; margin: 0 0 14px; font-weight: 800; }
@@ -139,8 +213,11 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   font-weight: 700;
   font-family: inherit;
   color: #fff;
-  background: var(--brand);
-  border: 3px solid var(--brand-dark);   /* ★ 테두리 */
+  /* ★ 2026-08: 파랑(--brand)에서 진초록(--source)으로. 밝은 민트(--fg-primary)
+     위 흰 글씨는 대비가 2:1 도 안 나와, 이 공용 버튼에는 대비 7:1 인 진초록을
+     쓴다(파일 맨 위 "명도 대비 7:1" 기준 유지). */
+  background: var(--source);
+  border: 3px solid var(--source-dark);  /* ★ 테두리 */
   border-radius: var(--radius);
   box-shadow: var(--shadow);             /* ★ 그림자 */
   cursor: pointer;
@@ -148,10 +225,7 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.18); }
 .btn:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
 
-.btn.secondary { background: #fff; color: var(--brand-dark); border-color: var(--brand); }
-.btn.choice    { background: #fff; color: var(--text); border-color: var(--line); justify-content: flex-start; text-align: left; }
-.btn.choice.selected { background: var(--brand-soft); border-color: var(--brand); }
-.btn.ghost     { background: transparent; color: var(--text-sub); border-color: transparent; box-shadow: none; text-decoration: underline; }
+.btn.secondary { background: #fff; color: var(--source-dark); border-color: var(--source); }
 .btn:disabled  { opacity: 0.5; cursor: not-allowed; }
 
 /* ------------------------------------------------------ 카드 */
@@ -162,93 +236,6 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   padding: 20px 18px;
   margin: 0 0 18px;
 }
-
-/* ★★ 신뢰 설계의 핵심 ★★
-   AI가 만든 문장과 '실제로 존재하는 출처'를 시각적으로 완전히 분리한다.
-   같은 흰 카드 안에 섞이면 사용자는 링크까지 AI가 만든 것으로 오해하거나,
-   반대로 AI 문장을 공식 발표로 오해한다. 배경색 + 세로 굵은 선 + 라벨로 구분한다. */
-.ai-block {
-  background: var(--brand-soft);
-  border-left: 8px solid var(--brand);
-  border-radius: 12px;
-  padding: 18px 16px;
-  margin-bottom: 4px;
-}
-.ai-label {
-  display: inline-block;
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--brand-dark);
-  background: #fff;
-  border: 2px solid var(--brand);
-  border-radius: 999px;
-  padding: 3px 12px;
-  margin-bottom: 12px;
-}
-.ai-question { font-size: 23px; font-weight: 800; line-height: 1.6; margin: 0; }
-.ai-why { font-size: 17px; color: var(--brand-dark); margin: 12px 0 0; }
-
-.source-block {
-  background: var(--source-soft);
-  border: 2px dashed var(--source);   /* 점선 = '외부에서 가져온 것'이라는 신호 */
-  border-radius: 12px;
-  padding: 16px;
-  margin-top: 14px;
-}
-.source-label {
-  display: inline-block;
-  font-size: 16px;
-  font-weight: 800;
-  color: #fff;
-  background: var(--source);
-  border-radius: 999px;
-  padding: 3px 12px;
-  margin-bottom: 10px;
-}
-.source-link {
-  display: block;
-  min-height: 56px;                    /* 링크도 터치 타깃 기준을 지킨다 */
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--source);
-  background: #fff;
-  border: 2px solid var(--source);
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-bottom: 10px;
-  text-decoration: underline;
-}
-.source-empty { font-size: 17px; color: var(--warn); font-weight: 700; }
-
-/* ------------------------------------------------------ 확인 결과 배지 (S3 상단)
-   ★ 색만으로 구분하지 않는다 - 아이콘 + 글자 라벨을 항상 함께 쓴다(색각이상 고려).
-   테두리 색은 보조 신호일 뿐, 실제 구분은 아이콘(✅/⚠️/❓)과 글자(확인됨/의심/확인 불가)로 한다. */
-.verdict-badge {
-  border: 3px solid var(--line);
-  border-radius: var(--radius);
-  padding: 16px 18px;
-  margin-bottom: 20px;
-}
-.verdict-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.verdict-icon { font-size: 28px; line-height: 1; }
-.verdict-label { font-size: var(--fs-title); font-weight: 800; }
-.verdict-desc { font-size: var(--fs-body); font-weight: 700; margin: 0 0 6px; }
-.verdict-summary { font-size: 17px; color: var(--text-sub); margin: 0; }
-
-.verdict-badge.tier-ok { background: var(--source-soft); border-color: var(--source); }
-.verdict-badge.tier-ok .verdict-label,
-.verdict-badge.tier-ok .verdict-desc { color: var(--source); }
-
-.verdict-badge.tier-warn { background: var(--warn-soft); border-color: var(--warn); }
-.verdict-badge.tier-warn .verdict-label,
-.verdict-badge.tier-warn .verdict-desc { color: var(--warn); }
-
-.verdict-badge.tier-unknown { background: var(--unknown-soft); border-color: var(--unknown); }
-.verdict-badge.tier-unknown .verdict-label,
-.verdict-badge.tier-unknown .verdict-desc { color: var(--unknown); }
 
 /* ------------------------------------------------------ 신호/배지 */
 .signal {
@@ -262,16 +249,7 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   margin-bottom: 10px;
   font-size: 18px;
 }
-.badge {
-  display: inline-block;
-  font-size: 16px;
-  font-weight: 700;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--brand-soft);
-  color: var(--brand-dark);
-  border: 2px solid var(--brand);
-}
+/* (.badge 제거 - 어느 화면에서도 안 쓰는데 옛 파랑만 물고 있던 규칙) */
 .mock-flag {
   display: inline-block;
   font-size: 15px;
@@ -284,40 +262,49 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   margin-bottom: 12px;
 }
 
-/* ------------------------------------------------------ 진행/로딩 */
-.progress { display: flex; gap: 8px; margin-bottom: 18px; }
-.progress span { flex: 1; height: 10px; background: var(--line); border-radius: 999px; }
-.progress span.on { background: var(--brand); }
-
-.loading { text-align: center; padding: 60px 0; }
-.spinner {
-  width: 64px; height: 64px; margin: 0 auto 24px;
-  border: 8px solid var(--brand-soft);
-  border-top-color: var(--brand);
-  border-radius: 50%;
-  animation: spin 1.1s linear infinite;
+/* ------------------------------------------------------ 진행/로딩
+   ★ 2026-08: 파란 링 스피너(.loading/.spinner)를 걷어냈다. 확인 흐름과 훈련
+   탭은 모두 Figma 초록 톤으로 옮겼는데 "질문을 준비하고 있어요"(발견)와
+   "이번 주 기록을 가져오고 있어요"(훈련)에만 옛 파랑(--brand)이 남아, 그
+   두 화면만 다른 앱처럼 보였다. S2 확인 중과 같은 마스코트+초록 번짐으로
+   맞춘다. 기다리는 동안 멈춘 게 아니라는 신호가 필요해 번짐만 천천히
+   숨 쉬게 한다(회전보다 어지럽지 않다). */
+.wait { text-align: center; padding: 56px 0 24px; }
+.wait-icon-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+.wait-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(71,216,153,0.35), rgba(71,216,153,0) 72%);
+  filter: blur(6px);
+  animation: waitPulse 1.9s ease-in-out infinite;
+}
+.wait-icon { position: relative; width: 80px; height: 80px; object-fit: contain; }
+.wait-text {
+  margin: 0;
+  font-size: var(--fs-lead);
+  font-weight: 800;
+  line-height: 1.6;
+  color: var(--fg-ink-title);
+}
+@keyframes waitPulse {
+  0%, 100% { transform: scale(1);    opacity: 0.8; }
+  50%      { transform: scale(1.12); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .wait-glow { animation: none; } }
 
 /* ------------------------------------------------------ 업로드
    ★ 2026-08 Figma 톤: S1 첫 화면 자체(모달을 열기 전)도 --fg-* 로 바꿨다 -
    전에는 모달 안쪽만 Figma 톤이고 바깥 화면은 기존 파랑이라 "안 바뀐 것처럼"
-   보였다. .btn.figma-primary/.figma-outline 는 .btn 의 크기(60px·100% 폭·
-   그림자)는 그대로 두고 색만 S1 전용으로 바꾼 변형이다. */
-.upload-box {
-  border: 3px dashed var(--fg-primary-soft);
-  background: var(--fg-surface-tint);
-  border-radius: var(--radius);
-  padding: 26px 18px;
-  text-align: center;
-  margin-bottom: 18px;
-}
-.btn.figma-primary {
-  background: var(--fg-primary);
-  border-color: var(--fg-primary-border);
-  color: #fff;
-}
+   보였다. .btn.figma-outline 는 .btn 의 크기(60px·100% 폭·그림자)는 그대로
+   두고 색만 S1 전용으로 바꾼 변형이다. */
 .btn.figma-outline {
   background: #fff;
   color: var(--fg-ink-mid);
@@ -334,7 +321,10 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   border-radius: 10px;
   resize: vertical;
 }
-.textarea:focus { border-color: var(--brand); outline: 3px solid var(--brand-soft); }
+/* ★ 2026-08: 문자·링크 입력창은 모든 확인이 반드시 지나는 길인데, 누르는
+   순간에만 옛 파랑(--brand)으로 빛나 모달 안에서 여기만 튀었다.
+   같은 모달의 이름 입력(.name-input:focus)이 이미 쓰는 초록에 맞춘다. */
+.textarea:focus { border-color: var(--fg-primary); outline: 3px solid var(--fg-primary-disabled-bg); }
 
 /* ------------------------------------------------------ 리포트 */
 .stat-row { display: flex; gap: 12px; margin-bottom: 16px; }
@@ -342,11 +332,11 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   flex: 1; text-align: center; background: var(--bg-soft);
   border: 2px solid var(--line); border-radius: 12px; padding: 16px 8px;
 }
-.stat .num { display: block; font-size: var(--fs-big); font-weight: 800; color: var(--brand); }
+.stat .num { display: block; font-size: var(--fs-big); font-weight: 800; color: var(--source); }
 .stat .cap { font-size: 16px; color: var(--text-sub); }
 
 .trend-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 17px; }
-.trend-bar { height: 20px; background: var(--brand); border-radius: 999px; min-width: 6px; }
+.trend-bar { height: 20px; background: var(--fg-primary); border-radius: 999px; min-width: 6px; }
 
 .error-box {
   background: #FDECEC; border: 2px solid var(--danger); color: var(--danger);
@@ -432,7 +422,10 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   display: flex;
   width: 100%;
   max-width: 380px;
+  /* ★ 모바일 주소창이 펴져 있을 때 100vh 는 보이는 높이보다 커서, 모달
+     아래쪽 버튼("이렇게 부를게요")이 주소창 밑으로 잘렸다. */
   max-height: calc(100vh - 36px);
+  max-height: calc(100dvh - 36px);
   flex-direction: column;
   overflow: hidden;
   border-radius: 22px;
@@ -546,3 +539,1301 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   line-height: 1.65;
   color: var(--fg-ink-body);
 }
+
+/* ---- 한 줄 입력창(이름 등) ---- */
+.name-input {
+  width: 100%;
+  min-height: 56px;
+  font-family: inherit;
+  font-size: 19px;
+  padding: 12px 14px;
+  border: 2px solid var(--fg-hairline);
+  border-radius: 10px;
+  color: var(--fg-ink-input);
+}
+.name-input:focus { border-color: var(--fg-primary); outline: 3px solid var(--fg-primary-disabled-bg); }
+
+/* ============================================================
+   S1 홈 - 신규 레이아웃 (2026-08, Figma 이식 2차)
+   출처: 헤더/히어로 카드/확인 카드 3개+SNS/포인트 배너/하단 고정 네비.
+   Figma 원본은 393x852 고정 좌표(px)지만, 여기서는 전부 Flex 로 재구성했다 -
+   position:absolute + left/top 을 쓰지 않아야 360~430px 폭 어디서나 깨지지
+   않는다(FAB 가운데 정렬만 예외적으로 absolute+transform 을 쓰는데, 이건
+   부모 nav 기준 상대 배치라 화면 폭에 안전하다).
+
+   ★ 글자 크기 조정(시니어 대상 - 기획서 "큰 글씨 중심" 원칙, Figma 실측보다 키움):
+     카드 설명 10→14, 부제/배너 12→15, 카드 제목 15→18, 네비 라벨 15(유지),
+     히어로 제목 22(유지). 커진 만큼 카드 높이/간격도 함께 늘렸다(아래 min-height
+     참고) - 색과 레이아웃 비율 자체는 바꾸지 않았다.
+   ============================================================ */
+:root {
+  --home2-muted: #6e6e6e;         /* 헤더 안내문구·카드 설명·SNS 라벨 */
+  --home2-body: #4a4a4a;          /* 포인트 배너 본문 */
+  --home2-hero-shadow: rgba(161,115,87,0.25);
+  --home2-hero-sub: #defff1;
+  --home2-hero-title: #fdfefd;
+  --home2-gold: #f9b700;          /* G 배지 글자 */
+  --home2-gold-bg: #fff9b5;       /* G 배지 배경 */
+  --home2-card-shadow: rgba(178,178,178,0.25);
+  --home2-arrow-bg: rgba(237,230,230,0.7);
+  --home2-nav-bg: rgba(255,255,255,0.72);
+  --home2-nav-border: rgba(255,255,255,0.8);
+  --home2-nav-shadow: rgba(61,88,64,0.1);
+  --home2-nav-active: #416a50;
+  --home2-fab-label: #269766;
+  --home2-cluster-bg: #f4fbf6;
+}
+
+/* ---- 헤더 ---- */
+.home-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.home-eyebrow { margin: 0 0 6px; font-size: 16px; font-weight: 700; color: var(--home2-muted); }
+.home-title { margin: 0; font-size: 24px; font-weight: 900; color: var(--fg-ink-title); letter-spacing: -0.7px; line-height: 1.2; }
+.home-title-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  /* ★ 이름 바꾸기 버튼이 37px 밖에 안 돼 손끝으로 누르기 어려웠다(권장 44px).
+     여백만 키우고 음수 margin 으로 되돌려 겉보기 위치는 그대로 둔다. */
+  min-height: 44px;
+  padding: 7px 0;
+  margin: -7px 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.home-title-btn:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+.home-title-edit { flex-shrink: 0; opacity: 0.55; }
+.home-bell {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 32px;
+  border-radius: 22px;
+  border: 1px solid var(--fg-hairline);
+  background: #fff;
+  cursor: pointer;
+}
+.home-bell:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* ---- 히어로 카드 ---- */
+.hero-wrap { position: relative; margin: 0 0 36px; }
+/* ★ 2026-08 반응형: 320px 기기에서 제목이 3줄로 늘어나 카드가 무너졌다.
+   글자·일러스트·여백을 폭에 따라 함께 줄여 어느 폭에서도 제목 2줄을 지킨다.
+   min-height 도 고정 178px 대신 하한만 둔다(내용이 길어지면 자라도록). */
+.hero-card {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 3.5vw, 14px);
+  min-height: clamp(150px, 45vw, 178px);
+  background: var(--fg-primary);
+  border: 2px solid var(--fg-primary-border);
+  border-radius: 16px;
+  padding: clamp(14px, 5vw, 20px);
+}
+.hero-illust {
+  flex-shrink: 0;
+  width: clamp(64px, 22vw, 87px);
+  height: clamp(64px, 22vw, 87px);
+  object-fit: contain;
+  transform: rotate(-13.7deg);
+  filter: drop-shadow(-6px 13px 5px var(--home2-hero-shadow));
+}
+.hero-copy { min-width: 0; }
+.hero-copy .hero-title {
+  margin: 0 0 8px;
+  font-size: clamp(19px, 5.6vw, 22px);  /* ★ 393px 에서 22px = Figma 값 그대로 */
+  font-weight: 900;
+  color: var(--home2-hero-title);
+  letter-spacing: -0.7px;
+  line-height: 1.3;
+}
+.hero-sub { margin: 0; font-size: 15px; font-weight: 700; color: var(--home2-hero-sub); } /* ★ 12→15 */
+.hero-cta {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 257px;
+  height: 50px;
+  margin: -25px auto 0;         /* 카드 하단에 절반 걸침 */
+  background: #fff;
+  border: 2px solid var(--fg-primary-border);
+  border-radius: 30px;
+  color: var(--fg-primary);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+.hero-cta:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+.hero-cta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--home2-gold-bg);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+}
+.hero-cta-badge .g { color: var(--home2-gold); }
+.hero-cta-badge .pt { color: var(--home2-body); }
+
+/* ---- 확인 카드 묶음 ---- */
+.confirm-cluster {
+  display: flex;
+  gap: 12px;
+  background: var(--home2-cluster-bg);
+  border-radius: 16px;
+  padding: 13px;
+  margin: 0 0 12px;
+}
+.confirm-cards { flex: 1 1 100%; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.confirm-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 78px;              /* ★ 72→78: 커진 글자(2줄)를 담기 위해 함께 늘림 */
+  background: #fefefe;
+  border: none;
+  border-radius: 16px;
+  padding: 8px 12px;
+  box-shadow: 0 0 16px 1px var(--home2-card-shadow);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.confirm-card:disabled { opacity: 0.5; cursor: not-allowed; }
+.confirm-card:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+.confirm-card-icon { flex-shrink: 0; width: 28px; height: 28px; object-fit: contain; }
+.confirm-card-text { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.confirm-card-title {
+  font-size: 18px;               /* ★ 15→18 */
+  font-weight: 900;
+  color: var(--fg-ink-title);
+  line-height: 1.25;
+  /* 제목까지 줄바꿈되면 카드 높이가 기기마다 널뛴다(아래 확인 문구 line-clamp
+     참고) - 제목은 항상 1줄 고정, 좁은 폭에서만 말줄임(원문이 짧아 실제로는
+     거의 발생하지 않는다). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.confirm-card-desc {
+  font-size: 14px;               /* ★ 10→14 */
+  font-weight: 700;
+  color: var(--home2-muted);
+  line-height: 1.3;
+  /* 폭이 좁은 기기에서 3줄로 넘치면 카드 높이가 들쭉날쭉해져 하단 네비와
+     겹친다 - 항상 최대 2줄로 고정하고 넘치면 말줄임(내용은 짧아 잘려도
+     의미가 통한다: "클릭하여 사진 선…"). */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* ★ 360px 이하 좁은 기기: 제목(18px)이 "사진 확인" 한 줄에 안 들어가 말줄임되던
+   문제 - 제목만 1단계(16px) 줄여 한 줄을 확실히 보장한다(설명 14px는 그대로). */
+@media (max-width: 370px) {
+  .confirm-card-title { font-size: 16px; }
+}
+.confirm-card-arrow {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--home2-arrow-bg);
+}
+
+
+/* ---- 포인트 배너 ---- */
+.point-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 2px;
+  margin: 0 0 8px;
+}
+.point-g-badge {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 29px;
+  height: 29px;
+  border-radius: 14.5px;
+  background: var(--home2-gold-bg);
+  color: var(--home2-gold);
+  font-size: 15px;
+  font-weight: 900;
+}
+.point-text { margin: 0; font-size: 15px; font-weight: 700; color: var(--home2-body); line-height: 1.5; } /* ★ 12→15 */
+.point-text b { color: var(--fg-ink-title); font-weight: 900; }
+.point-text b.pt { color: var(--home2-gold); }
+
+/* ---- 하단 네비 위 페이드 막 ---- */
+/* 스크롤 위치와 무관하게, 네비 뒤로 지나가는 콘텐츠가 어중간하게 잘려
+   보이지 않도록 배경색으로 자연스럽게 사라지게 한다(iOS 탭바류 패턴).
+   네비(z-index 40)보다는 아래, 일반 콘텐츠보다는 위에 둔다. */
+/* ★ 2026-08 반응형: left/right:0 이라 화면 폭 전체를 덮었다. 데스크톱(1280px)
+   에서는 앱 기둥(430px) 밖 회색 배경까지 흰 띠가 가로질러 그려졌다.
+   고정 요소도 앱 기둥 폭 안에 묶는다. */
+.bottom-scrim {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: min(100%, var(--app-max));
+  height: calc(var(--nav-space) + var(--safe-b) + 14px);
+  z-index: 39;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.8) 0%, var(--bg) 38%);
+}
+
+/* ---- 하단 고정 네비 ---- */
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--nav-gap-b) + var(--safe-b));   /* ★ 홈 인디케이터 위로 띄운다 */
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: min(calc(100% - 32px), calc(var(--app-max) - 24px));
+  height: var(--nav-h);
+  padding: 0 12px;
+  background: var(--home2-nav-bg);
+  border: 1px solid var(--home2-nav-border);
+  border-radius: 30px;
+  box-shadow: 0 10px 28px var(--home2-nav-shadow);
+  backdrop-filter: blur(12px);
+}
+.nav-gap { flex: 0 0 var(--fab-size); }     /* 가운데 FAB 자리 비움 */
+.nav-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 56px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  /* ★ 320px 기기에서 "내 정보" 가 두 줄로 쪼개져 네비만 키가 커졌다.
+     한 줄을 보장하고, 좁은 폭에서만 한 단계 줄인다(네비 라벨은 본문이
+     아니라서 18px 하한 대상이 아니다 - 위 주석의 Figma 15px 예외와 같은 취급). */
+  white-space: nowrap;
+  font-size: clamp(13px, 4vw, 15px);
+  font-weight: 500;
+  color: var(--home2-muted);
+  cursor: pointer;
+}
+.nav-item.active { color: var(--home2-nav-active); font-weight: 800; }
+.nav-item:focus-visible { outline: 4px solid var(--warn); outline-offset: -4px; }
+.nav-fab {
+  position: absolute;
+  left: 50%;
+  top: calc(-1 * var(--fab-rise));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: var(--fab-size);
+  height: var(--fab-size);
+  border-radius: 999px;
+  background: var(--fg-primary);
+  border: 8px solid #fff;
+  color: var(--home2-fab-label);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(61,88,64,0.2);
+}
+.nav-fab:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+.nav-toast-wrap {
+  position: fixed;
+  left: 50%;
+  /* 네비 높이가 기기마다 달라졌으니 122px 고정을 계산식으로 바꾼다.
+     FAB 높이(--fab-rise)까지 넘겨야 "준비 중입니다" 가 FAB 를 덮지 않는다. */
+  bottom: calc(var(--nav-h) + var(--nav-gap-b) + var(--fab-rise) + var(--safe-b) + 12px);
+  transform: translateX(-50%);
+  z-index: 41;
+  pointer-events: none;
+}
+.nav-toast {
+  background: rgba(17,17,17,0.85);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   S2 확인 중 - Figma 이식 (2026-08)
+   출처: 곁눈(figma) 신규 내보내기 node 95:901(체크리스트형 로딩 화면).
+   기존 스피너+한 줄 순환 문구를 마스코트 아이콘 + 고정 문구 + 단계별
+   체크리스트 + 진행바로 바꿨다. 이 화면 전용 클래스를 따로 둔다.
+   (Question/Training 에 남아 있던 파란 .spinner 는 그 뒤 .wait 로 걷어냈다 -
+    위 "진행/로딩" 절 참고.)
+   ============================================================ */
+.checking2 { text-align: center; padding: 48px 0 20px; }
+.checking2-icon-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+}
+.checking2-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(71,216,153,0.35), rgba(71,216,153,0) 72%);
+  filter: blur(6px);
+}
+.checking2-icon { position: relative; width: 80px; height: 80px; object-fit: contain; }
+.checking2-title {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  margin: 0 0 8px;
+  color: var(--fg-ink-title);
+}
+.checking2-title .brand { color: var(--fg-primary); }
+.checking2-sub { font-size: 15px; font-weight: 500; color: #444; margin: 0 0 28px; }
+
+.checking2-steps {
+  list-style: none;
+  margin: 0 auto 24px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 329px;
+  text-align: left;
+}
+.checking2-steps li { display: flex; align-items: center; gap: 14px; }
+.checking2-step-badge {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #dbe3df;
+  transition: background 0.3s ease;
+}
+.checking2-steps li.done .checking2-step-badge { background: var(--fg-primary); }
+.checking2-step-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #a8a8a8;
+  transition: color 0.3s ease;
+}
+.checking2-steps li.done .checking2-step-text { color: var(--fg-ink-title); }
+
+.checking2-progress {
+  max-width: 329px;
+  height: 6px;
+  margin: 0 auto;
+  background: #e8e8e8;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.checking2-progress-fill {
+  height: 100%;
+  background: var(--fg-primary);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+/* ============================================================
+   S5 연습(학습) - Figma 이식 (2026-08)
+   출처: 연습 시작 안내(node 144:846) + 진행 중 화면(node 151:1656).
+   기존 --fg-primary(#47D899) 는 그대로 CTA 배경으로 쓰고, 아래 값들은
+   이 두 화면에만 등장하는 색(안내 카드 그라데이션·정답/오답 O·X·강조
+   문구 배경)만 담는다 - Training.jsx 참고.
+   ============================================================ */
+:root {
+  --practice-card-from: #4fdd9f;
+  --practice-card-to: #31c98d;
+  --practice-step-text: #1c5340;
+  --practice-cta-text: #2bb87c;
+  --practice-focus-shadow: rgba(71,216,153,0.24);
+  --practice-answer-believe-icon-bg: #eaf3ff;
+  --practice-answer-believe-border: #b8d2f1;
+  --practice-answer-doubt-icon-bg: #fff0ee;
+  --practice-answer-doubt-border: #edc5c0;
+  --practice-answer-correct-bg: #effbf4;
+  --practice-answer-correct-border: #47d899;
+  --practice-answer-wrong-bg: #fff2f0;
+  --practice-answer-wrong-border: #d96860;
+  --practice-highlight-warn-bg: #ffe1de;
+  --practice-highlight-warn-text: #b6463f;
+  --practice-highlight-link-bg: #fff0ee;
+  --practice-highlight-link-text: #a84f48;
+  --practice-hint-bg: #fff8d9;
+  --practice-hint-text: #62521a;
+  --practice-next-disabled-bg: #dce6df;
+  --practice-next-disabled-text: #849188;
+  --practice-feedback-correct-bg: #f4fbf6;
+  --practice-feedback-correct-title: #111111;
+  --practice-feedback-correct-detail: #575757;
+  --practice-feedback-wrong-bg: #fff0ee;
+  --practice-feedback-wrong-title: #b6463f;
+  --practice-feedback-wrong-detail: #8b4b46;
+}
+
+/* ---- 연습 시작 안내 ---- */
+.practice-hero { padding-top: 4px; }
+.practice-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 14px;
+  border: 1.5px solid var(--practice-card-to);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(49,201,141,0.13);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--practice-cta-text);
+}
+.practice-title {
+  margin: 8px 0 10px;
+  font-size: 23px;
+  font-weight: 900;
+  letter-spacing: -0.8px;
+  line-height: 1.28;
+  color: var(--fg-ink-title);
+  text-align: center;
+}
+.practice-chips { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+.practice-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1.5px solid var(--practice-card-to);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(49,201,141,0.12);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--practice-step-text);
+}
+.practice-howcard {
+  padding: 12px 16px 12px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, var(--practice-card-from) 0%, var(--practice-card-to) 100%);
+  box-shadow: 0 10px 22px -6px rgba(23,124,84,0.4);
+}
+.practice-how-eyebrow { margin: 0 0 7px 4px; font-size: 12px; font-weight: 900; letter-spacing: 0.4px; text-transform: uppercase; color: #fff; }
+.practice-how-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.practice-how-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(19,110,74,0.18);
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--practice-step-text);
+}
+.practice-how-num {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--practice-card-to);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+}
+.practice-start-btn {
+  display: flex;
+  width: 100%;
+  min-height: 56px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: none;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(15,94,63,0.28);
+  color: var(--practice-cta-text);
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.practice-start-btn:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+.practice-quit-note { margin: 16px 0 0; font-size: 14px; color: #888; text-align: center; }
+
+/* ---- 진행 중 화면: 헤더 ---- */
+.practice-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.practice-back-btn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 50px;
+  height: 50px;
+  border-radius: 999px;
+  border: 1.5px solid var(--fg-hairline);
+  background: #fff;
+  cursor: pointer;
+}
+.practice-back-btn:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+.practice-quit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 50px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: #555;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+.practice-quit-btn:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* ---- 진행 중 화면: 4단계 진행 표시 ---- */
+.practice-progress { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin: 4px 0 18px; }
+.practice-progress-seg { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.practice-progress-bar { width: 100%; height: 16px; border-radius: 999px; background: var(--practice-next-disabled-bg); transition: background 0.35s ease; }
+.practice-progress-seg.done .practice-progress-bar,
+.practice-progress-seg.current .practice-progress-bar { background: var(--fg-primary); }
+.practice-progress-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 17px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--fg-primary);
+  box-shadow: 0 2px 5px rgba(71,216,153,0.28);
+  font-size: 11px;
+  font-weight: 900;
+  color: #fff;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.practice-progress-tag.visible { opacity: 1; transform: scale(1); }
+.practice-progress-label { font-size: 13px; font-weight: 700; color: var(--practice-next-disabled-text); transition: color 0.35s ease; }
+.practice-progress-seg.done .practice-progress-label,
+.practice-progress-seg.current .practice-progress-label { color: var(--home2-nav-active); font-weight: 900; }
+
+/* ---- 진행 중 화면: 이번 단계 안내 배너 ---- */
+.practice-focus-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px 18px;
+  border-radius: 15px;
+  background: var(--fg-primary);
+  box-shadow: 0 5px 13px var(--practice-focus-shadow);
+  margin-bottom: 18px;
+}
+.practice-focus-num {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.22);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+}
+.practice-focus-step { margin: 0; font-size: 14px; font-weight: 900; color: #fff; }
+.practice-focus-tip { margin: 2px 0 0; font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.9); }
+
+/* ---- 진행 중 화면: 받은 문자 카드 + 강조 표시 ---- */
+.practice-message-card {
+  border: 1.5px solid var(--fg-hairline);
+  border-radius: 20px;
+  padding: 18px;
+  box-shadow: 0 7px 22px rgba(27,94,63,0.1);
+  margin-bottom: 14px;
+}
+.practice-message-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 11px;
+  margin-bottom: 14px;
+  border-bottom: 1.5px solid #e9f0ec;
+}
+.practice-message-head span:first-child { font-size: 14px; font-weight: 700; color: var(--home2-muted); }
+.practice-message-tag { padding: 5px 11px; border-radius: 999px; background: #f1f5f9; font-size: 13px; font-weight: 700; color: var(--home2-nav-active); }
+.practice-message-body { margin: 0; font-size: 17px; font-weight: 700; color: #252525; line-height: 1.72; letter-spacing: -0.3px; white-space: pre-line; }
+.practice-highlight-warn {
+  background: var(--practice-highlight-warn-bg);
+  color: var(--practice-highlight-warn-text);
+  border-radius: 10px;
+  padding: 3px 8px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.practice-highlight-link {
+  background: var(--practice-highlight-link-bg);
+  color: var(--practice-highlight-link-text);
+  text-decoration: underline;
+  border-radius: 10px;
+  padding: 3px 8px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* ---- 진행 중 화면: 힌트 ---- */
+.practice-hint-toggle {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-radius: 14px;
+  border: 1.5px solid var(--fg-primary-border);
+  background: var(--fg-surface-tint);
+  color: #285a40;
+  font-size: 15px;
+  font-weight: 900;
+  font-family: inherit;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+.practice-hint-toggle:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+.practice-hint-box {
+  margin: 0 0 20px;
+  padding: 10px 16px;
+  border-radius: 13px;
+  background: var(--practice-hint-bg);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--practice-hint-text);
+  line-height: 1.5;
+  animation: practiceFadeIn 0.22s ease both;
+}
+
+/* ---- 진행 중 화면: O·X 판단 ---- */
+.practice-question { margin: 0 0 14px; font-size: 20px; font-weight: 900; letter-spacing: -0.6px; color: #222; }
+.practice-answers { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; margin-bottom: 18px; }
+.practice-answer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 100px;
+  padding: 14px;
+  border-radius: 18px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.18s ease, border-color 0.18s ease, outline-color 0.18s ease, transform 0.12s ease;
+}
+.practice-answer:active { transform: scale(0.97); }
+.practice-answer-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  transition: background 0.18s ease;
+}
+.practice-answer .label { font-size: 17px; font-weight: 900; letter-spacing: -0.4px; color: #292929; }
+.practice-answer.believe { background: #fff; border: 1.5px solid var(--practice-answer-believe-border); }
+.practice-answer.believe .practice-answer-icon { background: var(--practice-answer-believe-icon-bg); }
+.practice-answer.doubt { background: #fff; border: 1.5px solid var(--practice-answer-doubt-border); }
+.practice-answer.doubt .practice-answer-icon { background: var(--practice-answer-doubt-icon-bg); }
+.practice-answer.correct { background: var(--practice-answer-correct-bg); border-color: var(--practice-answer-correct-border); box-shadow: 0 3px 8px rgba(71,216,153,0.16); }
+.practice-answer.correct .practice-answer-icon { background: var(--practice-answer-correct-border); }
+.practice-answer.wrong { background: var(--practice-answer-wrong-bg); border-color: var(--practice-answer-wrong-border); }
+.practice-answer.wrong .practice-answer-icon { background: var(--practice-answer-wrong-border); }
+.practice-answer:focus-visible { outline: 4px solid var(--warn); outline-offset: 2px; }
+
+/* ---- 진행 중 화면: 선택 후 피드백 ---- */
+.practice-feedback { display: flex; align-items: flex-start; gap: 11px; margin: -4px 0 18px; padding: 14px 16px; border-radius: 16px; animation: practiceFadeIn 0.28s ease both; }
+.practice-feedback-icon { flex-shrink: 0; margin-top: 2px; }
+.practice-feedback b { display: block; margin-bottom: 4px; font-size: 16px; font-weight: 900; }
+.practice-feedback .detail { margin: 0; font-size: 13px; font-weight: 500; line-height: 1.7; }
+.practice-feedback.correct { background: var(--practice-feedback-correct-bg); }
+.practice-feedback.correct b { color: var(--practice-feedback-correct-title); }
+.practice-feedback.correct .detail { color: var(--practice-feedback-correct-detail); }
+.practice-feedback.wrong { background: var(--practice-feedback-wrong-bg); }
+.practice-feedback.wrong b { color: var(--practice-feedback-wrong-title); }
+.practice-feedback.wrong .detail { color: var(--practice-feedback-wrong-detail); }
+
+/* ---- 진행 중 화면: 다음 단계 ---- */
+.practice-next-btn {
+  display: flex;
+  width: 100%;
+  min-height: 56px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-radius: 17px;
+  border: none;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: background 0.25s ease, color 0.25s ease, transform 0.12s ease;
+}
+.practice-next-btn:disabled { background: var(--practice-next-disabled-bg); color: var(--practice-next-disabled-text); cursor: not-allowed; }
+.practice-next-btn:not(:disabled) { background: var(--fg-primary); color: #fff; }
+.practice-next-btn:not(:disabled):active { transform: scale(0.98); }
+.practice-next-btn:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* ---- 진행 중 화면: 단계 전환 애니메이션 ---- */
+/* 단계를 넘길 때 다음 문항이 뚝 끊기듯 바뀌지 않도록, 매 단계(key={index})
+   다시 마운트되는 이 래퍼에 살짝 아래에서 올라오며 페이드인되게 한다. */
+.practice-step-body { animation: practiceFadeIn 0.32s ease both; }
+@keyframes practiceFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .practice-step-body,
+  .practice-hint-box,
+  .practice-feedback { animation: none; }
+  .practice-answer,
+  .practice-next-btn,
+  .practice-progress-bar,
+  .practice-progress-tag,
+  .practice-progress-label { transition: none; }
+}
+
+/* ---- 학습 완료 (node 196:1406) ---- */
+.practice-complete { padding-top: 18px; text-align: center; animation: practiceFadeIn 0.32s ease both; }
+.practice-complete-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 14px;
+  border: 1.5px solid var(--practice-card-to);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(49,201,141,0.13);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--practice-cta-text);
+}
+.practice-complete-title { margin: 0 0 8px; font-size: 24px; font-weight: 900; letter-spacing: -0.8px; color: #161616; }
+.practice-complete-sub { margin: 0 0 6px; font-size: 15px; font-weight: 600; color: #5f7469; }
+.practice-complete-hero { display: block; width: 100%; max-width: 260px; height: auto; margin: 0 auto; object-fit: contain; }
+.practice-complete-stats {
+  display: flex;
+  margin: 6px 0 20px;
+  padding: 18px 0;
+  border-radius: 16px;
+  background: var(--fg-primary);
+}
+.practice-complete-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.practice-complete-stat:not(:last-child) { border-right: 1px solid rgba(255,255,255,0.35); }
+.practice-complete-stat b { font-size: 22px; font-weight: 900; letter-spacing: -0.9px; color: #fff; }
+.practice-complete-stat span { font-size: 11px; font-weight: 800; color: #e6fff0; }
+.practice-complete-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; margin-bottom: 22px; text-align: left; }
+.practice-complete-card {
+  padding: 16px;
+  border: 1.5px solid var(--fg-hairline);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(28,83,64,0.06);
+}
+.practice-complete-card-label { margin: 0 0 8px; font-size: 15px; font-weight: 900; color: #222; }
+.practice-complete-card-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.practice-complete-card-count { margin: 0; font-size: 26px; font-weight: 900; color: #161616; letter-spacing: -0.5px; }
+.practice-complete-card-count em { margin-left: 2px; font-size: 15px; font-weight: 800; font-style: normal; color: #5f7469; }
+.practice-complete-card-row img { flex-shrink: 0; }
+.practice-complete-cta {
+  display: flex;
+  width: 100%;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 17px;
+  border: none;
+  background: var(--fg-primary);
+  box-shadow: 0 6px 16px rgba(71,216,153,0.28);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+  font-family: inherit;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+.practice-complete-cta:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* ---- 리워드 (node 272:22) ----
+   Figma 원본은 배지+동전+그라데이션이 하나로 합쳐진 배경 이미지 한 장이지만,
+   화면 높이가 기기마다 달라 고정 좌표로 겹치면 기기별로 어긋난다. 그라데이션은
+   CSS로, 배지 문구는 실제 텍스트로 다시 만들고, 동전만 이미지로 올렸다. */
+.practice-reward {
+  position: fixed;
+  /* ★ inset:0 이면 데스크톱에서 초록 그라데이션이 화면 전체를 덮어 앱 기둥
+     밖으로 튀어나왔다. 다른 화면과 같은 폭 안에 세운다. */
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, var(--app-max));
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(44px + var(--safe-t)) 24px calc(40px + var(--safe-b));
+  background: linear-gradient(180deg, #46d899 0%, #33d48f 42%, #74e1b2 62%, #d4f6e7 88%, #ffffff 100%);
+  overflow-y: auto;
+  animation: practiceFadeIn 0.32s ease both;
+}
+.practice-reward-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 33px;
+  padding: 0 15px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1.5px solid #31c98d;
+  box-shadow: 0 1px 4px rgba(49,201,141,0.13);
+  font-size: 13px;
+  font-weight: 800;
+  color: #249967;
+}
+.practice-reward-coin { width: 175px; height: auto; margin: 64px 0 40px; border-radius: 18px; }
+.practice-reward-body { text-align: center; margin-bottom: 40px; }
+.practice-reward-label { margin: 0; font-size: 16px; font-weight: 700; color: rgba(255,255,255,0.9); }
+.practice-reward-title { margin: 9px 0 0; font-size: 30px; font-weight: 900; letter-spacing: -1.2px; color: #fff; }
+.practice-reward-sub { margin: 9px 0 0; font-size: 15px; font-weight: 600; color: rgba(255,255,255,0.9); }
+.practice-reward-actions { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 360px; margin-top: auto; }
+.practice-reward-btn {
+  display: flex;
+  width: 100%;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-radius: 17px;
+  border: none;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(28,83,64,0.18);
+  color: #249967;
+  font-size: 18px;
+  font-weight: 900;
+  font-family: inherit;
+  cursor: pointer;
+}
+.practice-reward-btn.primary { background: var(--fg-primary); color: #fff; }
+.practice-reward-btn:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .practice-complete,
+  .practice-reward { animation: none; }
+}
+
+
+/* ============================================================
+   확인 흐름 3단계 - Figma 3차 이식 (2026-08)
+   node 340:459(판단) / 428:312(발견) / 483:191(탐색) /
+        428:568(확인) / 493:87(응답) / 509:37(기록)
+
+   ★ Figma 수치를 그대로 옮기지 않은 곳 (의도적)
+     - 스테퍼 라벨 14px → 15px: 보조 표시라 본문 18px 규칙 대상은 아니지만
+       14px 은 너무 작다. 아이콘·낭독기 문구를 함께 두어 색만으로 구분하지 않는다.
+     - '다시 보기' 버튼 높이 50.4px → 56px: 이 파일 맨 위 "버튼 min-height 56px"
+       규칙이 우선한다(충돌 시 접근성 우선 원칙).
+     - Figma 는 절대좌표로 배치돼 있는데 여기서는 전부 흐름 배치로 바꿨다.
+       시니어가 브라우저 글자 크기를 키우면 절대배치는 그대로 겹쳐 깨진다.
+   ============================================================ */
+
+/* 색만으로 상태를 알리지 않기 위한 낭독기 전용 텍스트 */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---------------------------------------------------- 3단계 진행 표시 */
+.verify-progress {
+  display: flex; align-items: center; gap: 9px;
+  padding: 5px 0 14px; margin: 0; list-style: none;
+}
+.verify-progress-item { display: flex; align-items: center; gap: 9px; flex: 1 1 0; min-width: 0; }
+.verify-step {
+  flex: 1 1 0; min-width: 0;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 9px 4px; border-radius: 11px;
+  font-size: 15px; font-weight: 900; line-height: 1;
+  border: 1px solid transparent;
+}
+.verify-step.done    { background: #eaf9f1; border-color: #b4edcc; color: #249967; }
+.verify-step.active  { background: var(--fg-primary); color: #fff; box-shadow: 0 3px 5px rgba(71, 216, 153, .3); }
+.verify-step.pending { background: #f2f2f0; border-color: #e2e2de; color: #ababab; }
+.verify-step-arrow { flex: 0 0 auto; }
+
+.verify { padding-bottom: 8px; }
+.verify-turn { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--text-sub); }
+
+/* ---------------------------------------------------- 공용 주 버튼 */
+.verify-cta {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  width: 100%; min-height: 58px; margin-top: 18px; padding: 0 18px;
+  background: var(--fg-primary); color: #fff;
+  border: 0; border-radius: 15px;
+  font-size: 20px; font-weight: 700; font-family: inherit;
+  box-shadow: 0 7px 8px rgba(71, 216, 153, .2);
+  cursor: pointer;
+}
+.verify-cta:disabled { background: #b7b7b2; box-shadow: none; cursor: default; }
+.verify-cta:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* ---------------------------------------------------- ① 발견 */
+.verify-find {
+  background: #fff; border: 2px solid #ffe9ad; border-radius: 14px;
+  padding: 18px 20px 20px;
+  box-shadow: 0 4px 3px rgba(216, 175, 71, .16);
+}
+.verify-find-mascot { display: block; border-radius: 50%; background: #fff; }
+.verify-find-question {
+  margin: 22px 0 0; font-size: 20px; font-weight: 700; line-height: 1.5;
+  letter-spacing: -0.7px; color: #111;
+}
+.verify-find-why { margin: 12px 0 0; font-size: 16px; line-height: 1.6; color: var(--fg-ink-mid); }
+
+.verify-recall {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; min-height: 56px; margin-top: 18px; padding: 0 16px;
+  background: #ffe9ad; border: 2px solid #fac845; border-radius: 13px;
+  color: var(--fg-ink-mid); font-size: 17px; font-weight: 900; font-family: inherit;
+  cursor: pointer;
+}
+.verify-recall.in-card {
+  background: #fff; border: 1px solid #b4edcc; border-radius: 14px;
+  color: #176947; font-size: 18px; font-weight: 700; margin-top: 14px;
+}
+.verify-recall:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* ---------------------------------------------------- ② 탐색 */
+.verify-explore { display: flex; flex-direction: column; gap: 16px; }
+.verify-ref {
+  background: #fff; border: 1px solid #e6e2da; border-radius: 18px; overflow: hidden;
+  box-shadow: 0 3px 10px rgba(178, 178, 178, .15);
+}
+.verify-ref-head { background: var(--fg-surface-tint); border-bottom: 1px solid #e9f0ec; padding: 18px; }
+.verify-ref-title { display: flex; align-items: center; gap: 10px; }
+.verify-ref-badge {
+  flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%;
+  background: #147348; display: flex; align-items: center; justify-content: center;
+}
+.verify-ref-head > .verify-ref-title { align-items: flex-start; }
+.verify-ref-name { margin: 0; font-size: 17px; font-weight: 900; line-height: 1.45; color: #147348; }
+.verify-ref-meta { margin: 3px 0 0; font-size: 15px; font-weight: 500; color: #638071; }
+.verify-ref-link {
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  min-height: 56px; margin: 16px 18px 18px; padding: 0 16px;
+  background: #f4fbf6; border: 1px solid var(--fg-primary); border-radius: 14px;
+  color: #176947; font-size: 18px; font-weight: 900; text-decoration: none;
+  box-shadow: 0 3px 4px rgba(71, 216, 153, .16);
+}
+.verify-ref-link:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+.verify-empty {
+  margin: 0; padding: 22px 20px; background: var(--bg-soft);
+  border: 1px solid var(--line); border-radius: 16px;
+  font-size: 17px; line-height: 1.7; color: var(--text-sub);
+}
+
+/* ---------------------------------------------------- ③ 확인 */
+.verify-confirm {
+  background: #f3fcf7; border: 1px solid #b4edcc; border-radius: 22px; padding: 20px;
+  box-shadow: 0 8px 22px rgba(36, 153, 103, .1);
+}
+.verify-confirm-chip {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 6px 14px 6px 7px; border-radius: 999px; background: #fff;
+  font-size: 15px; font-weight: 700; color: #176947;
+  box-shadow: 0 2px 3px rgba(23, 105, 71, .1);
+}
+.verify-confirm-chip img { border-radius: 50%; }
+.verify-confirm-question {
+  margin: 20px 0 0; font-size: 23px; font-weight: 700; line-height: 1.5;
+  letter-spacing: -0.8px; color: #153e2c;
+}
+
+.verify-options { display: flex; flex-direction: column; gap: 12px; margin-top: 18px; }
+.verify-option {
+  display: flex; align-items: center; gap: 18px;
+  width: 100%; min-height: 70px; padding: 12px 22px;
+  background: #fff; border: 1px solid #e6e2da; border-radius: 18px;
+  font-size: 20px; font-weight: 700; font-family: inherit; color: #292929;
+  text-align: left; cursor: pointer;
+}
+.verify-option.selected { border: 2px solid var(--fg-primary); background: #f4fbf6; }
+.verify-option:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+.verify-radio {
+  flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%;
+  background: #fff; border: 1px solid #c9cec9;
+}
+.verify-option.selected .verify-radio {
+  border: 2px solid var(--fg-primary);
+  background: var(--fg-primary) padding-box;
+  box-shadow: inset 0 0 0 4px #fff;
+}
+
+/* ---------------------------------------------------- 다시 보기 시트 */
+.verify-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(0, 0, 0, .45);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.verify-sheet {
+  /* ★ 760px 은 앱 기둥(430px)보다 넓어 데스크톱에서 시트만 밖으로 삐져
+     나왔다. 기둥 폭에 맞춘다. */
+  width: 100%; max-width: var(--app-max);
+  max-height: 82vh; max-height: 82dvh;
+  background: #fff; border-radius: 22px 22px 0 0;
+  display: flex; flex-direction: column;
+}
+.verify-sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px; border-bottom: 1px solid var(--line);
+}
+.verify-sheet-head h3 { margin: 0; font-size: 19px; font-weight: 900; color: var(--text); }
+.verify-sheet-close {
+  min-height: 44px; padding: 0 16px; background: var(--bg-soft);
+  border: 1px solid var(--line); border-radius: 12px;
+  font-size: 16px; font-weight: 700; font-family: inherit; color: var(--text-sub);
+  cursor: pointer;
+}
+.verify-sheet-body { padding: 20px; overflow-y: auto; }
+.verify-sheet-text {
+  margin: 0; font-size: 18px; line-height: 1.75; color: var(--text);
+  white-space: pre-wrap; word-break: break-word;
+}
+.verify-sheet-photo {
+  display: block; width: 100%; height: auto; border-radius: 14px;
+  border: 1px solid var(--line);
+}
+.verify-sheet-note { margin: 16px 0 0; font-size: 15px; color: var(--text-sub); }
+
+/* ---------------------------------------------------- 판단 (node 340:459) */
+/* ★ Figma 는 CTA 가 화면 아래쪽(852px 중 589px 지점)에 있다. 내용을 위에 두고
+   버튼을 바닥으로 밀어야 원본과 맞고, 엄지로 누르기도 쉽다. */
+.judgment {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 24px 0 8px;
+  /* ★ 빼야 할 값은 확인 흐름의 실제 상하 여백이다. 120px 은 홈 기준(옛
+     .app padding-bottom)이라 판단 화면에서 CTA 가 바닥에 안 닿았다. */
+  min-height: calc(100vh - var(--flow-pad-t) - var(--flow-pad-b));
+  min-height: calc(100dvh - var(--flow-pad-t) - var(--flow-pad-b));
+}
+.judgment .judgment-cta { margin-top: auto; }
+.judgment-hero {
+  position: relative; width: 178px; height: 178px;
+  display: flex; align-items: center; justify-content: center;
+}
+.judgment-hero-ring {
+  position: absolute; width: 128px; height: 128px; border-radius: 50%;
+  border: 2.3px solid rgba(216, 71, 71, .6); filter: blur(14px);
+}
+.judgment-hero.danger .judgment-hero-ring { border-color: rgba(194, 47, 47, .7); }
+.judgment-hero.ok .judgment-hero-ring     { border-color: rgba(36, 153, 103, .6); }
+.judgment-hero.hold .judgment-hero-ring   { border-color: rgba(217, 119, 6, .6); }
+/* ★ 2026-08-09 리디자인 브랜치(bd62d32)에서 가져온 두 가지: 아이콘을 키우고,
+     갈래별로 그림자 색을 맞춘다. 전에는 98px 에 그림자가 없어 178px 원 안에서
+     아이콘이 작고 붕 떠 보였다. 링(judgment-hero-ring)만으로는 번짐이 약했다.
+     ★ 판정 로직(verdict.js)과 문구는 그대로다 - 저쪽은 3갈래에 부제가 하드코딩이라
+     가져오지 않았다. 여기서 바꾸는 건 크기와 색뿐이다. */
+.judgment-hero-img {
+  position: relative; transform: rotate(7.83deg);
+  width: 111px; height: 111px;
+  filter: drop-shadow(0 10px 12px rgba(216, 165, 71, .24)) drop-shadow(0 0 16px rgba(216, 165, 71, .18));
+}
+/* 경고 두 갈래는 조금 더 크게 - 삼각형은 같은 폭이어도 원보다 작아 보인다 */
+.judgment-hero.danger .judgment-hero-img,
+.judgment-hero.warn .judgment-hero-img { width: 118px; height: 118px; }
+.judgment-hero.danger .judgment-hero-img {
+  filter: drop-shadow(0 10px 12px rgba(194, 47, 47, .26)) drop-shadow(0 0 16px rgba(194, 47, 47, .2));
+}
+.judgment-hero.warn .judgment-hero-img {
+  filter: drop-shadow(0 10px 12px rgba(216, 71, 71, .24)) drop-shadow(0 0 16px rgba(216, 71, 71, .18));
+}
+.judgment-hero.ok .judgment-hero-img {
+  transform: none;
+  filter: drop-shadow(0 10px 12px rgba(71, 216, 153, .24)) drop-shadow(0 0 16px rgba(71, 216, 153, .18));
+}
+
+.judgment-title {
+  margin: 26px 0 0; font-size: 24px; font-weight: 900;
+  letter-spacing: -0.5px; line-height: 1.5; color: #111;
+}
+/* 빨강은 '지금 멈추세요'(계좌·카드번호 검출)와 '확인이 필요한 문자예요'에서만 쓴다.
+   못 찾음은 주황, 찾음은 초록 - 정상 안내문에 빨간 경고가 나가면 안 된다. */
+.judgment-title .accent.danger { color: #C22F2F; }
+.judgment-title .accent.warn   { color: #D84747; }
+.judgment-title .accent.hold   { color: #B45309; }
+.judgment-title .accent.ok     { color: #249967; }
+
+/* '사실 한 줄' - 무엇을 보고 그렇게 판단했는지. 다음 화면까지 안 가도 알 수 있게. */
+.judgment-fact {
+  display: inline-block; margin: 14px 0 0; padding: 10px 16px;
+  border-radius: 999px; font-size: 17px; font-weight: 700; line-height: 1.6;
+  text-decoration: none;
+}
+.judgment-fact.danger { background: #FDECEC; color: #A82424; }
+.judgment-fact.warn   { background: #FDEFEF; color: #B33B3B; }
+.judgment-fact.hold   { background: #FDF3E4; color: #8A4408; }
+.judgment-fact.ok     { background: #EAF9F1; color: #176947; }
+.judgment-fact.link { text-decoration: underline; text-underline-offset: 3px; }
+.judgment-fact.link:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+.judgment-cta {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; min-height: 58px; margin-top: 38px; padding: 0 18px;
+  border: 0; border-radius: 15px; color: #fff;
+  font-size: 20px; font-weight: 700; font-family: inherit; cursor: pointer;
+}
+.judgment-cta.danger { background: #E05252; box-shadow: 0 7px 16px rgba(224, 82, 82, .3); }
+.judgment-cta.warn   { background: #f07879; box-shadow: 0 7px 16px rgba(240, 120, 121, .25); }
+.judgment-cta.hold   { background: #E8952F; box-shadow: 0 7px 16px rgba(232, 149, 47, .28); }
+.judgment-cta.ok     { background: var(--fg-primary); box-shadow: 0 7px 16px rgba(71, 216, 153, .25); }
+.judgment-cta:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* ---------------------------------------------------- 응답 (node 493:87) */
+.respond { margin: -25px -22.5px 0; }
+.respond-head {
+  background: var(--fg-primary); padding: 30px 24px 44px;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.respond-mascot { border-radius: 50%; background: #fff; padding: 4px; }
+.respond-eyebrow { margin: 16px 0 0; font-size: 15px; font-weight: 700; color: rgba(255, 255, 255, .9); }
+.respond-title { margin: 6px 0 0; font-size: 25px; font-weight: 900; color: #fff; letter-spacing: -0.5px; }
+
+.respond-sheet {
+  background: #fff; border-radius: 28px 28px 0 0; margin-top: -24px;
+  padding: 26px 16px 24px;
+}
+.respond-note { margin: 0 0 20px; text-align: center; font-size: 15px; line-height: 1.7; color: var(--fg-ink-soft); }
+
+.respond-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.respond-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 34px 10px 16px; background: #fff;
+  border: 1px solid var(--line); border-radius: 16px;
+  font-family: inherit; cursor: pointer;
+  box-shadow: 0 3px 10px rgba(178, 178, 178, .12);
+}
+.respond-card.selected { border: 2px solid var(--fg-primary); background: #f4fbf6; }
+.respond-card:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+.respond-check {
+  position: absolute; top: 12px; right: 12px;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: #fff; border: 1px solid #c9cec9;
+}
+.respond-card.selected .respond-check {
+  border: 2px solid var(--fg-primary); background: var(--fg-primary);
+  box-shadow: inset 0 0 0 4px #fff;
+}
+.respond-card-img { width: auto; height: 96px; object-fit: contain; }
+.respond-card-label { font-size: 16px; font-weight: 700; color: #292929; text-align: center; line-height: 1.45; }
+
+/* ---------------------------------------------------- 기록 (node 509:37) */
+.record { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 28px 0 8px; }
+.record-hero { display: block; }
+.record-title { margin: 24px 0 0; font-size: 24px; font-weight: 900; letter-spacing: -0.5px; color: #111; }
+.record-title .accent { color: #249967; }
+/* 기록 화면에서 '왜 기록하는지'를 밝히는 한 줄(2026-08-09 알파테스트). */
+.record-sub { margin: 12px 0 0; font-size: 16px; line-height: 1.7; color: var(--fg-ink-body); }
+.record-card {
+  width: 100%; margin-top: 22px; padding: 20px;
+  border: 1px solid var(--line); border-radius: 14px; background: #fff;
+}
+.record-badge {
+  display: inline-block; padding: 4px 12px; border-radius: 999px;
+  background: #5c5c5c; color: #fff; font-size: 13px; font-weight: 900;
+}
+.record-message { margin: 14px 0 0; font-size: 17px; line-height: 1.75; color: var(--fg-ink-body); }
+
+.record-btn {
+  width: 100%; min-height: 58px; margin-top: 14px; padding: 0 18px;
+  background: #fff; border: 1px solid var(--fg-primary); border-radius: 15px;
+  color: #176947; font-size: 19px; font-weight: 900; font-family: inherit; cursor: pointer;
+}
+.record-btn.primary { background: var(--fg-primary); border-color: var(--fg-primary); color: #fff; margin-top: 30px; }
+.record-btn:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* ============================================================
+   요청 지연·실패 안내 (2026-08)
+   ★ 타임아웃 30초. 사진 1건이 실측 12초, 질문 생성이 최대 14초라
+     정상 요청도 10초를 넘기는 게 정상이다 - 짧게 잡으면 멀쩡한 요청을 끊는다.
+   ★ 어르신은 '끝나지 않는 화면'을 고장으로 읽고 앱을 닫는다. 그래서
+     (1) 기다리는 중에도 그만둘 수 있고 (2) 끊기면 다시 시도를 준다.
+   ============================================================ */
+.checking-fail {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 40px 0 8px;
+}
+.checking-fail-icon { display: block; opacity: .9; }
+.checking-fail-title {
+  margin: 22px 0 0; font-size: 23px; font-weight: 900; line-height: 1.55;
+  color: var(--text); white-space: pre-line;   /* 문구의 줄바꿈을 그대로 살린다 */
+}
+.checking-fail-msg {
+  margin: 14px 0 0; font-size: 17px; line-height: 1.7; color: var(--text-sub);
+}
+.checking-fail-code { margin: 10px 0 0; font-size: 14px; color: var(--fg-ink-soft); }
+.checking-fail .verify-cta { margin-top: 34px; }
+.checking-fail-quit {
+  width: 100%; min-height: 56px; margin-top: 12px;
+  background: #fff; border: 1px solid var(--line); border-radius: 15px;
+  color: var(--text-sub); font-size: 18px; font-weight: 700; font-family: inherit;
+  cursor: pointer;
+}
+.checking-fail-quit:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+
+/* 로딩 중 '그만두기' - 눈에 띄되 주 동작(기다리기)을 밀어내지 않게 약하게 둔다 */
+.checking2-cancel {
+  display: block; margin: 28px auto 0; min-height: 48px; padding: 0 22px;
+  background: transparent; border: 1px solid var(--line); border-radius: 14px;
+  color: var(--text-sub); font-size: 16px; font-weight: 700; font-family: inherit;
+  cursor: pointer;
+}
+.checking2-cancel:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }

@@ -29,9 +29,24 @@ PHONE_PREFIX_PATTERN = r"(?:01[016789]|070|0[2-6][0-5]?)"
 PHONE_RE = re.compile(
     r"(?<![0-9A-Za-z_])"
     r"(?:\((?P<paren_prefix>" + PHONE_PREFIX_PATTERN + r")\)|"
-    r"(?P<plain_prefix>" + PHONE_PREFIX_PATTERN + r"))"
+    # ★ 2026-08-09: 국번 뒤 닫는 괄호만 쓰는 표기("02)731-2048")를 받는다.
+    #   국내 안내문에서 흔한 형태인데 여는 괄호가 없어 종전 패턴이 놓쳤다.
+    r"(?P<plain_prefix>" + PHONE_PREFIX_PATTERN + r")\)?)"
     r"[ \t]*[-.]?[ \t]*(\d{3,4})"
     r"[ \t]*[-.]?[ \t]*(\d{4})"
+    r"(?![0-9A-Za-z_])"
+)
+# ★ 2026-08-09: 자간이 벌어진 OCR 출력("0 1 0 - 0 4 8 2 - 7 3 6 5") 전용.
+#   PHONE_RE 가 먼저 돌고 남은 것만 여기서 잡는다. 느슨한 패턴이라
+#   replace 쪽에서 (a) 공백을 실제로 포함하고 (b) 숫자 총 10~11자리인
+#   경우로만 한정한다 - 그렇지 않으면 숫자 나열을 전화번호로 오인한다.
+SPACED_PHONE_RE = re.compile(
+    r"(?<![0-9A-Za-z_])"
+    r"(?:0[ \t]*1[ \t]*[016789]|0[ \t]*7[ \t]*0)"
+    r"(?:[ \t]*[-.])?"
+    r"(?:[ \t]*\d){3,4}"
+    r"(?:[ \t]*[-.])?"
+    r"(?:[ \t]*\d){4}"
     r"(?![0-9A-Za-z_])"
 )
 PHONE_POSITIVE_CONTEXT_RE = re.compile(
@@ -53,6 +68,47 @@ RRN_RE = re.compile(
     r"(\d{6})[ \t]*[-./\r\n]?[ \t]*([1-4]\d{6})"
     r"(?![0-9A-Za-z_])"
 )
+
+# ★ 2026-08-09: OCR 혼동문자 정규화 (전화번호·주민번호 **매칭에만** 쓴다)
+#   로컬 OCR(PaddleOCR)이 숫자를 닮은 글자로 잘못 읽는 경우가 실측된다:
+#   O/o→0, l/I→1, 키릴 О→0, 키릴 З→3. 그대로 두면 "O1O-O482-7365" 처럼
+#   사람 눈에는 명백한 전화번호가 정규식을 통째로 비껴간다.
+#
+#   ★ 원칙 두 가지 - 이걸 지켜야 안전하다
+#     1) **매칭에만 쓰고 출력에는 쓰지 않는다.** 치환은 항상 원본 문자열의
+#        같은 위치에 한다. 정규화가 본문을 바꿔 버리면 안 된다.
+#     2) **계좌·카드에는 적용하지 않는다.** 그쪽은 자릿수만 맞으면 걸리는
+#        느슨한 패턴이라, 글자를 숫자로 바꿔 주면 오탐이 늘어난다.
+#        전화·주민번호는 앞자리(01x/07x/0x, 6자리+[1-4])가 형태를 강하게
+#        제약해서 오탐 위험이 낮다.
+#   각 대응이 1글자→1글자라 정규화본과 원본의 **인덱스가 정확히 일치**한다.
+_OCR_CONFUSABLES = {
+    "O": "0", "o": "0", "Ｏ": "0", "О": "0",   # 마지막은 키릴 대문자 О
+    "l": "1", "I": "1", "ｌ": "1",
+    "З": "3",                                  # 키릴 대문자 Ze
+}
+_OCR_TABLE = str.maketrans(_OCR_CONFUSABLES)
+
+
+def _ocr_normalized(text: str) -> str:
+    """OCR 혼동문자를 숫자로 되돌린 사본. 길이·인덱스는 원본과 동일하다."""
+    return text.translate(_OCR_TABLE)
+
+
+def _sub_on_normalized(pattern: re.Pattern, text: str, replace) -> str:
+    """정규화본에서 찾고, 치환은 원본의 같은 구간에 한다.
+
+    replace(match, normalized_source, raw_original) -> str
+    """
+    norm = _ocr_normalized(text)
+    parts: List[str] = []
+    last = 0
+    for m in pattern.finditer(norm):
+        parts.append(text[last:m.start()])
+        parts.append(replace(m, norm, text[m.start():m.end()]))
+        last = m.end()
+    parts.append(text[last:])
+    return "".join(parts)
 
 # 카드번호:
 # 15자리(4-6-5), 16자리(4-4-4-4), 19자리(4-4-4-4-3), 구분자 없는
@@ -188,9 +244,7 @@ def _mask_card_candidates(text: str, found: dict) -> str:
 
 
 def _mask_phone_candidates(text: str, found: dict) -> str:
-    source = text
-
-    def replace(match: re.Match) -> str:
+    def replace(match: re.Match, source: str, raw: str) -> str:
         has_positive = _has_context(
             PHONE_POSITIVE_CONTEXT_RE,
             source,
@@ -209,13 +263,33 @@ def _mask_phone_candidates(text: str, found: dict) -> str:
         # 거리를 쓰지 않는 정책: 전화 문맥이 있으면 마스킹하고, 전화 문맥 없이
         # 부정 문맥만 있으면 일반 번호로 남긴다.
         if not has_positive and has_negative:
-            return match.group(0)
+            return raw
 
         prefix = match.group("paren_prefix") or match.group("plain_prefix")
         _add(found, "phone", f"{prefix}-****-****")
         return f"{prefix}-****-****"
 
-    return PHONE_RE.sub(replace, source)
+    out = _sub_on_normalized(PHONE_RE, text, replace)
+
+    # ★ 자간이 벌어진 잔여분만 2차로 처리한다. 느슨한 패턴이라 가드를 건다:
+    #   공백이 실제로 섞여 있고(그렇지 않으면 위에서 이미 잡혔다),
+    #   숫자가 정확히 10~11자리일 때만 전화번호로 인정한다.
+    def replace_spaced(match: re.Match, source: str, raw: str) -> str:
+        digits = "".join(c for c in match.group(0) if c.isdigit())
+        if " " not in raw and "\t" not in raw:
+            return raw
+        if len(digits) not in (10, 11):
+            return raw
+        if _has_context(PHONE_NEGATIVE_CONTEXT_RE, source, match.start(),
+                        match.end(), PHONE_CONTEXT_WINDOW) and not _has_context(
+                            PHONE_POSITIVE_CONTEXT_RE, source, match.start(),
+                            match.end(), PHONE_CONTEXT_WINDOW):
+            return raw
+        prefix = digits[:3]
+        _add(found, "phone", f"{prefix}-****-****")
+        return f"{prefix}-****-****"
+
+    return _sub_on_normalized(SPACED_PHONE_RE, out, replace_spaced)
 
 
 def _mask_account_candidates(text: str, found: dict) -> str:
@@ -258,11 +332,11 @@ def mask_text(text: str) -> MaskResult:
     out = text
 
     # 1) 주민등록번호 (가장 민감 → 최우선)
-    def _rrn(m: re.Match) -> str:
+    def _rrn(m: re.Match, source: str, raw: str) -> str:
         _add(found, "rrn", "******-*******")
         return "******-*******"
 
-    out = RRN_RE.sub(_rrn, out)
+    out = _sub_on_normalized(RRN_RE, out, _rrn)
 
     # 2) 카드번호
     out = _mask_card_candidates(out, found)

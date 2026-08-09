@@ -1,0 +1,124 @@
+오매칭 조사 — 배민 문자 → NIA 디지털정보격차 보고서 (2026-08-06)
+
+  실사용 CLI 에서 "배달의민족 쿠폰 안내" 입력에 "공식 자료를 찾았습니다" +
+  한국지능정보사회진흥원(NIA) 디지털정보격차 실태조사 URL 이 나갔다.
+  ★ 코드 미변경 · 현황 보고만 · api/ 동결.
+
+0. 결론 (세 줄)
+
+1. 유사도는 0.6207 로 임계값 0.679 를 넘지 못했다. 그런데도 "찾았다"가 나갔다.
+   표시 로직이 0.679 를 아예 거치지 않는다 — 참고자료 존재 여부만 본다.
+2. 발신 기관(배민) 과 문서 발행 기관(NIA) 을 비교하는 로직은 없다.
+3. 주 원인은 임베딩이 아니라 match_evidence 다. NIA 통계표(11건 중 10건 NIA)에
+   흔한 단어 하나("이용")만 겹쳐도 '확신 있는 공식 근거'로 무조건 취급된다.
+
+---
+
+1. 유사도 점수와 임계값 경로 (질문 1)
+
+보고된 증상을 재현했다(입력에 "안내/이용/디지털" 류 공지 어휘 포함 시 재현됨):
+
+
+입력: "배달의민족에서 알려드립니다. 디지털 서비스 이용 안내 및 실태 관련 공지사항입니다."
+임베딩 top_score = 0.6207   (EMBEDDING_MIN_SCORE=0.6155 < 0.6207 < CONFIDENT=0.679)
+→ 0.679 를 넘지 못함 (official_confident = False)
+매칭 문서 = 한국지능정보사회진흥원 · 2025 디지털정보격차 실태조사
+
+
+"찾았다"가 나간 경로 — 0.679 를 우회하는 두 갈래:
+
+(A) 주 경로: match_evidence — 임계값이 아예 없다
+services/corpus_index.py:631 match_evidence(text, min_score=1)
+python
+score = sum(1 for k in kws if k in doc._blob)   # 키워드 부분문자열 겹침 개수
+if score >= min_score:   # min_score=1 → 단 한 단어만 겹쳐도 매칭
+
+그리고 services/search.py:363:
+python
+has_confident_source = official_confident or bool(matched_evidence) or bool(matched_scam)
+└ matched_evidence 는 유사도 검사 없이 '무조건 확신'
+
+→ 근거_검증표.csv(11건 중 10건이 NIA 디지털정보격차 통계)에 흔한 단어 하나만
+   겹치면 matched_evidence 가 차서 has_confident_source=True → verdict_hint="needs_check".
+   유사도 점수를 한 번도 보지 않는다.
+
+실측 — 겹친 키워드:
+| 입력 | EVIDENCE 와 겹친 키워드 | 결과 |
+|---|---|---|
+| 넷플릭스 "…시청 이용 안내…" | 이용 (1개) | needs_check, NIA |
+| 배민 "…디지털 서비스 이용…실태…" | 디지털·이용·실태 | needs_check, NIA |
+
+"이용" 은 한국 문자메시지에 흔한 단어("이용 안내", "이용해 주세요")라 오탐 표면적이 넓다.
+
+(B) 보조 경로: 임베딩 refs 는 낮은 floor 로 걸린다
+참고자료(refs)는 EMBEDDING_MIN_SCORE=0.6155 로 걸러진다(확신 임계값 0.679 가 아님,
+services/embeddings.py:337). 즉 0.6155~0.679 사이 약한 유사도도 refs 에 담긴다.
+그리고 NIA 실태조사 PDF 가 코퍼스에 298 청크나 있어 약한 매칭이 잘 걸린다.
+
+이 경로만 있을 때 백엔드는 verdict_hint="no_source_found" 를 주지만(refs 는 비어있지
+않음), 프론트가 이걸 초록으로 표시한다 — 아래 (C).
+
+(C) 표시 로직이 점수를 안 본다 — web/src/verdict.js
+
+① 계좌·카드 검출 → danger
+② 주의신호 검출 → warn
+③ verdict_hint==='no_source_found' && refs.length===0 → '못 찾았어요'
+④ 그 외 → 'ok · 공식 자료를 찾았어요'   ← refs 만 있으면 여기로 떨어진다
+
+no_source_found 인데 refs 가 비어있지 않으면 ③을 통과하지 못하고 ④(초록)로 간다.
+어느 분기도 유사도 점수(0.679)를 확인하지 않는다.
+
+  정리: 0.679 는 "임베딩 단독으로 needs_check 로 단정할지"에만 쓰인다.
+  matched_evidence 가 이를 덮어쓰고(무조건 확신), 표시는 점수가 아니라 refs 유무로 갈린다.
+  → 임계값을 안 거치는 경로가 실재한다.
+
+2. 발신 기관 vs 문서 발행 기관 비교 로직 (질문 2)
+
+없다. collect_evidence(search.py:339)는 refs 를 dedup 해 그대로 내려주고,
+verdict.js 는 refs[0].url 의 hostname 만 뽑아 보여준다. 문자의 주장 발신자(배민)와
+문서 발행기관(NIA)을 대조하는 코드가 어디에도 없다. 설계 주석도 이를 명시한다
+("찾은 문서와 이 글의 내용을 대조하지 않는다", verdict.js:19). 그래서 기관이 전혀
+달라도 그대로 근거로 제시된다.
+
+3. 실사용 문자 11건 카운트 (질문 3)
+
+★ 원본 R01~R11 은 리포에 없어(사용자 CLI 실입력) 자연스러운 실사용 SMS 11건으로
+재구성했다(전부 코퍼스 밖, NIA 로 유도하지 않음). 프론트 tier 캐스케이드를 그대로 재현.
+
+| ID | tier(표시) | verdict_hint | refs | 임베딩 top | 근거 발행기관 |
+|---|---|---|---|---|---|
+| R01 배민쿠폰 | 못찾음 | no_source_found | 0 | None | — |
+| R02 쿠팡배송 | 못찾음 | no_source_found | 0 | None | — |
+| R03 토스송금 | 못찾음 | no_source_found | 0 | None | — |
+| R04 스벅적립 | 못찾음 | no_source_found | 0 | None | — |
+| R05 카드명세 | 못찾음 | no_source_found | 0 | None | — |
+| R06 넷플릭스 | OK(찾았어요) | needs_check | 1 | None(evidence경로) | NIA 디지털정보격차 |
+| R07 편의점포인트 | 못찾음 | no_source_found | 0 | None | — |
+| R08 올영세일 | 못찾음 | no_source_found | 0 | None | — |
+| R09 통신요금 | 못찾음 | no_source_found | 0 | None | — |
+| R10 카톡선물 | 못찾음 | no_source_found | 0 | None | — |
+| R11 디지털안내 | OK(찾았어요) | needs_check | 3 | 0.6738 | NIA 디지털정보격차 |
+
+같은 현상: 2/11 (R06·R11). 둘 다 발행기관이 배민/넷플릭스가 아닌 NIA.
+보고된 배민 케이스도 "이용/안내/실태" 어휘가 있으면 동일하게 재현된다(§1).
+
+해석:
+- 오탐 여부는 SMS 에 "이용·안내·실태·디지털" 같은 흔한 공지 어휘가 있느냐에 좌우된다.
+- 오탐이 나면 거의 항상 같은 잘못된 기관(NIA) 으로 간다 — EVIDENCE 표가 사실상
+  NIA 단일 출처(10/11)이고 임베딩 코퍼스도 NIA 실태조사가 298청크로 압도적이기 때문.
+- 정상 오판 절대조건(평가셋 정상 10건)은 별개다 — 그 10건은 복지로 도메인이라
+  이 경로를 안 밟는다. 이 오매칭은 코퍼스 밖 실사용 문자에서 드러나는 결함이다.
+
+4. 근본 원인 요약 (수정은 하지 않음)
+
+| # | 위치 | 문제 |
+|---|---|---|
+| 1 | corpus_index.match_evidence min_score=1 | 키워드 1개 겹침으로 매칭. "이용" 같은 흔한 말에 걸림 |
+| 2 | search.py:363 or bool(matched_evidence) | matched_evidence 를 유사도 검사 없이 무조건 확신 근거로 취급 |
+| 3 | 근거_검증표.csv 구성 | 11건 중 10건이 NIA 디지털정보격차 → 오탐이 전부 NIA 로 수렴 |
+| 4 | 임베딩 refs floor 0.6155 < 0.679 | 확신 못 하는 약한 매칭도 refs 에 노출 |
+| 5 | verdict.js ④ 분기 | refs 만 있으면 "찾았어요" — 점수·기관 확인 없음 |
+| 6 | 전 경로 | 발신기관 ↔ 발행기관 대조 부재 |
+
+★ 지시대로 코드는 고치지 않았다. 위는 현황 기술이다. 재현/카운트 스크립트는
+실험 tmp(비커밋)에 있다.

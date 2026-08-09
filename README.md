@@ -12,7 +12,7 @@
 
 시니어가 카카오톡·유튜브에서 받은 의심스러운 정보를 **사진 한 장 또는 링크**로 올리면,
 AI가 **진위를 판정하지 않고** 스스로 확인할 수 있는 **질문을 하나씩** 던져 판단을 돕습니다.
-판단이 끝나면 **오판유형을 태깅**해, 다음 날 **5분 훈련**으로 연결합니다.
+판단이 끝나면 **확인 취약 유형을 태깅**해, 다음 날 **5분 훈련**으로 연결합니다.
 
 ### 왜 판정하지 않는가
 
@@ -36,10 +36,32 @@ S2 확인 중     OCR → 개인정보 마스킹 → 공공데이터 대조 → 
    ↓
 S3 질문 카드   ★ AI 질문(파란 영역) + 실제 출처 링크(초록 영역)를 시각적으로 분리
    ↓
-S4 판단 기록   '진짜/가짜'가 아니라 '내가 어떻게 할지'를 고른다 → 오판유형 태깅
+S4 판단 기록   '진짜/가짜'가 아니라 '내가 어떻게 할지'를 고른다 → 확인 취약 유형 태깅
    ↓
 S5 훈련/리포트 5분 훈련 카드 + 주간 리포트(가족 공유)
 ```
+
+---
+
+## 심사위원 3분 데모
+
+1. 배포 주소 <https://gyeotnun.duckdns.org> 에 접속합니다.
+2. 예시 문자(사기 의심 문구)를 입력하거나 카톡 캡처를 올립니다.
+3. **확인 질문 카드**가 뜨는지 봅니다 — 진위를 판정하지 않고, 스스로 확인할 질문을 하나씩 줍니다.
+4. 외부 API 장애 시 주소 끝에 `?mock=1` 을 붙이면 고정 응답으로 폴백해 데모가 이어집니다.
+
+---
+
+## 검증 결과 (예선 평가 세트 30건)
+
+| 지표 | 결과 |
+|---|---|
+| 근거 검색 성공률 | 15/18 (83.3%) |
+| Top-3 정답 포함 | 13/18 (72.2%) |
+| 잘못된 근거 제시 | 0건 |
+| 확인불가 정확 처리 | 7/8 |
+
+라벨 정의·재현 절차: [`docs/evaluation/label_reclassification_20260810.md`](docs/evaluation/label_reclassification_20260810.md)
 
 ---
 
@@ -74,6 +96,19 @@ docker compose --profile prod up -d --build   # api + db + nginx + certbot
 
 ---
 
+## 새로 클론한 환경에서
+
+검색 대상 문서와 색인은 저장소에 포함하지 않았습니다. 수집한
+공공기관 자료 가운데 상당수가 개별 이용 조건 확인이 필요한
+상태여서, 확인이 끝나기 전까지 공개 저장소에 재배포하지 않기로
+했습니다.
+
+따라서 새로 클론한 환경에서는 근거 검색 결과가 0건으로 나옵니다.
+키워드 검색으로 전환되더라도 검색 대상 문서 자체가 없기 때문입니다.
+서비스 동작은 배포된 주소에서 확인하실 수 있습니다.
+
+---
+
 ## 3. mock 사용법 ★ 가장 먼저 읽을 것
 
 **모든 엔드포인트는 `?mock=1` 을 붙이면 `api/mocks/fixtures.py` 의 고정 응답을 돌려줍니다.**
@@ -88,10 +123,7 @@ curl -X POST "http://localhost:8000/api/v1/checks?mock=1" -F "device_id=demo"
 주소창 쿼리 `?mock=1`/`?mock=0` > 환경변수 `VITE_USE_MOCK=1`(`web/.env.example`
 참고) > 기본값(false). 개발 중 백엔드 없이 화면만 보고 싶으면 `?mock=1` 을 붙이세요.
 
-왜 mock 토글 자체는 남겨 뒀는가
-1. 프론트(조희진)가 백엔드 없이도, 또는 특정 화면만 빠르게 볼 때 쓸 수 있다.
-2. API 키가 없는 환경에서도 개발이 멈추지 않는다.
-3. **시연 중 외부 API가 죽어도 `?mock=1` 로 즉시 폴백해 데모를 이어갈 수 있다.**
+**시연 중 외부 API가 죽어도 `?mock=1` 로 즉시 폴백해 데모를 이어갈 수 있습니다.**
 
 mock 이 아닐 때 키가 없으면 **501 + 안내 메시지**를 돌려줍니다(서버가 죽지 않음).
 
@@ -102,19 +134,9 @@ mock 이 아닐 때 키가 없으면 **501 + 안내 메시지**를 돌려줍니�
 
 ---
 
-## 4. 폴더별 담당자
+## 4. 팀 · 기여
 
-| 담당 | 영역 | 주요 파일 |
-|---|---|---|
-| **박진** | 인식 · 마스킹 | `api/services/ocr.py`, `api/services/masking.py` |
-| **김유리** | 검색 · 공공데이터 대조 | `api/services/search.py` |
-| **김태희** | 프롬프트 (판정 억제) | `api/services/prompt_chain.py` |
-| **장지석** | 태깅 · RAG · 코퍼스 | `api/services/tagger.py`, `api/services/rag.py`, `corpus/` |
-| **조희진** | 프론트 | `web/` 전체 |
-| **박진영** | API · DB · 배포 | `api/main.py`, `api/routers/`, `api/models/`, `docker-compose.yml`, `deploy/` |
-
-> 남의 폴더를 고쳐야 하면 먼저 담당자에게 말하세요.
-> 단, `api/models/schemas.py`(계약서)는 **바꾸기 전에 반드시 팀 채널 공지**.
+폴더별 담당자·협업 규칙은 [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) 참고.
 
 ---
 
@@ -129,7 +151,7 @@ Base URL: 로컬 `http://localhost:8000/api/v1` · 배포 `https://gyeotnun.duck
 | `POST` | `/checks` | multipart(image·link·text + device_id) 업로드 → 텍스트 추출 + 마스킹 | 박진 |
 | `GET` | `/checks/{id}/evidence` | 공공데이터 대조 + 검색 결과 | 김유리 |
 | `POST` | `/checks/{id}/dialogue` | 확인 질문 1개 생성 (판정 억제) | 김태희 |
-| `POST` | `/checks/{id}/verdict` | 사용자 판단 기록 + 오판유형 태깅 | 장지석 |
+| `POST` | `/checks/{id}/verdict` | 사용자 판단 기록 + 확인 취약 유형 태깅 | 장지석 |
 | `GET` | `/training/today` | 오늘의 5분 훈련 카드 | 장지석 |
 | `GET` | `/reports/weekly` | 주간 리포트 | 박진영 |
 | `POST` | `/onboarding/diagnosis` | 첫 실행 3문항 진단 | 장지석 |
@@ -146,28 +168,12 @@ Base URL: 로컬 `http://localhost:8000/api/v1` · 배포 `https://gyeotnun.duck
  "masked_items":[{"type":"phone","original_hint":"010-****-****","count":1}],
  "detected_domain":"policy","status":"extracted"}
 
-// GET /checks/{id}/evidence   ★ verdict_hint 에 true/false 는 없다
-{"check_id":"chk_demo","verdict_hint":"partially_matched",   // needs_check | partially_matched | no_source_found
- "signals":[{"key":"number_mismatch","label":"...","severity":"attention"}],
- "references":[{"title":"...","url":"https://...","publisher":"보건복지부","source_type":"gov"}]}
-
 // POST /checks/{id}/dialogue  요청 {"turn":1,"user_reply":null}
 {"turn":1,"question":"두 문장 이내 질문","why":"이 질문을 하는 이유",
  "evidence_refs":["https://..."],"options":[{"id":"found","label":"..."}],"is_final":false}
-
-// POST /checks/{id}/verdict   요청 {"decision":"hold","reason_tags":[]}
-// decision: apply | not_apply | hold | ask_family
-{"check_id":"chk_demo","tagged_error_type":"number_condition","confidence":0.82,"message":"..."}
-// tagged_error_type: title_dependent | authority_impersonation | number_condition | overgeneralization
-
-// GET /training/today
-{"card_id":"...","target_error_type":"number_condition","content":"...",
- "items":[{"id":"a","label":"..."}],"answer":"a","explanation":"...","estimated_sec":300}
-
-// GET /reports/weekly
-{"week":"2026-W30","checks_count":4,"training_completed":5,
- "error_type_trend":{"number_condition":2},"streak_days":5,"message":"..."}
 ```
+
+전체 스키마: `/docs` (Swagger)
 
 ---
 
@@ -243,12 +249,16 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 | `users` | 비회원 사용자 (device 해시, 취약 유형, 연속 일수) |
 | `checks` | 확인 요청 1건 (**마스킹 텍스트만** 저장) |
 | `evidence` | 검색·대조 결과 (verdict_hint, signals, references) |
-| `taggings` | 사용자 판단 + 오판유형 태깅 |
+| `taggings` | 사용자 판단 + 확인 취약 유형 태깅 |
 | `training_cards` | 5분 훈련 카드 |
-| `corpus` | 공공데이터 577건 |
+| `corpus` | 공공데이터 문서 (규모는 표 아래 참고) |
 | `weekly_reports` | 주간 리포트 스냅샷 |
 | `events` | 사용자 행동 계측 (화면 진입/이탈·클릭·오류 - **입력 내용 없음**, device 해시만) |
 | `error_logs` | 장애 로그(2026-08) - 코드/화면/device 해시/짧은 진단정보만, **개인정보 없음** |
+
+> **코퍼스 규모**
+> - 라이브 인덱스 1,052문서 / 2,012청크 (기획서 평가 기준, 현재 서빙 중인 검색 인덱스)
+> - 디스크 재구성본 1,017 / 2,065 는 차기 인덱스 빌드 예정 (현재 검색 미반영)
 
 ### 오류 코드 체계 (2026-08 추가, 8/2 보안 멘토링 지시사항)
 
@@ -285,42 +295,52 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 
 ---
 
-## 10. 협업 규칙
-
-1. **매일 push.** 로컬에만 두고 자면 다음 날 합칠 수 없습니다.
-2. **`.env` 절대 커밋 금지.** 커밋 전 `git status` 로 확인하는 습관.
-3. **브랜치: `feat/{모듈}`** — `feat/ocr`, `feat/search`, `feat/prompt`, `feat/tagger`, `feat/web`, `feat/api`
-4. `main` 직접 push 금지. PR → 담당자 1명 확인 → merge.
-5. `models/schemas.py` (API 계약) 수정은 **팀 채널 공지 필수.**
-6. 커밋 메시지: `feat(ocr): Vision OCR 연동` / `fix(web): 버튼 높이 56px 미달 수정`
-7. 막히면 30분 안에 물어보기. 혼자 붙잡고 있는 시간이 가장 비쌉니다.
-
----
-
 ## 11. 지금 상태
 
 **동작함 (키 없이)**
 - 전 엔드포인트 `?mock=1` 응답 · `validate_question()` 판정 억제 검증 ·
-  텍스트 마스킹(전화/계좌/주민/카드) · 규칙 기반 신호 탐지 · 오판유형 태깅 ·
+  텍스트 마스킹(전화/계좌/주민/카드) · 규칙 기반 신호 탐지 · 확인 취약 유형 태깅 ·
   샘플 훈련카드 3장 · 프론트 5개 화면 전체 플로우
 
 **동작함 (ANTHROPIC_API_KEY 필요, `?mock=0`)**
-- 이미지 인식: Claude Vision 으로 카톡 캡처 본문 추출 → masking 적용
-  (별도 Google Vision 키 불필요, `services/ocr.py`)
+- 이미지 인식과 근거 검색은 자체 서버의 로컬 모델로 처리합니다.
+  외부 인공지능 서비스는 확인 질문을 생성하는 단계에서만 사용하며,
+  이때 전달되는 것은 개인정보가 제거된 문장뿐입니다.
+
+  ```
+  이미지 인식   PaddleOCR (자체 서버)
+  근거 검색     e5-small-ko-v2 (자체 서버)
+  질문 생성     Claude API
+  ```
+- 근거 검색: `dragonkue/multilingual-e5-small-ko-v2`(384차원) 임베딩 + BM25
+  자동 폴백. 평가 세트 실측 근거 검색 성공률 15/18건(83.3%),
+  잘못된 근거 제시 0건 (`services/search.py`, `services/corpus_index.py`)
 - 질문 생성: Claude(`claude-sonnet-5`)로 실제 호출 + 재생성 루프 + 프롬프트 캐싱
   (`services/prompt_chain.py`)
 - 근거 대조: `근거_검증표`/`평가세트`/`사례_재라벨링표` CSV 로컬 인덱스 대조 +
-  공공데이터 996건 대상 **Upstage Solar Embedding 검색을 채택해 프로덕션
-  적용**(`services/embeddings.py`, `search.match_official_docs_safe`). BM25
-  단독 대비 정상 근거매칭 7/10→10/10, Recall@3 30%→65%, 경계 확인불가
-  1/10→3/10(정상 오판은 0/10 그대로 유지)로 전 지표 개선. 임베딩 API 장애·
-  타임아웃(3초) 시 로컬 BM25 검색(`services/corpus_index.py`)으로 자동
-  폴백하며 그 사실을 로그로 남긴다 - 발표 당일 외부 API 의존 리스크에 대한
-  "공짜 보험". RRF 하이브리드 결합(`search.match_official_docs_hybrid`)은
-  벤치마크 결과 임베딩 단독보다 나은 지표가 없어 미채택했지만, 코드는
-  삭제하지 않고 남겨 뒀다. 근거·비교표는
-  [`docs/evaluation/hybrid_search_report.md`](docs/evaluation/hybrid_search_report.md).
-- 오판유형 태깅: Claude 프롬프팅 기반 분류(`services/tagger.py` `tag_error_type_llm`),
+  공공데이터 대상 **임베딩 검색을 채택해 프로덕션 적용**(`services/embeddings.py`,
+  `search.match_official_docs_safe`). BM25 단독 대비 정상 근거매칭 7/10→10/10,
+  Recall@3 30%→65%, 경계 확인불가 1/10→3/10(정상 오판은 0/10 그대로 유지).
+  - **★ 2026-08-04 부터 임베딩은 자체 서버의 로컬 모델로 돈다** —
+    `EMBEDDING_PROVIDER = "local"`, `dragonkue/multilingual-e5-small-ko-v2`
+    (Apache-2.0, 384차원). 30건 재측정에서 Upstage 대비 Recall@3 0.65 동일,
+    근거검색 0.867→0.900 로 오히려 개선, 정상 10건 오판 0/10 유지, 질의
+    112ms→141ms. 바꾼 가장 큰 이유는 성능이 아니라 개인정보다 - **사용자
+    질의 텍스트가 외부 API 로 나가지 않는다.** 로컬 후보 5종 중 유일하게
+    정상/경계 유사도가 분리돼(정상min 0.6820 > 경계max 0.6760) 확신 판정이
+    가능했다. 근거는
+    [`docs/evaluation/local_embeddings_report.md`](docs/evaluation/local_embeddings_report.md).
+  - 롤백 경로는 살려 뒀다: `embeddings.py` 의 `EMBEDDING_PROVIDER` 를
+    `"upstage"` 로 되돌리면 Upstage Solar Embedding 경로가 그대로 다시 돈다
+    (`_embed_upstage()` 미삭제, `UPSTAGE_API_KEY` 는 그때만 필요).
+  - 임베딩을 쓸 수 없을 때(인덱스 파일 없음·모델 로드 실패·질의 3초 타임아웃)는
+    로컬 BM25 검색(`services/corpus_index.py`)으로 자동 폴백하며 그 사실을
+    로그로 남긴다.
+  - RRF 하이브리드 결합(`search.match_official_docs_hybrid`)은 벤치마크 결과
+    임베딩 단독보다 나은 지표가 없어 미채택했지만, 코드는 삭제하지 않고 남겨 뒀다.
+    비교표는
+    [`docs/evaluation/hybrid_search_report.md`](docs/evaluation/hybrid_search_report.md).
+- 확인 취약 유형 태깅: Claude 프롬프팅 기반 분류(`services/tagger.py` `tag_error_type_llm`),
   실패 시 규칙 기반으로 자동 폴백
 - PWA: 아이콘·Web Share Target·service worker 적용, 설치 조건 실측 통과
 - **배포: <https://gyeotnun.duckdns.org> 로 실제 서비스 중.** 자세한 내용은
@@ -328,10 +348,9 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 
 **TODO (담당자별)**
 - 박진: 링크 본문 추출, 얼굴 블러
-- 김유리: 네이버 검색 API 연동(현재는 로컬 CSV 대조까지). 임베딩 검색은 채택·
-  프로덕션 적용 완료(위 항목 참고)
+- 김유리: 네이버 검색 API 연동
 - 김태희: 프롬프트 튜닝(질문 길이 등)
-- 장지석: 공공데이터 577건 수집·변환, 코퍼스→훈련카드 자동 생성
+- 장지석: 공공데이터 수집·변환, 코퍼스→훈련카드 자동 생성
 - 조희진: iOS 대체 경로 실기기 테스트(Share Target 은 Android Chrome 전용)
 - 박진영: 메모리 저장소 → DB 세션 교체, Alembic
 
@@ -364,3 +383,16 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
   보다 1MB 여유를 둬서, 10~11MB 구간은 nginx 기본 에러 페이지 대신 앱의 안내
   메시지가 뜨게 했다).
 - 자세한 절차·트러블슈팅: [`deploy/README.md`](deploy/README.md)
+
+---
+
+## 알려진 한계
+
+- 기록 조회의 소유자 대조는 화면이 보내는 기기 식별자에 기대고
+  있습니다. 서버가 발급하는 인증은 본선 단계에서 적용합니다.
+- 확인 기록을 프로세스 메모리에 보관하므로 처리 프로세스가
+  하나입니다. 여러 이용자가 동시에 요청하면 순서대로 처리됩니다.
+- 생성된 질문이 입력에 없는 내용을 전제하는지는 아직 검사하지
+  않습니다.
+- 발신자명이 채팅 화면 상단에 있을 때 말풍선 영역 밖으로 판단해
+  인식하지 못하는 경우가 있습니다.

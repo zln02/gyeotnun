@@ -1,0 +1,19 @@
+# 로컬 OCR·임베딩 실험 전용 격리 이미지 (2026-08)
+# ★ docker-compose 서비스가 아니다 - 운영 중인 gyeotnun-api 와 완전히 분리된
+#   일회성 컨테이너로만 띄운다(메모리 제한을 걸어 운영 스택에 영향이 없게 한다).
+#   빌드/실행: deploy 문서 대신 이 세션의 벤치마크 스크립트가 직접 docker build/run 한다.
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        tesseract-ocr tesseract-ocr-kor \
+        fonts-nanum \
+        libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt requirements-local-experiment.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-local-experiment.txt
+
+# api/ 코드는 실행 시 read-only 볼륨으로 마운트한다(이미지에 굽지 않음 - 코드
+# 변경마다 재빌드하지 않기 위해서다. corpus/ 도 마찬가지로 마운트한다).
+CMD ["sleep", "infinity"]

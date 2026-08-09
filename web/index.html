@@ -4,11 +4,20 @@
     <meta charset="UTF-8" />
     <!-- ★ 시니어 UX: user-scalable=no 금지. 확대를 막으면 안 된다. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#1B4D8F" />
+    <!-- 안드로이드 크롬 주소창·작업 전환기 색. 옛 파랑이라 앱만 초록이고
+         브라우저 껍데기는 파란 채로 남아 있었다. -->
+    <meta name="theme-color" content="#47D899" />
     <meta name="description" content="곁눈 - 받은 정보를 스스로 확인하도록 돕는 서비스" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="icon" href="/icon-192.png" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <!-- ★ 파일 이름을 icon-* 에서 logo-* 로 바꾼 이유: 브라우저와 iOS 는 파비콘·홈
+         화면 아이콘을 URL 기준으로 아주 오래 캐시한다. 같은 이름으로 그림만 바꾸면
+         옛 파란 눈이 그대로 남는다. 이름을 바꿔야 확실히 새로 받아간다. -->
+    <!-- 탭 파비콘은 16px 까지 줄어든다. logo-192 는 홈 화면용이라 여백이 넓어
+         16px 에서 콩이 너무 작았다 - 탭 전용으로 여백을 줄인 판을 따로 쓴다. -->
+    <link rel="icon" type="image/png" href="/logo-favicon.png" />
+    <!-- ★ apple-touch-icon 은 투명 배경 금지. iOS 는 투명 영역을 검정으로 합성해서
+         흰 여백이 검게 나온다. logo-192.png 는 흰 불투명 배경으로 만들었다. -->
+    <link rel="apple-touch-icon" href="/logo-192.png" />
     <title>곁눈 - 함께 확인해요</title>
   </head>
   <body>

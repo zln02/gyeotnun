@@ -1,0 +1,77 @@
+# 제출 전 최종 보안·운영 하드닝 (2026-08-06)
+
+IDOR 최소 수정(`idor_live_test_2026-08-06.md`)에 이어, 스코프 밖으로 남겨 뒀던
+항목과 운영 하드닝을 **한 배치로** 처리하고 마지막으로 배포했다.
+
+## 사전 확인 — 5432 / AWS 보안그룹
+
+| 확인 | 결과 |
+|---|---|
+| 호스트 `0.0.0.0:5432` 노출 | **없음** — 인터넷 도달 불가 확정 |
+| `127.0.0.1:5432` 리슨 | 존재하나 **호스트 postgres(pid 1412053), 루프백 전용**. gyeotnun 도커 db 아님 |
+| gyeotnun 도커 db 포트 바인딩 | `{}` (매핑 없음) — **내부 도커 네트워크 전용**(api → `db:5432`) |
+| AWS 보안그룹 | **코드로 확인 불가**(aws CLI 없음). 콘솔에서 5432 인바운드 미허용 확인 권장 — 다만 위 바인딩상 SG 와 무관하게 외부 도달 불가 |
+
+## 1. GET /errors/summary — ADMIN_TOKEN 게이트
+
+events/summary 와 **같은 게이트**(`_common.require_operator`)를 적용했다. 한쪽만
+막으면 다른 쪽으로 새어 "운영자 전용"이라 부를 수 없기 때문이다.
+- `/errors/summary`: ADMIN_TOKEN 미설정 시 닫힘(404), 올바른 토큰만 200.
+- `/errors/codes`: **공개 유지**(프론트가 오류 문구 단일 소스로 사용). 정적 코드표라 인증 대상 아님.
+- 게이트를 `_common.py` 로 공용화하고 events/summary 도 그것을 쓰도록 정리.
+
+검증: 무토큰 404 / 틀린 토큰 404 / 올바른 토큰 200(events·errors 둘 다) / codes 200.
+프론트·테스트에 `/errors/summary` 호출부 없음 → 백엔드만 수정(프론트 선행 불필요).
+
+## 2. create_check 의 device_id 기본값 처리
+
+**거부**를 택했다. `require_owner` 에서 요청자 또는 소유자가 빈값/기본값이면
+거부한다(`_NON_OWNER_IDS`). 정상 프론트는 항상 실제 UUID(`deviceId()`)를 보내므로
+정상 흐름을 깨지 않는다(실측 확인: UUID 소유자 200, 익명 조회 404). 그렇게 만들어진
+기록은 아무도 못 읽는다(안전한 실패). 이미 저장된 기록도 무력화된다.
+
+## 3. 보관 기간 삭제 잡 (events / error_logs, 90일)
+
+무기한 축적을 막는다. `tools/purge_old_records.py` + `settings.RETENTION_DAYS`(기본 90)
++ 호스트 cron 매일 04:00.
+- 대상은 관측 로그 2종만(checks 등 서비스 데이터는 현재 DB 미사용 = 인메모리). DB 이관 시 여기 추가.
+- created_at 은 naive UTC 라 컷오프도 UTC. 멱등.
+- 검증: 합성 100일 전 행 삽입 → purge → **events/error_logs old 삭제(각 1건), 최근 행 보존**.
+
+cron:
+```
+0 4 * * * cd /home/ubuntu/gyeotnun && sudo docker compose exec -T api python tools/purge_old_records.py >> deploy/purge.log 2>&1
+```
+
+## 4. python-multipart 0.0.20 → 0.0.32 (>=0.0.31)
+
+`requirements.txt` 상향 후 api 이미지 재빌드. **업로드 경로 실측**:
+- 1x1 PNG → EX-001(비전 API가 이미지 거부) — graceful.
+- 글자 PNG → RC-001(OCR 미인식) — graceful.
+- 깨진 multipart → 400 "parsing the body" (대조군, 구분됨).
+→ 파싱은 정상 동작하고 바이트가 OCR 까지 전달됨을 확인. 500/파싱오류 없음.
+
+## 5. --reload 제거, 워커 수
+
+compose `command` 에서 `--reload` 제거, `--workers 1` 명시.
+- ★ **워커를 1보다 늘리지 않았다.** checks 흐름이 프로세스 메모리(`_MEMORY_STORE`)에
+  의존해, 워커를 늘리면 create 한 워커와 evidence/dialogue 를 받는 워커가 달라져
+  404 가 난다(코드상 확정). 다중 워커는 저장소를 DB/Redis 로 옮긴 뒤라야 한다(제출 후 과제).
+- 검증: 실행 커맨드에 `--reload` 없음·`--workers 1` 확인. **동시 요청 5건**(각 create→evidence
+  전체 흐름) **전부 HTTP 200**. 단일 워커라 직렬화되지만 모두 성공 — 다중 워커였다면 일부 404.
+
+## 회귀 검증 (4·5 배포 후)
+
+- 평가셋 30건: 사칭 위험신호 10/10, 정상 오판 0, 홀드아웃 실패 0, 채택 가능 예 — **불변**.
+- 라이브(nginx→api) 엔드투엔드: 홈 200 / 소유자 200 / 타인 404 / errors/summary 404 / errors/codes 200.
+- pytest: 79 passed(앱 코드 변경분 기준). 
+
+## CSP
+
+지시대로 **건드리지 않았다**(프론트 파손 위험, 롤백 시간 없음).
+
+## 남은 과제 (제출 후)
+
+제출 후 과제와 근본 인증 관련 잔여 항목은 공개 저장소에 두지 않고 별도로 관리한다.
+운영 점검용으로 한 가지만 남긴다: AWS 보안그룹에서 5432/기타 인바운드를 콘솔에서
+확인할 것(현재 포트 바인딩상 외부 도달은 불가하나 콘솔 확인 권장).
