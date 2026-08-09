@@ -65,6 +65,18 @@ export default function Decision({ checkId, onTraining, onHome }) {
       <div className="record">
         <img src={recordDone} width="120" height="120" alt="" aria-hidden="true" className="record-hero" />
         <h2 className="record-title">응답을 <span className="accent">기록</span>해 두었어요</h2>
+        {/* ★ 2026-08-09 알파테스트: 제목만 있어서 "왜 기록하는지"가 없었고,
+            그래서 데이터 수집처럼 읽혔다. 기록이 사용자에게 무엇을 해 주는지
+            한 줄로 밝힌다.
+            ★ 문구 주의: "다음에 비슷한 문자가 오면 저희가 먼저 확인해 드릴게요"
+              라고 쓰면 안 된다. 지금 태깅 결과는 어디에도 저장되지 않고
+              (verdict 라우터에 DB 쓰기가 없다) 다음 판단에 쓰이지도 않는다.
+              지킬 수 없는 약속이라 '확인해 보세요'(사용자가 하는 일)로 적는다.
+              저장·재사용이 실제로 붙으면 그때 문구를 올린다. */}
+        <p className="record-sub">
+          이 글에서 헷갈리기 쉬웠던 부분을 아래에 정리했어요.<br />
+          다음에 비슷한 문자가 오면 이 부분을 먼저 확인해 보세요.
+        </p>
         <div className="record-card">
           <span className="record-badge">
             {ERROR_TYPE_LABEL[result.tagged_error_type] || '확인이 필요한 글'}
@@ -91,9 +103,14 @@ export default function Decision({ checkId, onTraining, onHome }) {
       </div>
 
       <div className="respond-sheet">
+        {/* ★ 2026-08-09: 종전 문구 "응답은 더 좋은 연습을 만들기 위해 활용됩니다" 를
+            바꿨다. (1) 데이터 수집 고지처럼 읽혔고 (2) 사실도 아니다 - 고른 답은
+            어디에도 쌓이지 않는다. 실제로 일어나는 일만 적는다: 고른 답에 맞춰
+            무엇을 확인하면 좋을지 바로 알려 준다(tagger.build_message 가
+            decision 별로 문구를 만든다). */}
         <p className="respond-note">
           정답은 없습니다<br />
-          응답은 더 좋은 연습을 만들기 위해 활용됩니다
+          고르신 답에 맞춰 무엇을 확인하면 좋을지 알려드려요
         </p>
 
         {error && <div className="error-box">{error}</div>}

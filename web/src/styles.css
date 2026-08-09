@@ -1780,6 +1780,8 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 .record-hero { display: block; }
 .record-title { margin: 24px 0 0; font-size: 24px; font-weight: 900; letter-spacing: -0.5px; color: #111; }
 .record-title .accent { color: #249967; }
+/* 기록 화면에서 '왜 기록하는지'를 밝히는 한 줄(2026-08-09 알파테스트). */
+.record-sub { margin: 12px 0 0; font-size: 16px; line-height: 1.7; color: var(--fg-ink-body); }
 .record-card {
   width: 100%; margin-top: 22px; padding: 20px;
   border: 1px solid var(--line); border-radius: 14px; background: #fff;
