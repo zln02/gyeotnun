@@ -310,16 +310,28 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 - 질문 생성: Claude(`claude-sonnet-5`)로 실제 호출 + 재생성 루프 + 프롬프트 캐싱
   (`services/prompt_chain.py`)
 - 근거 대조: `근거_검증표`/`평가세트`/`사례_재라벨링표` CSV 로컬 인덱스 대조 +
-  공공데이터 996건 대상 **Upstage Solar Embedding 검색을 채택해 프로덕션
-  적용**(`services/embeddings.py`, `search.match_official_docs_safe`). BM25
-  단독 대비 정상 근거매칭 7/10→10/10, Recall@3 30%→65%, 경계 확인불가
-  1/10→3/10(정상 오판은 0/10 그대로 유지)로 전 지표 개선. 임베딩 API 장애·
-  타임아웃(3초) 시 로컬 BM25 검색(`services/corpus_index.py`)으로 자동
-  폴백하며 그 사실을 로그로 남긴다 - 발표 당일 외부 API 의존 리스크에 대한
-  "공짜 보험". RRF 하이브리드 결합(`search.match_official_docs_hybrid`)은
-  벤치마크 결과 임베딩 단독보다 나은 지표가 없어 미채택했지만, 코드는
-  삭제하지 않고 남겨 뒀다. 근거·비교표는
-  [`docs/evaluation/hybrid_search_report.md`](docs/evaluation/hybrid_search_report.md).
+  공공데이터 대상 **임베딩 검색을 채택해 프로덕션 적용**(`services/embeddings.py`,
+  `search.match_official_docs_safe`). BM25 단독 대비 정상 근거매칭 7/10→10/10,
+  Recall@3 30%→65%, 경계 확인불가 1/10→3/10(정상 오판은 0/10 그대로 유지).
+  - **★ 2026-08-04 부터 임베딩은 자체 서버의 로컬 모델로 돈다** —
+    `EMBEDDING_PROVIDER = "local"`, `dragonkue/multilingual-e5-small-ko-v2`
+    (Apache-2.0, 384차원). 30건 재측정에서 Upstage 대비 Recall@3 0.65 동일,
+    근거검색 0.867→0.900 로 오히려 개선, 정상 10건 오판 0/10 유지, 질의
+    112ms→141ms. 바꾼 가장 큰 이유는 성능이 아니라 개인정보다 - **사용자
+    질의 텍스트가 외부 API 로 나가지 않는다.** 로컬 후보 5종 중 유일하게
+    정상/경계 유사도가 분리돼(정상min 0.6820 > 경계max 0.6760) 확신 판정이
+    가능했다. 근거는
+    [`docs/evaluation/local_embeddings_report.md`](docs/evaluation/local_embeddings_report.md).
+  - 롤백 경로는 살려 뒀다: `embeddings.py` 의 `EMBEDDING_PROVIDER` 를
+    `"upstage"` 로 되돌리면 Upstage Solar Embedding 경로가 그대로 다시 돈다
+    (`_embed_upstage()` 미삭제, `UPSTAGE_API_KEY` 는 그때만 필요).
+  - 임베딩을 쓸 수 없을 때(인덱스 파일 없음·모델 로드 실패·질의 3초 타임아웃)는
+    로컬 BM25 검색(`services/corpus_index.py`)으로 자동 폴백하며 그 사실을
+    로그로 남긴다.
+  - RRF 하이브리드 결합(`search.match_official_docs_hybrid`)은 벤치마크 결과
+    임베딩 단독보다 나은 지표가 없어 미채택했지만, 코드는 삭제하지 않고 남겨 뒀다.
+    비교표는
+    [`docs/evaluation/hybrid_search_report.md`](docs/evaluation/hybrid_search_report.md).
 - 오판유형 태깅: Claude 프롬프팅 기반 분류(`services/tagger.py` `tag_error_type_llm`),
   실패 시 규칙 기반으로 자동 폴백
 - PWA: 아이콘·Web Share Target·service worker 적용, 설치 조건 실측 통과

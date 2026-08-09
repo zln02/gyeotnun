@@ -69,8 +69,15 @@ class Settings:
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     NAVER_CLIENT_ID: str = os.getenv("NAVER_CLIENT_ID", "")
     NAVER_CLIENT_SECRET: str = os.getenv("NAVER_CLIENT_SECRET", "")
-    # 임베딩 검색(services/embeddings.py) - 공식 문서 청크 벡터 인덱스 구축·질의용.
-    # Upstage Solar Embedding (한국어 특화, 국내 API) - 2026-08 Voyage 에서 전환.
+    # ★ 현재 미사용(롤백용). 평소에는 비워 둬도 된다.
+    #   임베딩 검색은 2026-08-04 부터 **자체 서버의 로컬 모델**로 돈다:
+    #     services/embeddings.py:57  EMBEDDING_PROVIDER = "local"
+    #     모델 dragonkue/multilingual-e5-small-ko-v2 (Apache-2.0, 384차원)
+    #   → 질의 텍스트가 외부 API 로 나가지 않는다. 이 키는 호출되지 않는다
+    #     (embeddings.py:168 이 local 이면 _embed_local 로 즉시 분기).
+    #   이 키가 필요해지는 경우는 하나뿐이다: EMBEDDING_PROVIDER 를 "upstage" 로
+    #   되돌리는 롤백. 그때 쓸 Upstage Solar Embedding(한국어 특화 국내 API) 코드는
+    #   embeddings.py 에 그대로 보존돼 있다.
     UPSTAGE_API_KEY: str = os.getenv("UPSTAGE_API_KEY", "")
     # 더 이상 쓰지 않는다: 이미지 인식이 Claude Vision(ANTHROPIC_API_KEY)으로
     # 옮겨 가면서 별도 Vision 키가 필요 없어졌다(services/ocr.py). 과거 .env 에
