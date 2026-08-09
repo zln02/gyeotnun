@@ -116,6 +116,17 @@ ERROR_CODES: List[ErrorCodeDef] = [
         "internal_handling": "services/tagger.py tag_error_type_llm() 실패 시 tag_error_type() 규칙 기반으로 "
                               "대체(기존 폴백, 동작 변경 없음). log_incident() 로 서버가 빈도를 인지한다.",
     },
+    {
+        "code": "GN-003",
+        "area": "생성",
+        "situation": "최근 질문 생성 중 기본 질문으로 대체된 비율이 임계(50%)를 넘음 "
+                     "- 개별 실패가 아니라 '반복되고 있다'는 상태 경고",
+        "user_message": "",
+        "recovery": "사용자 조치 불필요. 팀이 외부 LLM 상태(잔액·장애·레이트리밋)를 점검한다.",
+        "internal_handling": "routers/dialogue.py 가 최근 N건의 fallback 여부를 세어 임계를 넘으면 "
+                              "1회 경고한다(동작 변경 없음, 관측만). 2026-08-09 추가 - 크레딧 소진으로 "
+                              "8시간 동안 폴백률 100% 였는데 아무도 인지하지 못한 사건에서 나왔다.",
+    },
     # ══════════════════════════════════════════════════════════ 저장 (ST)
     {
         "code": "ST-001",
