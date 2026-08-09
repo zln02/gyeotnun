@@ -36,7 +36,9 @@ export default function Judgment({ evidence, checkData, onStart }) {
     <div className="judgment">
       <div className={`judgment-hero ${s.tier}`}>
         <span className="judgment-hero-ring" aria-hidden="true" />
-        <img src={HERO[s.tier]} width="98" height="98" alt="" aria-hidden="true" className="judgment-hero-img" />
+        {/* 크기는 styles.css 가 갈래별로 다시 잡는다(경고 118 / 그 외 111).
+            여기 값은 로딩 중 레이아웃이 튀지 않게 하는 기준치일 뿐이다. */}
+        <img src={HERO[s.tier]} width="111" height="111" alt="" aria-hidden="true" className="judgment-hero-img" />
       </div>
 
       <h2 className="judgment-title">

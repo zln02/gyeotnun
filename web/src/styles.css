@@ -1677,8 +1677,29 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 .judgment-hero.danger .judgment-hero-ring { border-color: rgba(194, 47, 47, .7); }
 .judgment-hero.ok .judgment-hero-ring     { border-color: rgba(36, 153, 103, .6); }
 .judgment-hero.hold .judgment-hero-ring   { border-color: rgba(217, 119, 6, .6); }
-.judgment-hero-img { position: relative; transform: rotate(7.83deg); }
-.judgment-hero.ok .judgment-hero-img { transform: none; }
+/* ★ 2026-08-09 리디자인 브랜치(bd62d32)에서 가져온 두 가지: 아이콘을 키우고,
+     갈래별로 그림자 색을 맞춘다. 전에는 98px 에 그림자가 없어 178px 원 안에서
+     아이콘이 작고 붕 떠 보였다. 링(judgment-hero-ring)만으로는 번짐이 약했다.
+     ★ 판정 로직(verdict.js)과 문구는 그대로다 - 저쪽은 3갈래에 부제가 하드코딩이라
+     가져오지 않았다. 여기서 바꾸는 건 크기와 색뿐이다. */
+.judgment-hero-img {
+  position: relative; transform: rotate(7.83deg);
+  width: 111px; height: 111px;
+  filter: drop-shadow(0 10px 12px rgba(216, 165, 71, .24)) drop-shadow(0 0 16px rgba(216, 165, 71, .18));
+}
+/* 경고 두 갈래는 조금 더 크게 - 삼각형은 같은 폭이어도 원보다 작아 보인다 */
+.judgment-hero.danger .judgment-hero-img,
+.judgment-hero.warn .judgment-hero-img { width: 118px; height: 118px; }
+.judgment-hero.danger .judgment-hero-img {
+  filter: drop-shadow(0 10px 12px rgba(194, 47, 47, .26)) drop-shadow(0 0 16px rgba(194, 47, 47, .2));
+}
+.judgment-hero.warn .judgment-hero-img {
+  filter: drop-shadow(0 10px 12px rgba(216, 71, 71, .24)) drop-shadow(0 0 16px rgba(216, 71, 71, .18));
+}
+.judgment-hero.ok .judgment-hero-img {
+  transform: none;
+  filter: drop-shadow(0 10px 12px rgba(71, 216, 153, .24)) drop-shadow(0 0 16px rgba(71, 216, 153, .18));
+}
 
 .judgment-title {
   margin: 26px 0 0; font-size: 24px; font-weight: 900;
