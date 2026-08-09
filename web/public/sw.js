@@ -21,12 +21,14 @@
 //   참고 - 별도로 /assets/ 를 404 처리하도록 고쳤다) 브라우저가 HTML 을
 //   JS 로 파싱하려다 조용히 죽어 화면이 아예 안 뜨는 사고로 이어졌다.
 //   버전 문자열을 올리면 activate 단계에서 구버전 캐시가 자동 삭제된다.
-const SHELL_CACHE = 'gyeotnun-shell-v2'
+// v3: 앱 아이콘을 새 로고(logo-*.png)로 교체하면서 올렸다. 이 값을 올리지 않으면
+//     activate 단계의 구버전 캐시 삭제가 돌지 않아 옛 파란 눈 아이콘이 계속 남는다.
+const SHELL_CACHE = 'gyeotnun-shell-v3'
 const SHARE_CACHE = 'gyeotnun-share-v1'
 const SHARE_KEY = '/__shared-image'
 // '/' 는 더 이상 여기 넣지 않는다 - 아래 fetch 핸들러에서 네트워크 우선으로
 // 따로 처리한다(항상 최신 index.html 을 받고, 오프라인일 때만 캐시로 대체).
-const SHELL_FILES = ['/manifest.json', '/icon-192.png', '/icon-512.png']
+const SHELL_FILES = ['/manifest.json', '/logo-favicon.png', '/logo-192.png', '/logo-512.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
