@@ -43,6 +43,28 @@ S5 훈련/리포트 5분 훈련 카드 + 주간 리포트(가족 공유)
 
 ---
 
+## 심사위원 3분 데모
+
+1. 배포 주소 <https://gyeotnun.duckdns.org> 에 접속합니다.
+2. 예시 문자(사기 의심 문구)를 입력하거나 카톡 캡처를 올립니다.
+3. **확인 질문 카드**가 뜨는지 봅니다 — 진위를 판정하지 않고, 스스로 확인할 질문을 하나씩 줍니다.
+4. 외부 API 장애 시 주소 끝에 `?mock=1` 을 붙이면 고정 응답으로 폴백해 데모가 이어집니다.
+
+---
+
+## 검증 결과 (예선 평가 세트 30건)
+
+| 지표 | 결과 |
+|---|---|
+| 근거 검색 성공률 | 15/18 (83.3%) |
+| Top-3 정답 포함 | 13/18 (72.2%) |
+| 잘못된 근거 제시 | 0건 |
+| 확인불가 정확 처리 | 7/8 |
+
+라벨 정의·재현 절차: [`docs/evaluation/label_reclassification_20260810.md`](docs/evaluation/label_reclassification_20260810.md)
+
+---
+
 ## 2. 빠른 시작 (3줄)
 
 ```bash
@@ -101,10 +123,7 @@ curl -X POST "http://localhost:8000/api/v1/checks?mock=1" -F "device_id=demo"
 주소창 쿼리 `?mock=1`/`?mock=0` > 환경변수 `VITE_USE_MOCK=1`(`web/.env.example`
 참고) > 기본값(false). 개발 중 백엔드 없이 화면만 보고 싶으면 `?mock=1` 을 붙이세요.
 
-왜 mock 토글 자체는 남겨 뒀는가
-1. 프론트(조희진)가 백엔드 없이도, 또는 특정 화면만 빠르게 볼 때 쓸 수 있다.
-2. API 키가 없는 환경에서도 개발이 멈추지 않는다.
-3. **시연 중 외부 API가 죽어도 `?mock=1` 로 즉시 폴백해 데모를 이어갈 수 있다.**
+**시연 중 외부 API가 죽어도 `?mock=1` 로 즉시 폴백해 데모를 이어갈 수 있습니다.**
 
 mock 이 아닐 때 키가 없으면 **501 + 안내 메시지**를 돌려줍니다(서버가 죽지 않음).
 
@@ -115,19 +134,9 @@ mock 이 아닐 때 키가 없으면 **501 + 안내 메시지**를 돌려줍니�
 
 ---
 
-## 4. 폴더별 담당자
+## 4. 팀 · 기여
 
-| 담당 | 영역 | 주요 파일 |
-|---|---|---|
-| **박진** | 인식 · 마스킹 | `api/services/ocr.py`, `api/services/masking.py` |
-| **김유리** | 검색 · 공공데이터 대조 | `api/services/search.py` |
-| **김태희** | 프롬프트 (판정 억제) | `api/services/prompt_chain.py` |
-| **장지석** | 태깅 · RAG · 코퍼스 | `api/services/tagger.py`, `api/services/rag.py`, `corpus/` |
-| **조희진** | 프론트 | `web/` 전체 |
-| **박진영** | API · DB · 배포 | `api/main.py`, `api/routers/`, `api/models/`, `docker-compose.yml`, `deploy/` |
-
-> 남의 폴더를 고쳐야 하면 먼저 담당자에게 말하세요.
-> 단, `api/models/schemas.py`(계약서)는 **바꾸기 전에 반드시 팀 채널 공지**.
+폴더별 담당자·협업 규칙은 [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) 참고.
 
 ---
 
@@ -159,28 +168,12 @@ Base URL: 로컬 `http://localhost:8000/api/v1` · 배포 `https://gyeotnun.duck
  "masked_items":[{"type":"phone","original_hint":"010-****-****","count":1}],
  "detected_domain":"policy","status":"extracted"}
 
-// GET /checks/{id}/evidence   ★ verdict_hint 에 true/false 는 없다
-{"check_id":"chk_demo","verdict_hint":"partially_matched",   // needs_check | partially_matched | no_source_found
- "signals":[{"key":"number_mismatch","label":"...","severity":"attention"}],
- "references":[{"title":"...","url":"https://...","publisher":"보건복지부","source_type":"gov"}]}
-
 // POST /checks/{id}/dialogue  요청 {"turn":1,"user_reply":null}
 {"turn":1,"question":"두 문장 이내 질문","why":"이 질문을 하는 이유",
  "evidence_refs":["https://..."],"options":[{"id":"found","label":"..."}],"is_final":false}
-
-// POST /checks/{id}/verdict   요청 {"decision":"hold","reason_tags":[]}
-// decision: apply | not_apply | hold | ask_family
-{"check_id":"chk_demo","tagged_error_type":"number_condition","confidence":0.82,"message":"..."}
-// tagged_error_type: title_dependent | authority_impersonation | number_condition | overgeneralization
-
-// GET /training/today
-{"card_id":"...","target_error_type":"number_condition","content":"...",
- "items":[{"id":"a","label":"..."}],"answer":"a","explanation":"...","estimated_sec":300}
-
-// GET /reports/weekly
-{"week":"2026-W30","checks_count":4,"training_completed":5,
- "error_type_trend":{"number_condition":2},"streak_days":5,"message":"..."}
 ```
+
+전체 스키마: `/docs` (Swagger)
 
 ---
 
@@ -258,10 +251,14 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 | `evidence` | 검색·대조 결과 (verdict_hint, signals, references) |
 | `taggings` | 사용자 판단 + 확인 취약 유형 태깅 |
 | `training_cards` | 5분 훈련 카드 |
-| `corpus` | 공공데이터 577건 |
+| `corpus` | 공공데이터 문서 (규모는 표 아래 참고) |
 | `weekly_reports` | 주간 리포트 스냅샷 |
 | `events` | 사용자 행동 계측 (화면 진입/이탈·클릭·오류 - **입력 내용 없음**, device 해시만) |
 | `error_logs` | 장애 로그(2026-08) - 코드/화면/device 해시/짧은 진단정보만, **개인정보 없음** |
+
+> **코퍼스 규모**
+> - 라이브 인덱스 1,052문서 / 2,012청크 (기획서 평가 기준, 현재 서빙 중인 검색 인덱스)
+> - 디스크 재구성본 1,017 / 2,065 는 차기 인덱스 빌드 예정 (현재 검색 미반영)
 
 ### 오류 코드 체계 (2026-08 추가, 8/2 보안 멘토링 지시사항)
 
@@ -295,18 +292,6 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 - [ ] 얇은 폰트(300) 금지, 최소 500
 - [ ] `user-scalable=no` 금지 (확대를 막지 않는다)
 - [ ] **S3 화면에서 AI 문장(파란 영역)과 실제 출처(초록 점선 영역)가 시각적으로 분리**되어 있는가 ★
-
----
-
-## 10. 협업 규칙
-
-1. **매일 push.** 로컬에만 두고 자면 다음 날 합칠 수 없습니다.
-2. **`.env` 절대 커밋 금지.** 커밋 전 `git status` 로 확인하는 습관.
-3. **브랜치: `feat/{모듈}`** — `feat/ocr`, `feat/search`, `feat/prompt`, `feat/tagger`, `feat/web`, `feat/api`
-4. `main` 직접 push 금지. PR → 담당자 1명 확인 → merge.
-5. `models/schemas.py` (API 계약) 수정은 **팀 채널 공지 필수.**
-6. 커밋 메시지: `feat(ocr): Vision OCR 연동` / `fix(web): 버튼 높이 56px 미달 수정`
-7. 막히면 30분 안에 물어보기. 혼자 붙잡고 있는 시간이 가장 비쌉니다.
 
 ---
 
@@ -365,7 +350,7 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
 - 박진: 링크 본문 추출, 얼굴 블러
 - 김유리: 네이버 검색 API 연동
 - 김태희: 프롬프트 튜닝(질문 길이 등)
-- 장지석: 공공데이터 577건 수집·변환, 코퍼스→훈련카드 자동 생성
+- 장지석: 공공데이터 수집·변환, 코퍼스→훈련카드 자동 생성
 - 조희진: iOS 대체 경로 실기기 테스트(Share Target 은 Android Chrome 전용)
 - 박진영: 메모리 저장소 → DB 세션 교체, Alembic
 
