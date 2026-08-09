@@ -1,0 +1,133 @@
+PaddleOCR 정상조건 재측정 (2026-08-06)
+
+  실험 전용 · 채택하지 않음 · services/ocr.py 미변경 · 커밋하지 않음.
+  이전 측정(oneDNN 크래시로 enable_mkldnn=False, 16초/장)을 폐기하고 정상
+  조건에서 다시 쟀다. 하네스·데이터셋·지표는 easyocr/Claude Vision 측정과 동일.
+
+0. 결론 (한 줄)
+
+정상 조건에서 PaddleOCR clean 근거검색 0.800 — easyocr(0.600)을 크게 앞서고
+Claude Vision(0.867)에 근접, 속도는 1.16초/장으로 셋 중 가장 빠르다. 채택
+기준(0.80)과 동률이나, 지시대로 이번에는 적용하지 않고 기록만 남긴다.
+
+---
+
+1. 이전에 어떤 모델을 썼는가 (지시 1)
+
+인식 모델은 이미 한국어 전용(korean_PP-OCRv5_mobile_rec)이었다.
+"기본 다국어 모델을 썼을 것"이라는 가설은 틀렸다. 모델 캐시
+(api/data/paddle_home/.paddlex/official_models, 8/2 생성)에 남은 것:
+
+| 역할 | 이전 run 이 받은 모델 | 성격 |
+|---|---|---|
+| 인식(rec) | korean_PP-OCRv5_mobile_rec | 한국어 전용, 경량 ✓ |
+| 검출(det) | PP-OCRv5_server_det | 서버(대형) 검출기 — 느림 |
+| 전처리 | PP-LCNet_x1_0_doc_ori | 문서 방향 분류 |
+| 전처리 | UVDoc | 문서 펼치기(unwarp) |
+
+즉 이전 16초·2.4GB·정확도 저하의 실제 원인은 인식 모델이 아니라
+(a) 서버 검출기 + (b) 카톡 캡처에 불필요한 문서 방향/펼치기 전처리 +
+(c) enable_mkldnn=False 조합이었다(이전 벤치 스크립트는 보존돼 있지 않아
+캐시 증거로 추정). 재측정은 이 셋을 바로잡았다:
+
+python
+PaddleOCR(
+    lang="korean",
+    text_detection_model_name="PP-OCRv5_mobile_det",       # 서버→모바일 검출기
+    text_recognition_model_name="korean_PP-OCRv5_mobile_rec",
+    use_doc_orientation_classify=False,                    # 문서 전처리 끔
+    use_doc_unwarping=False,                               #  (채팅 캡처엔 불필요)
+    use_textline_orientation=False,
+    enable_mkldnn=True, cpu_threads=4,                     # oneDNN 활성
+)
+
+검출기(det+rec only, 문서 펼치기 없음)를 끈 구성은 easyocr(CRAFT 검출 + CRNN
+인식, 문서 펼치기 없음)와 동등한 성격이라 비교가 공정하다.
+
+2. oneDNN(mkldnn) 문제 — 해결됨 (지시 2)
+
+해결했다. mkldnn 활성 상태에서 크래시 없이 측정했다.
+
+- 이전 크래시의 배경: 8/2 당시 paddle 버전에서 oneDNN 런타임 오류 → 우회로
+  enable_mkldnn=False. 이 CPU 는 avx/avx2/avx512/fma 를 모두 지원하므로
+  (확인함) oneDNN 비호환 CPU 문제는 아니었다 — 버전 문제였다.
+- 재현 중 별개 블로커: paddleocr==3.1.1 + paddlex==3.7.2 조합이
+  PaddlePredictorOption.__init__() takes 1 positional argument but 2 were given
+  로 죽었다(의존성 스큐). paddleocr 를 3.7.0 으로 올려 정합시키니 해소.
+- 최종 환경: paddlepaddle 3.0.0 · paddleocr 3.7.0 · paddlex 3.7.2,
+  enable_mkldnn=True 정상 동작.
+- mkldnn 효과(같은 구성, 속도만 비교): True 1.16초/장 vs False 2.04초/장
+  (clean) — 약 1.76배. → 이전 16초는 mkldnn 이 주범이 아니라 서버 검출기+문서
+  전처리가 주범이었음이 이로써 확인된다(mkldnn 을 꺼도 2.04초로 8배 빠르다).
+
+3. 동일 조건 비교 (지시 3) — easyocr · Claude Vision 과 같은 데이터셋·지표
+
+데이터셋: 곁눈_평가세트_30건.csv + tests/fixtures/ocr_eval{,_hard}/{case_id}.jpg.
+지표: difflib.SequenceMatcher(제시문구, OCR).ratio(), 말풍선 필터 후 정확도,
+근거검색 성공률 = search.collect_evidence(text).references 개수>0 비율(전 30건).
+★ 세 엔진 모두 동일한 collect_evidence() 를 통과 — 검색 계층은 완전히 동일하고
+차이는 "입력 텍스트를 어느 OCR 이 만들었나" 뿐이다.
+
+clean (ocr_eval)
+
+| 엔진 | 인식정확도 | 말풍선필터 후 | 근거검색 | 판단일치율 | 정상오판 | 장당 | 피크메모리 | 모델크기 |
+|---|---|---|---|---|---|---|---|---|
+| Claude Vision | 1.000\* | — | 0.867 | 0.667 | 0/10 | 3.32s | (외부 API) | — |
+| easyocr | 0.916 | 0.916 | 0.600 | 0.667 | 0/10 | 2.73s | ~2.5GB | ~90MB |
+| PaddleOCR | 0.951 | 0.951 | 0.800 | 0.800 | 0/10 | 1.16s | 2.07GB | ~18MB |
+
+hard (ocr_eval_hard, 실촬영 열화 시뮬레이션)
+
+| 엔진 | 인식정확도 | 말풍선필터 후 | 근거검색 | 판단일치율 | 정상오판 | 장당 |
+|---|---|---|---|---|---|---|
+| Claude Vision | 0.998 | — | 0.867 | 0.667 | 0/10 | 3.52s |
+| easyocr | 0.534 | 0.534 | 0.467 | 0.433 | 0/10 | 2.38s |
+| PaddleOCR | 0.822 | 0.901 | 0.733 | 0.633 | 0/10 | 0.76s |
+
+\* Vision 의 정확도 1.000 은 평가용 제시문구가 사실상 Vision 출력에서 유래해
+구조적으로 유리하다(독립 측정 아님). Paddle 0.951 은 독립 측정값이다.
+
+읽기:
+- PaddleOCR 은 easyocr 를 모든 지표에서 앞선다(근거검색 0.800 vs 0.600,
+  정확도·속도·열화 견고성 전부).
+- Vision 대비: 근거검색은 뒤지지만(0.800 vs 0.867), 판단 일치율은 오히려 높고
+  (0.800 vs 0.667) 속도는 3배 가깝게 빠르다.
+- 상주/피크 메모리는 easyocr 와 비슷(~2GB), 모델 파일은 18MB 로 훨씬 작다
+  (det 4.8MB + rec 14MB).
+- 정상 10건 오판 0건(절대조건) — 세 엔진 모두 충족.
+
+근거검색 0.800 의 내역 (clean, refs=0 인 6건)
+
+| 유형 | case | 해석 |
+|---|---|---|
+| 사칭 | S03·S07·S10 | 근거를 못 찾음 = 실제 미스(사칭은 partially_matched 기대) |
+| 경계 | B08·B09·B10 | no_source_found 가 정답 — 근거 0이 정상 동작 |
+
+즉 지표 정의상 경계 3건이 "근거검색 실패"로 잡히지만 실제로는 올바른 결과다.
+(이 지표 정의는 easyocr·Vision 에도 똑같이 적용되므로 비교 자체는 공정하다.)
+정상+사칭 20건 기준으로 보면 paddle 은 17/20 에서 근거를 찾았다(정상 10/10, 사칭 7/10).
+
+4. 판단 (지시 4)
+
+- 채택 기준: 근거검색 0.80 미만이면 후보 제외. clean 0.800 은 미만이 아니라
+  동률 → 후보에서 제외되지 않는다. hard 는 0.733(미만).
+- 그러나 지시대로 0.80 을 넘어도 이번에는 적용하지 않는다. 기록만 남긴다.
+- 정리: PaddleOCR 은 정상 조건에서 easyocr 대비 명확히 우수하고 Vision 에
+  근접하는 실질 후보다. 로컬·오프라인·경량(18MB)·최속(1.16s)이라 "이미지를 외부로
+  보내지 않는 자체 OCR" 목표에 부합한다. 다만 이번 제출 범위에서는 채택하지 않는다.
+
+5. 실행 조건 (재현용)
+
+- 격리 컨테이너(gyeotnun-local-experiment:latest)에 런타임 설치, 메모리 8GB 제한,
+  운영 스택과 분리. services/ocr.py·프로덕션 코드 미변경, 커밋 없음.
+- 벤치 스크립트: bench_paddle_retest.py(실험 tmp, 비커밋) — easyocr 하네스와 동일 구조.
+- 소요: 재측정 총 약 40분(4시간 상한 내). oneDNN 해결 포함.
+- 원자료: paddle_retest_mkldnn.json / paddle_retest_nomkldnn.json.
+
+6. 이전 "부적합" 결론과의 관계
+
+ocr_comparison.md 의 "PaddleOCR 부적합(0.568, 16s, 2.4GB)" 은 잘못 구성된
+파이프라인(서버 검출기 + 문서 전처리 + mkldnn off) 에 대한 것이었고, 그 문서에도
+"oneDNN 오류로 최적화를 끈 상태라는 단서" 가 적혀 있었다. 정상 조건 재측정으로
+그 결론은 뒤집힌다 — paddle 은 부적합이 아니라 easyocr 우위의 유효 후보다.
+(단, 이번 채택은 하지 않음.)
