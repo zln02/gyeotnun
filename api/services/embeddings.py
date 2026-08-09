@@ -58,6 +58,9 @@ EMBEDDING_PROVIDER = "local"
 
 # ---- 로컬 제공자 설정
 LOCAL_EMBED_MODEL = "dragonkue/multilingual-e5-small-ko-v2"   # Apache-2.0
+# ★ 리비전 핀 - 캐시가 비면 다른 리비전을 받아 임베딩이 미묘하게 달라지는 재현성
+#   리스크를 없앤다. 인덱스(local_index_e5-small-ko-v2.npz)는 이 리비전으로 만들었다.
+LOCAL_EMBED_REVISION = "fcfc26bf355882620c48df58be112275bd756f50"
 LOCAL_EMBED_DIMENSIONS = 384
 # ★ e5 계열은 "query: "/"passage: " 접두어가 필수다(모델 카드 공식 권고).
 #   안 붙이면 검색 품질이 크게 떨어진다 - 색인과 질의에서 반드시 같은 규약을 쓴다.
@@ -145,7 +148,8 @@ def _get_local_model():
 
         torch.set_num_threads(int(__import__("os").cpu_count() or 1))
         log.info("[embeddings] 로컬 모델 로드: %s", LOCAL_EMBED_MODEL)
-        _local_model = SentenceTransformer(LOCAL_EMBED_MODEL, device="cpu")
+        _local_model = SentenceTransformer(LOCAL_EMBED_MODEL, device="cpu",
+                                           revision=LOCAL_EMBED_REVISION)
     return _local_model
 
 
