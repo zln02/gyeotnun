@@ -1,148 +1,20 @@
-# 식별자 교체로 타인 기록 조회 — 실제 시도 결과 (2026-08-06)
+# 접근 통제(IDOR) 점검 및 최소 수정 — 2026-08-06 (공개본)
 
-질문: **"식별자를 바꿔 넣으면 타인 기록이 조회되는가"** — 코드만 읽지 않고
-실제 요청을 날려 확인했다.
+> 라이브 서비스에 대한 실제 재현 절차와 수정 후 잔여 우회 경로는 공개 저장소에 두지 않고 별도로 관리한다. 이 문서에는 **발견 사실과 조치·검증 결과(심사 근거)**만 남긴다.
 
-## 결론
+## 발견
 
-**그렇다. check_id 만 알면 소유자가 아니어도 타인의 검사 기록이 조회된다.**
-로컬(`127.0.0.1:8000`)과 공개 HTTPS(`gyeotnun.duckdns.org`) 양쪽에서 실증했다.
-소유권을 검증하는 코드가 **아예 없다.** 기록을 지키는 유일한 것은 check_id 를
-"추측하기 어렵다"는 사실뿐이고, 그것은 접근 통제가 아니다.
+`GET /checks/{id}/evidence`, `POST /checks/{id}/dialogue`, `POST /checks/{id}/verdict` 세 엔드포인트가 저장 시 `device_id`를 함께 넣어 두고도 **조회 시 요청자와 대조하지 않아**, `check_id`만 알면 소유자가 아니어도 타인의 검사 기록에 접근할 수 있었다(접근 통제 부재, IDOR). 코드 정독뿐 아니라 실제 요청으로 확인했다.
 
----
+## 수정 (2026-08-06) — 최소 수정, 새 인증 체계 없음
 
-## 재현 (실제 실행 로그)
+세 엔드포인트에서 저장된 `device_id`와 요청자의 `device_id`를 대조하고, **불일치·미제공·없는 id를 모두 동일한 404로 거부**한다. 공통 함수 하나(`require_owner`)로 처리한다.
 
-**1) Alice 가 식별 가능한 문구로 업로드** (`device_id=alice-phone`)
-
-```
-POST /api/v1/checks   text="앨리스전용비밀_기초연금_수급계좌_110-222-333333 …"
-→ check_id = chk_b3016e1d79
-  extracted_text: "앨리스전용비밀_기초연금_수급계좌_***-***-****** 안내드립니다.
-                   오늘까지 아래 링크로 계좌를 인증해 주세요."
-```
-
-**2) Bob 이 Alice 의 check_id 로 근거 조회** — device_id 를 아예 보내지 않음
-
-```
-GET /api/v1/checks/chk_b3016e1d79/evidence      → HTTP 200
-  signals: [urgency_pressure, contact_in_image, source_missing, no_official_source]
-```
-
-**3) Bob 이 Alice 의 check_id 로 대화(질문 카드) 요청**
-
-```
-POST /api/v1/checks/chk_b3016e1d79/dialogue  {"turn":1}   → HTTP 200
-  question: "이 글에는 계좌를 '오늘까지' 인증하라고 되어 있는데, 어느 기관이 …"
-```
-
-★ 3번 응답의 질문이 **Alice 가 입력한 문구를 그대로 되비춘다**("계좌를
-'오늘까지' 인증"). Bob 은 Alice 가 무엇을 올렸는지 내용을 알 수 있다.
-
-**4) 대조군 — 없는 check_id**
-
-```
-GET /api/v1/checks/chk_ffffffffff/evidence      → HTTP 501 (ST-001, "찾을 수 없음")
-```
-
-→ 존재하는 id 는 소유자 대조 없이 통과, 없는 id 만 막힌다.
-**방어선은 오직 "check_id 를 아느냐"뿐이다.**
-
-**5) 공개 인터넷에서도 동일**
-
-```
-GET https://gyeotnun.duckdns.org/api/v1/checks/chk_b3016e1d79/evidence → HTTP 200
-```
-
----
-
-## 원인 (코드)
-
-세 엔드포인트가 공유 딕셔너리 `_MEMORY_STORE[check_id]` 를 읽는데, 저장할 때
-`device_id` 를 같이 넣어 놓고도(`checks.py:94-98`) **조회할 때 요청자와 대조하지
-않는다.**
-
-| 엔드포인트 | 위치 | 소유권 검증 | 유출되는 것 |
-|---|---|---|---|
-| `GET /checks/{id}/evidence` | `checks.py:110` | **없음** | 위험신호·근거(피해자 텍스트 기반) |
-| `POST /checks/{id}/dialogue` | `dialogue.py:39` | **없음** | 질문이 피해자 입력 문구를 인용 |
-| `POST /checks/{id}/verdict` | `verdict.py:36` | **없음** | 타인 기록에 판단/태그 기록(쓰기) |
-
-```python
-# 현재 (checks.py:121) — check_id 만 보고 바로 내준다
-stored = _MEMORY_STORE.get(check_id)
-if not stored:
-    raise not_implemented(..., "ST-001", ...)
-# stored["device_id"] 와 요청자를 비교하는 코드가 없음
-```
-
-## 착취 난이도와 완화 요인 (정직하게)
-
-- **check_id = `chk_` + 16진수 10자 = 40비트 난수.** 순차 증가가 아니라
-  `1→2` 식으로 바로 옆 기록을 긁을 수는 없다. 대량 열거도 HTTP 속도로는 비현실적.
-  → "당장 아무나 전수 조회"는 아니다.
-- 그러나 **한 번 유출되면 그대로 재생된다**: 서버 로그, Referer 헤더,
-  가족 공유 링크, 브라우저 기록, URL 공유 등으로 check_id 가 새면 누구나 재요청 가능.
-  보호가 "비밀 URL" 수준이지 인증이 아니다.
-- 계좌·전화번호는 마스킹된다(`***`). 하지만 **본문 자유 텍스트는 마스킹되지
-  않고**, dialogue 응답이 그 본문을 인용한다.
-- `_MEMORY_STORE` 는 인메모리·비영속이라 재시작하면 사라지고 단일 프로세스에만 있다.
-
-## 부수 관찰 (같이 나온 것)
-
-- `GET /reports/weekly?device_id=X` — 임의 device_id 를 받지만 **현재는 전부
-  0을 돌려주는 스텁**이라 지금은 유출 없음. 단, `TODO: 집계 쿼리로 교체` 주석대로
-  구현되는 순간 **인증 없는 device_id 로 남의 주간 리포트를 보는 IDOR 가 된다.**
-  지금 설계 계약 자체가 그 방향이다.
-- `GET /events/summary` — 인증 없이 **전체 세션 사용성 집계**를 덤프한다
-  (HTTP 200). 개인별 유출은 아니고 device_hash 도 응답에 없지만, 접근 통제가 없다.
-- `onboarding/diagnosis`, `training/today` — 저장 기록 조회가 없어 IDOR 아님.
-
-## 권고 (미적용 — 확인만 요청받음)
-
-1. `evidence`/`dialogue`/`verdict` 에서 요청자 `device_id` 를 받아
-   `stored["device_id"]` 와 대조하고 불일치 시 거부. (익명 `anonymous` 는 서로
-   구분되지 않으므로 세션 토큰/서명값이 필요 — 단순 device_id Form 값은
-   위조 가능하니 근본 해법은 서버 발급 세션.)
-2. `reports/weekly` 구현 전에 인증을 먼저 정하고, 그 전까지 device_id 로 임의
-   조회가 안 되게 막기.
-3. `events/summary` 에 최소한의 접근 제한(내부용/토큰).
-
-> 지시는 "실제로 시도해 확인"까지였다. 코드는 수정하지 않았다. 고칠지 여부와
-> 인증 방식(세션 토큰 vs 서명 device_id)은 지시를 기다린다.
-
----
-
-## 수정 적용 (2026-08-06) — 최소 수정, 새 인증 체계 없음
-
-### 무엇을 고쳤나
-
-`evidence`/`dialogue`/`verdict` 세 엔드포인트에서 저장된 `device_id` 와 요청자의
-`device_id` 를 대조하고, **불일치·미제공·없는 id 를 모두 같은 404 로 거부**한다.
-공통 함수 하나로 처리한다.
-
-```python
-# api/routers/checks.py
-def require_owner(check_id, device_id):
-    stored = _MEMORY_STORE.get(check_id)
-    owner = stored.get("device_id") if stored else None
-    if not device_id or stored is None or owner != device_id:
-        raise HTTPException(status_code=404, detail={
-            "error": "not_found", "code": "ST-001",
-            "message": "요청하신 확인 내역을 찾을 수 없습니다."})
-    return stored
-```
-
-- `evidence`(GET): `device_id` 쿼리 파라미터 추가.
-- `dialogue`/`verdict`(POST): `DialogueRequest`/`VerdictRequest` 스키마에 `device_id` 추가.
-- verdict 는 `require_owner` 를 try **밖**에서 호출한다 — 404(HTTPException)가
-  기존 `except Exception` 에 잡혀 501 로 바뀌는 것을 막기 위해서다.
-- 없는 id 가 501 을 반환하던 것을 404 로 정리했다(존재 여부를 흘리지 않는 동일 응답).
-- 프론트(`web/src/api.js`)는 세 호출에 `deviceId()`(localStorage UUID)를 함께 보낸다.
-  이 3줄이 없으면 소유자 본인도 404 가 되어 앱이 깨지므로 함께 수정했다.
-- `?mock=1` 데모 경로는 고정 픽스처만 반환하고 실데이터를 안 건드리므로 검사 대상이
-  아니다(mock 으로는 남의 기록이 나올 수 없다).
+- `evidence`(GET)는 `device_id` 쿼리 파라미터, `dialogue`/`verdict`(POST)는 스키마에 `device_id` 추가.
+- `verdict`는 `require_owner`를 try **밖**에서 호출 — 404(HTTPException)가 `except Exception`에 잡혀 501로 바뀌는 것을 막는다.
+- 없는 id가 501을 반환하던 것을 404로 정리 — 존재 여부를 흘리지 않는 동일 응답.
+- 프론트(`web/src/api.js`)는 세 호출에 `deviceId()`(localStorage UUID)를 함께 보낸다. 이 수정이 없으면 소유자 본인도 404가 되므로 함께 반영했다.
+- `?mock=1` 데모 경로는 고정 픽스처만 반환하고 실데이터를 안 건드리므로 검사 대상이 아니다.
 
 ### 검증 결과 (실제 요청)
 
@@ -153,34 +25,10 @@ def require_owner(check_id, device_id):
 | device_id 미제공 | **404** | **404** | **404** |
 | 없는 id | **404** | **404** | **404** |
 
-없는 id·타인·미제공의 **응답 본문이 완전히 동일**(`ST-001` 동일 메시지) → check_id
-존재 여부가 새어나가지 않음. pytest **79 passed**. 평가셋 30건은 `collect_evidence`
-직접 경로라 이 변경과 무관하며 사칭 10/10·정상 오판 0·홀드아웃 실패 0 그대로.
+없는 id·타인·미제공의 **응답 본문이 완전히 동일**(`ST-001` 동일 메시지) → check_id 존재 여부가 새어나가지 않는다. pytest **79 passed**. 평가셋 30건은 이 변경과 무관하며 사칭 10/10·정상 오판 0·홀드아웃 실패 0 그대로.
 
-### events/summary
+### 관측 엔드포인트
 
-`ADMIN_TOKEN`(환경변수) 게이트를 걸었다. **미설정이면 기본 닫힘(404)**. 서명 토큰·
-세션 발급이 아니라 단순 공유 비밀 대조다. 현재 `.env` 에 없으므로 지금은 완전히
-닫혀 있다 — 운영자는 `.env` 에 `ADMIN_TOKEN` 을 넣고 `X-Admin-Token` 헤더로 호출한다.
-(호출부가 프론트·테스트 어디에도 없어 닫아도 깨지는 것이 없다.)
+`GET /events/summary`·`GET /errors/summary`에 `ADMIN_TOKEN`(환경변수) 게이트를 걸었다. **미설정이면 기본 닫힘(404)**. 서명 토큰·세션 발급이 아니라 단순 공유 비밀 대조다. 호출부가 프론트·테스트 어디에도 없어 닫아도 깨지는 것이 없다. (상세는 `final_hardening_2026-08-06.md`)
 
-### reports/weekly
-
-지금은 0만 돌려주는 스텁이라 유출 없음. **구현 시 IDOR 가 된다는 경고 주석**을
-`TODO` 위에 남겼다. 코드는 구현하지 않았다.
-
-### 남은 한계 (제출 후 과제)
-
-**`device_id` 는 프론트가 보내는 값이라 위조 가능하다.** 공격자가 피해자의
-`device_id`(예: 기기 UUID)를 알아내면 여전히 통과한다. 이 최소 수정이 막는 것은
-"아무 check_id 나 넣으면 남의 기록이 나오는" **접근 통제 부재**뿐이다. `check_id`
-(40비트 난수)에 더해 이제 `device_id` 까지 알아야 하므로 문턱은 크게 올라갔지만,
-근본 해법(서버 발급 세션 등)은 별도 과제로 남긴다 — 지시대로 새 인증 체계는 만들지
-않았다. 또한 `create_check` 의 `device_id` 기본값 `"anonymous"` 로 만들어진 건은
-`"anonymous"` 를 보내는 누구에게나 열린다(프론트는 항상 실제 UUID 를 보내므로
-정상 경로에선 발생하지 않음). 이 두 가지를 근본 인증 도입 시 함께 처리해야 한다.
-
-### 스코프 밖 관찰 (건드리지 않음)
-
-`GET /errors/summary` 도 인증 없이 집계를 노출한다(events/summary 와 같은 부류).
-이번 지시 범위(events/summary)에 없어 수정하지 않았다. 같은 방식의 게이트가 필요하다.
+> 수정 후 잔여 한계(근본 인증)와 `reports/weekly` 관련 사항은 별도 관리한다.
