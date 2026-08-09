@@ -304,8 +304,12 @@ function PracticeStep({ index, total, step, answer, hintOpen, onToggleHint, onPi
   )
 }
 
-function CompleteScreen({ answers, report, onConfirm }) {
-  const correctCount = PRACTICE_STEPS.filter((s, i) => answers[i] === s.correct).length
+function CompleteScreen({ firstAnswers, report, onConfirm }) {
+  // ★ 2026-08-09: 기록은 **첫 시도** 기준이다. 아래 firstAnswers 주석 참고.
+  //   고쳐서 맞힌 것을 처음부터 맞힌 것으로 적으면 훈련 진단이 무의미해진다.
+  const total = PRACTICE_STEPS.length
+  const correctCount = PRACTICE_STEPS.filter((s, i) => firstAnswers[i] === s.correct).length
+  const fixedCount = total - correctCount
 
   return (
     <div className="practice-complete">
@@ -313,14 +317,17 @@ function CompleteScreen({ answers, report, onConfirm }) {
         <span className="practice-complete-badge">학습 완료</span>
       </p>
       <h2 className="practice-complete-title">학습을 잘 마쳤어요!</h2>
-      <p className="practice-complete-sub">내가 고른 답을 한눈에 다시 살펴보세요.</p>
+      <p className="practice-complete-sub">
+        {total}문제 중 {correctCount}개를 처음에 맞히셨어요.
+        {fixedCount > 0 && ' 나머지는 다시 보면서 바로잡으셨어요.'}
+      </p>
 
       <img className="practice-complete-hero" src={completeHero} alt="" aria-hidden="true" />
 
       <div className="practice-complete-stats">
         <div className="practice-complete-stat">
-          <b>{correctCount}/{PRACTICE_STEPS.length}</b>
-          <span>오늘 정답</span>
+          <b>{correctCount}/{total}</b>
+          <span>처음에 맞힘</span>
         </div>
         <div className="practice-complete-stat">
           <b>{report ? report.training_completed : '-'}</b>
@@ -337,7 +344,7 @@ function CompleteScreen({ answers, report, onConfirm }) {
           <div className="practice-complete-card" key={card.label}>
             <p className="practice-complete-card-label">{card.label}</p>
             <div className="practice-complete-card-row">
-              <p className="practice-complete-card-count">{answers[i] === PRACTICE_STEPS[i].correct ? 1 : 0}<em>건</em></p>
+              <p className="practice-complete-card-count">{firstAnswers[i] === PRACTICE_STEPS[i].correct ? 1 : 0}<em>건</em></p>
               <img src={card.icon} width="44" height="44" alt="" aria-hidden="true" />
             </div>
           </div>
@@ -377,7 +384,15 @@ export default function Training({ onHome }) {
   // mode: 연습 시작 안내 → 4단계 O/X 실습 → 학습 완료 → 리워드 → (선택)주간 리포트
   const [mode, setMode] = useState('intro')
   const [stepIndex, setStepIndex] = useState(0)
+  // answers: 지금 화면에 표시되는 선택(바꾸면 덮어쓴다). 피드백 표시용.
   const [answers, setAnswers] = useState({})
+  // ★ firstAnswers: 각 단계에서 **처음 고른** 답. 한 번 정해지면 덮어쓰지 않는다.
+  //   학습 완료 화면의 기록은 반드시 이 값으로 센다.
+  //   왜 나누는가: 답을 바꿔 볼 수 있게 두는 것은 학습에 필요하지만(틀린 이유를
+  //   읽고 다시 고르는 게 이 연습의 핵심이다), 그렇게 고친 결과를 "처음부터
+  //   맞혔다"로 기록하면 훈련 진단이 거짓이 된다. 2026-08 알파테스트 지적 사항.
+  //   포인트는 종전대로 완주 기준으로 그대로 지급한다 - 기록만 사실대로 적는다.
+  const [firstAnswers, setFirstAnswers] = useState({})
   const [hintOpen, setHintOpen] = useState(true)
 
   const [report, setReport] = useState(null)
@@ -424,13 +439,17 @@ export default function Training({ onHome }) {
     logClick(SCREEN, 'practice_start')
     setStepIndex(0)
     setAnswers({})
+    setFirstAnswers({})
     setHintOpen(true)
     setMode('practice')
   }
 
   function pickAnswer(choice) {
-    logClick(SCREEN, `practice_answer_${choice}`)
+    const isRetry = firstAnswers[stepIndex] != null
+    logClick(SCREEN, `practice_answer_${choice}${isRetry ? '_retry' : ''}`)
     setAnswers((prev) => ({ ...prev, [stepIndex]: choice }))
+    // 첫 선택만 기록한다. 이미 값이 있으면 그대로 둔다(다시 골라도 덮이지 않는다).
+    setFirstAnswers((prev) => (prev[stepIndex] != null ? prev : { ...prev, [stepIndex]: choice }))
   }
 
   function goPrevStep() {
@@ -477,7 +496,7 @@ export default function Training({ onHome }) {
   if (mode === 'complete') {
     return (
       <CompleteScreen
-        answers={answers}
+        firstAnswers={firstAnswers}
         report={report}
         onConfirm={() => { logClick(SCREEN, 'complete_confirm'); setMode('reward') }}
       />
