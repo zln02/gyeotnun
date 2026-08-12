@@ -40,6 +40,33 @@ RECORDS = REPO / "corpus/public_data/gyeotnun_data/records_merged.jsonl"
 EVAL_OUT = REPO / "corpus/곁눈_평가세트_120건.csv"
 HOLD_OUT = REPO / "api/tests/fixtures/holdout/holdout_30.csv"
 BASE_30 = REPO / "corpus/곁눈_평가세트_30건.csv"
+REAL_SMS = REPO / "corpus/real_sms_normal_11.csv"
+RETIRED = REPO / "corpus/보관_정상_코퍼스파생_교체분_11건.csv"
+
+# ---------------------------------------------------------------- 실사용 교체
+# ★ 2026-08-11: 정상 40건에 실제 수신 문자가 0건이었다.
+#   인공 생성물은 "정상 문자는 얌전하다"는 우리 선입견만 담는다. 실제로는
+#   정상 문자도 단축URL·긴급성·당첨·앱설치·본인인증을 쓴다(R08·R10·R11).
+#   → 코퍼스 파생 정상 11건을 빼고 실사용 원문 11건을 넣는다.
+#
+# 어느 11건을 뺄지 고른 기준: **기관 편중을 줄이는 방향**으로만 골랐다.
+#   신규 정상 30건 중 복지로가 22건으로 과대 대표돼 있었고(기존 정상 10건도
+#   전부 복지로), 그래서 복지로 22건 중에서만 뺐다. 뺀 11건은 남는 것과
+#   주제가 겹치는 쪽을 골랐다(예: 긴급복지 연료비 ↔ 긴급복지 주거지원).
+#   결과적으로 정상 40건의 복지로 비중이 31/40 → 21/40 으로 내려간다.
+#
+# ★ 지운 게 아니라 옮긴 것이다. 뺀 11건은 RETIRED 파일로 보관한다.
+RETIRE_IDS = ["N13", "N16", "N20", "N23", "N25", "N26", "N27", "N28", "N30", "N31", "N32"]
+
+# 실사용 11건의 위험행동 — 제시문구가 요구하는 행동만 보고 분류했다.
+# ★ R10·R11 이 이 세트의 핵심이다. 정상인데 위험행동이 있는 유일한 케이스라,
+#   "위험행동이 있으면 경고" 규칙이 정상 문자를 오판하는지 여기서 드러난다.
+REAL_RISK = {
+    "R01": "없음", "R02": "없음", "R03": "없음", "R04": "없음", "R05": "없음",
+    "R06": "없음", "R07": "없음", "R08": "없음", "R09": "없음",
+    "R10": "인증번호",   # 쿠팡CLS — 본인인증 유도 + 단축URL + 수신자 한정
+    "R11": "앱설치",     # KB국민카드 — 당첨 안내 + 앱 설치 유도
+}
 
 COLS = ["case_id", "유형", "입력채널", "평가용_제시문구", "문구_성격", "참고_출처",
         "출처_URL", "기대판단", "위험행동", "위험단서", "필요한_확인질문", "정답근거", "검수상태"]
@@ -311,6 +338,35 @@ HOLD = [
 ]
 
 
+def load_real_sms() -> list[dict]:
+    """실사용 원문 11건을 평가셋 스키마로 옮긴다.
+
+    ★ 출처_URL 을 비워 두는 유일한 자리다. 이들은 코퍼스에 대조 문서가 없다 —
+      지자체·카드사·통신사가 실제로 보낸 문자라서 '정상'인 것이지, 공식 문서가
+      뒷받침해서 정상인 게 아니다. 여기에 그럴듯한 주소를 채워 넣으면 그게 바로
+      이 스크립트가 막으려는 URL 창작이다. 비운 채로 두고 정답근거에 밝힌다.
+    → 따라서 이 11건은 '근거 검색 성공률'의 모수(doc)에 들어가지 않는다.
+      정상 오판 측정과 축2 오탐 측정에만 쓴다.
+    """
+    if not REAL_SMS.exists():
+        sys.exit(f"[중단] 실사용 원문이 없다: {REAL_SMS}")
+    out = []
+    for r in csv.DictReader(REAL_SMS.open(encoding="utf-8-sig")):
+        cid = r["case_id"].strip()
+        out.append(dict(zip(COLS, [
+            cid, "정상", r["입력채널"], r["평가용_제시문구"],
+            "실사용원문",                      # ← 갈래 태그 (따로 집계 가능)
+            r["참고_출처"], "", VERDICT["정상"],
+            REAL_RISK[cid], r["주의_신호"],
+            "발신 기관이 실제로 보낸 문자인가|링크의 최종 도메인이 발신 기관 공식 도메인인가",
+            f"실제 수신 문자(코퍼스 대조 문서 없음). {r['검증_목적']}",
+            r["검수상태"],
+        ])))
+    if len(out) != len(RETIRE_IDS):
+        sys.exit(f"[중단] 실사용 {len(out)}건 vs 교체 대상 {len(RETIRE_IDS)}건 — 수가 안 맞는다")
+    return out
+
+
 def build() -> tuple[list[dict], list[dict]]:
     rows: list[dict] = []
     for i, (ch, src, text, danger) in enumerate(NORMAL, start=11):
@@ -353,8 +409,21 @@ def main() -> None:
     if bad:
         sys.exit(f"[중단] 위험행동 값이 허용 목록 밖: {bad[:10]}")
 
+    # 실사용 원문 11건을 넣고, 자리를 내준 코퍼스 파생 11건은 보관 파일로 옮긴다.
+    real = load_real_sms()
+    retired = [r for r in all_rows if r["case_id"] in RETIRE_IDS]
+    if len(retired) != len(RETIRE_IDS):
+        sys.exit(f"[중단] 교체 대상 {len(retired)}/{len(RETIRE_IDS)}건만 찾았다")
+    all_rows = [r for r in all_rows if r["case_id"] not in RETIRE_IDS] + real
+
+    with RETIRED.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=COLS)
+        w.writeheader()
+        w.writerows(retired)
+
     for r in all_rows + hold_rows:
-        if not r["출처_URL"]:
+        # 실사용원문만 출처_URL 이 비어도 된다 (위 load_real_sms 주석 참고).
+        if not r["출처_URL"] and r["문구_성격"] != "실사용원문":
             sys.exit(f"[중단] 출처_URL 이 비었다: {r['case_id']}")
 
     EVAL_OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -376,8 +445,13 @@ def main() -> None:
     print("  채널별 :", dict(collections.Counter(r["입력채널"] for r in all_rows)))
     print(f"홀드아웃 : {HOLD_OUT.relative_to(REPO)}  {len(hold_rows)}건")
     print("  유형별 :", dict(collections.Counter(r["유형"] for r in hold_rows)))
+    print("  정상 갈래:", dict(collections.Counter(
+        ("실사용원문" if r["문구_성격"] == "실사용원문" else "코퍼스파생/기존")
+        for r in all_rows if r["유형"] == "정상")))
     print("  경계 갈래:", dict(collections.Counter(
-        r["문구_성격"] for r in new_rows if r["유형"] == "경계")))
+        r["문구_성격"] for r in all_rows if r["유형"] == "경계" and r["문구_성격"].startswith("경계-"))))
+    print(f"  보관(교체분): {RETIRED.relative_to(REPO)}  {len(retired)}건 "
+          + ", ".join(r["case_id"] for r in retired))
 
     print("\n=== 축2(안전) — 유형 × 위험행동 교차표 ===")
     kinds = ["정상", "사칭", "경계"]
