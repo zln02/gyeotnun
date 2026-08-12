@@ -22,8 +22,22 @@
  *   그럴듯하게 적으면 그게 바로 곁눈이 막으려는 짓이다.
  */
 
-/** 서버가 실제로 내려주는 주의(attention) 신호 키. search.py SIGNAL_RULES 와 1:1. */
-const ATTENTION_KEYS = ['similar_scam_case', 'urgency_pressure', 'condition_omitted']
+/** 서버가 실제로 내려주는 주의(attention) 신호 키. search.py SIGNAL_RULES 와 1:1.
+ *
+ * ★ 2026-08-12 추가: official_alert_matched
+ *   근거로 붙은 공식 문서가 '사기 경보문'일 때 서버가 붙인다.
+ *   전에는 경보문이 OFFICIAL_DOCS 에 있다는 이유로 official_source_found(info)만
+ *   붙어, KISA 사칭 문자에 "KISA 사칭 스미싱 주의" 경보문을 찾아 놓고도 화면에는
+ *   초록 "공식 자료를 찾았어요"가 나갔다(S22). 찾은 건 맞는데 뜻이 정반대로 갔다.
+ *   ★ 이 목록에 넣어야 경고(warn)로 올라간다. 초록에서 내려가는 것은 ③의 허용
+ *     방식 덕에 자동이지만, 그것만으로는 주황에 머문다(실측 확인).
+ */
+const ATTENTION_KEYS = [
+  'similar_scam_case',
+  'urgency_pressure',
+  'condition_omitted',
+  'official_alert_matched',
+]
 
 /** 마스킹 유형 → 사람이 읽는 이름. masking.py 가 실제로 숫자를 찾아낸 것만 들어온다. */
 const MASKED_LABEL = {
@@ -62,6 +76,21 @@ export function judgmentState(evidence, checkData) {
   // ② 주의 신호가 있다 → 확인 필요.
   const attention = signals.find((s) => s.severity === 'attention' && ATTENTION_KEYS.includes(s.key))
   if (attention) {
+    // ★ official_alert_matched 는 공식 경보문을 실제로 찾은 경우다. 어르신이 그
+    //   원문을 직접 읽는 것이 이 화면의 목적이므로, 문구를 링크로 걸어 크게 보여
+    //   준다(factUrl 이 있으면 Judgment.jsx 가 <a> 로 렌더링한다).
+    //   ★ "사기"·"가짜" 를 쓰지 않는다 - validate_question 금지어와 같은 기준이다.
+    //     찾은 것은 '비슷한 사례를 알리는 안내'이지 이 글에 대한 판정이 아니다.
+    //   ★ "찾았어요" 도 쓰지 않는다. 초록(④)의 "공식 자료를 찾았어요" 와 같은
+    //     표현이라 S22 에서 사용자를 오도한 그 문구가 된다.
+    if (attention.key === 'official_alert_matched') {
+      return {
+        tier: 'warn',
+        lead: '확인이 ', accent: '필요', tail: '한 문자예요',
+        fact: '받으신 내용과 비슷한 사례를 알리는 공식 안내가 있어요',
+        factUrl: refs[0]?.url || '',
+      }
+    }
     // ★ similar_scam_case 의 원문 label 은 "...사기 수법과 비슷합니다" 처럼 단정적
     //   금지어를 담고 있다. 뜻은 살리고 표현만 순화한다.
     const fact = attention.key === 'similar_scam_case'
