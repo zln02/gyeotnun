@@ -77,7 +77,19 @@ IMPERSONATED: dict[str, tuple[str | None, str]] = {
     "S38": ("기초연금", "복지로 점검을 빌미로 한 기초연금 사칭"),
     "S39": ("장기요양급여이용지원", "장기요양 등급 심사 결과 통보 사칭 → 실재 제도"),
     "S40": (None, "지자체 행사 참가비 — 거래 사칭"),
+    # ---- 홀드아웃 사칭 10건 (2026-08-12 승인. 평가셋과 같은 기준)
+    "H21": ("주민등록 사실조사", "행안부 사칭. 코퍼스에 안내문 없음"),
+    "H22": ("대환대출", "은행 대출 신용보강 사칭. 코퍼스에 안내문 없음"),
+    "H23": (None, "경찰 사이버수사대 자금 이전 — 제도 아님"),
+    "H24": ("에너지바우처", "'정부 에너지 지원금' → 냉난방비 지원 제도"),
+    "H25": ("국민연금", "국민연금공단 미납 사칭. 코퍼스에 일반 안내문 없음"),
+    "H26": (None, "가족 사칭 — 제도 아님"),
+    "H27": (None, "휴대폰 보안 업데이트 — 제도 아님"),
+    "H28": (None, "지자체 케이터링 선결제 — 거래 사칭"),
+    "H29": ("어르신 교통비 지원", "지자체 사업. 코퍼스의 '교통시설 이용지원'은 보훈대상자용이라 다름"),
+    "H30": (None, "노후자금 운용 — 창작 투자상품"),
 }
+HOLD = REPO / "api/tests/fixtures/holdout/holdout_30.csv"
 
 
 def load_titles() -> dict[str, dict]:
@@ -94,6 +106,7 @@ def main() -> None:
         sys.exit(f"[중단] 코퍼스 원본이 없다: {RECS}")
     titles = load_titles()
     rows = {r["case_id"]: r for r in csv.DictReader(EVAL.open(encoding="utf-8-sig"))}
+    rows.update({r["case_id"]: r for r in csv.DictReader(HOLD.open(encoding="utf-8-sig"))})
 
     missing = [c for c in IMPERSONATED if c not in rows]
     if missing:
