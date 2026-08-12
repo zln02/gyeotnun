@@ -75,3 +75,9 @@ web/곁눈(figma)/
 
 # 보안 미해결 항목(라이브 공격 표면) - 공개 저장소 금지
 docs/security/internal/
+
+# ★ 2026-08-12 빌드/배포 분리
+#   web/dist  = npm run build 출력 (기존 dist/ 규칙으로 이미 제외됨)
+#   web/live  = nginx 가 실제로 서빙하는 디렉터리. deploy/publish.sh 로만 갱신한다.
+web/live/
+deploy/live_backups/
