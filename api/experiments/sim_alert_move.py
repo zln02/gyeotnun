@@ -59,6 +59,11 @@ def apply_move(on):
     ci._SCAM_DOC_FREQ.clear()
     ci._SCAM_DOC_FREQ.update(ci._doc_freq([c._blob for c in ci.SCAM_CASES]))
     ci._SCAM_N_DOCS = len(ci.SCAM_CASES)
+    # ★ 필수. _scam_substring_df 는 lru_cache 이고 SCAM_CASES 를 직접 순회한다.
+    #   비우지 않으면 df 는 옛 코퍼스 기준(작게) 남고 _SCAM_N_DOCS 만 커져
+    #   weight=log((N_new+1)/(df_old+1))+1 로 가중치가 과대 계산된다.
+    ci._scam_substring_df.cache_clear()
+    ci._case_categories.cache_clear()
 
 FRONT={'similar_scam_case','urgency_pressure','condition_omitted'}
 RISK={'계좌이체','앱설치','인증번호','개인정보요구'}
