@@ -71,17 +71,70 @@ class SearchResult:
     references: List[dict] = field(default_factory=list)
 
 
+# ★★ 긴급성 단독 경고 억제 (2026-08-12 채택) ★★
+#   정상 마케팅 문자가 "선착순·마지막 기회·완판직전"을 쓴다. 긴급성 하나만으로
+#   경고를 띄우면 정상 광고가 경고를 받는다 - 실측으로 정상 오판 4건 중 3건이
+#   이것이었다(R04 취업멘토링, R05 취업멘토링, R09 아파트 분양).
+#   → 긴급성은 '위험한 행동을 요구할 때'만 경고로 올린다. 단독이면 info 로 남긴다.
+#
+#   실측(확대 112건 / 홀드아웃 30건, docs/evaluation/실험_신호결합_도메인_2026-08-12.md)
+#     정상 오판   4/37 → 1/37     |  2/10 → 1/10
+#     사칭 판정   94.6% → 94.6%   |  100% → 100%    ← 1건도 안 떨어짐
+#     경계 판정   65.8% → 68.4%   |  70.0% → 80.0%
+#     축2 헛경고  15.7% → 2.9%    |  33.3% → 16.7%
+#
+#   ★ 되돌리려면 이 상수 하나만 False 로 바꾼다(임계값 상수와 같은 방식).
+#     False 면 2026-08-12 이전 동작(긴급성 단독으로도 경고)으로 즉시 복귀한다.
+URGENCY_REQUIRES_ACTION = True
+
+# 문장이 '요구하는 행동'을 텍스트만 보고 고른다.
+# ★ 평가셋의 위험행동 컬럼을 절대 참조하지 않는다 - 그건 라벨 누수이고 배포할 수 없다.
+#   키워드는 요구 행동의 동사에서 뽑았고, 실패 사례를 보고 고르지 않았다.
+#   (실측 재현율: 확대 112건에서 37/39. 놓친 2건은 B09·S24 인데 둘 다 이 변경으로
+#    tier 가 달라지지 않는 것을 확인하고 채택했다. 그 2건을 통과시키려고 키워드를
+#    덧붙이지 않는다 - 그건 평가셋 맞춤이다.)
+RISK_ACTION_KEYWORDS = {
+    "계좌이체": ["입금", "송금", "이체", "선결제", "예치", "상환", "납부",
+                 "보내 주", "보내주", "보내줘", "계좌로", "결제해"],
+    "앱설치": ["앱을 설치", "앱 설치", "설치하시", "설치해", "설치하고", "다운로드",
+               "파일을 설치", "깔아"],
+    "인증번호": ["인증번호", "본인인증", "인증서", "공동인증", "본인 인증"],
+    "개인정보요구": ["주민등록번호", "주민번호", "신분증", "통장 사본", "통장사본",
+                     "계좌번호를 입력", "계좌를 등록", "계좌 등록", "카드번호",
+                     "생년월일 뒤", "뒤 7자리", "연락처를 알려", "시세를 먼저 알려",
+                     "주소를 다시 입력", "정보를 다시 입력", "사진을 보내", "사진을 업로드"],
+}
+
+
+def detect_risk_action(text: str) -> str | None:
+    """이 글이 사용자에게 요구하는 '위험한 행동'을 고른다. 없으면 None.
+
+    계좌이체 / 앱설치 / 인증번호 / 개인정보요구 중 하나를 돌려준다.
+    """
+    t = text or ""
+    for label, keywords in RISK_ACTION_KEYWORDS.items():
+        if any(k in t for k in keywords):
+            return label
+    return None
+
+
 def detect_signals(text: str) -> List[dict]:
     """텍스트 자체에서 '요구 행동의 위험도' + '발행기관 명시 여부' 신호를 뽑는다.
 
     ★ source_missing 은 severity="info" 다 - 이것만으로 확인불가/의심을 정하지
       않는다. 실제 판정은 collect_evidence() 가 공식 출처 매칭 여부까지 함께 본다.
+    ★ urgency_pressure 는 위험행동과 함께 있을 때만 attention 이다
+      (URGENCY_REQUIRES_ACTION 참고).
     """
     text = text or ""
+    risk_action = detect_risk_action(text) if URGENCY_REQUIRES_ACTION else None
     out: List[dict] = []
     for key, keywords, label in SIGNAL_RULES:
         if any(k in text for k in keywords):
             severity = "info" if key == "contact_in_image" else "attention"
+            # 긴급성 단독(요구하는 행동이 없음)은 참고 정보로만 남긴다.
+            if URGENCY_REQUIRES_ACTION and key == "urgency_pressure" and risk_action is None:
+                severity = "info"
             out.append({"key": key, "label": label, "severity": severity})
     if not _ORG_SUFFIX_RE.search(text):
         out.append({
