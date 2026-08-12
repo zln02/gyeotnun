@@ -102,8 +102,18 @@ def test_collect_evidence_falls_back_and_still_returns_a_valid_result():
 def test_weak_embedding_similarity_below_confidence_threshold_yields_no_source_found():
     """근거(레퍼런스)는 찾았지만 유사도가 CONFIDENT_MATCH_THRESHOLD 미만이면
     needs_check 로 단정하지 않고 no_source_found 로 유보해야 한다(2026-08 변경).
-    다른 확증(위험신호·사기사례매칭)이 전혀 없는 경우로 모의한다."""
-    fake_doc = corpus_index.OFFICIAL_DOCS[0] if corpus_index.OFFICIAL_DOCS else None
+    다른 확증(위험신호·사기사례매칭)이 전혀 없는 경우로 모의한다.
+
+    ★ 2026-08-12 픽스처 수정 - 예전에는 OFFICIAL_DOCS[0] 을 그대로 썼는데,
+      그게 하필 warning_case("정당관계자 사칭 노쇼 사기 주의")였다. 경보문이
+      근거로 붙으면 official_alert_matched(attention)가 붙게 되면서
+      "다른 확증이 전혀 없다"는 이 테스트의 전제가 깨졌다.
+      단정을 완화한 게 아니라, 전제에 맞는 문서(제도 안내문)를 고르도록 고쳤다.
+      경보문이 붙는 경우는 아래 test_alert_doc_match_raises_attention 이 따로 본다."""
+    fake_doc = next(
+        (d for d in corpus_index.OFFICIAL_DOCS
+         if d.data_type not in search.ALERT_DOC_DATA_TYPES), None,
+    )
     if fake_doc is None:
         pytest.skip("OFFICIAL_DOCS 가 로컬에 없다 - 스킵")
 
@@ -122,3 +132,65 @@ def test_weak_embedding_similarity_below_confidence_threshold_yields_no_source_f
     assert result.verdict_hint == "no_source_found", (
         f"약한 유사도({weak_score})는 확인됨으로 단정하면 안 된다, 실제={result.verdict_hint}"
     )
+
+
+def test_alert_doc_match_raises_attention():
+    """근거로 붙은 공식 문서가 '사기 경보문'(warning_case)이면 attention 신호를
+    붙이고 확인됨으로 단정하지 않아야 한다 (2026-08-12, S22).
+
+    ★ 배경: KISA 사칭 문자에 "KISA 보안공지를 사칭한 스미싱 문자 주의"라는 바로
+      그 경보문을 0.7023 으로 찾아 놓고, 경보문이 OFFICIAL_DOCS 에 있다는 이유로
+      official_source_found(info)만 붙어 화면에 초록 "공식 자료를 찾았어요"가
+      나갔다. 찾은 건 맞는데 뜻이 정반대로 전달됐다.
+      docs/evaluation/IDF척도이동_A안_2026-08-12.md
+    """
+    alert_doc = next(
+        (d for d in corpus_index.OFFICIAL_DOCS
+         if d.data_type in search.ALERT_DOC_DATA_TYPES), None,
+    )
+    if alert_doc is None:
+        pytest.skip("OFFICIAL_DOCS 에 경보문이 없다 - 스킵")
+
+    # 확신선을 넘는 점수를 줘도(= 전에는 needs_check 로 갔던 조건) 단정하지 않아야 한다.
+    strong = search.CONFIDENT_MATCH_THRESHOLD + 0.02
+    with patch(
+        "services.embeddings.match_embedding_docs",
+        return_value=[(strong, alert_doc)],
+    ), patch("services.corpus_index.match_evidence", return_value=[]), \
+       patch("services.corpus_index.match_scam_cases", return_value=[]), \
+       patch("services.search.detect_signals", return_value=[]):
+        result = search.collect_evidence("임의의 텍스트")
+
+    keys = [s["key"] for s in result.signals]
+    assert "official_alert_matched" in keys, f"경보문 신호가 없다: {keys}"
+    assert any(s["key"] == "official_alert_matched" and s["severity"] == "attention"
+               for s in result.signals), "경보문 신호는 attention 이어야 한다"
+    assert result.verdict_hint != "needs_check", (
+        f"경보문을 찾았는데 확인됨으로 단정하면 안 된다, 실제={result.verdict_hint}"
+    )
+    # ★ label 에 "찾았습니다"가 들어가면 초록 화면 문구와 같아져 오해를 재생산한다.
+    label = next(s["label"] for s in result.signals if s["key"] == "official_alert_matched")
+    assert "찾았" not in label, f"label 에 '찾았' 표현이 있다: {label}"
+    assert "사기" not in label and "가짜" not in label, f"금지어가 있다: {label}"
+
+
+def test_alert_signal_can_be_disabled():
+    """되돌릴 스위치가 실제로 동작하는지 - ALERT_DOC_AS_ATTENTION=False 면 이전 동작."""
+    alert_doc = next(
+        (d for d in corpus_index.OFFICIAL_DOCS
+         if d.data_type in search.ALERT_DOC_DATA_TYPES), None,
+    )
+    if alert_doc is None:
+        pytest.skip("OFFICIAL_DOCS 에 경보문이 없다 - 스킵")
+
+    strong = search.CONFIDENT_MATCH_THRESHOLD + 0.02
+    with patch("services.search.ALERT_DOC_AS_ATTENTION", False), patch(
+        "services.embeddings.match_embedding_docs",
+        return_value=[(strong, alert_doc)],
+    ), patch("services.corpus_index.match_evidence", return_value=[]), \
+       patch("services.corpus_index.match_scam_cases", return_value=[]), \
+       patch("services.search.detect_signals", return_value=[]):
+        result = search.collect_evidence("임의의 텍스트")
+
+    assert "official_alert_matched" not in [s["key"] for s in result.signals]
+    assert result.verdict_hint == "needs_check", "스위치를 끄면 이전 동작이어야 한다"

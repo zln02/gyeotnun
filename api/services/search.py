@@ -87,6 +87,19 @@ class SearchResult:
 #     False 면 2026-08-12 이전 동작(긴급성 단독으로도 경고)으로 즉시 복귀한다.
 URGENCY_REQUIRES_ACTION = True
 
+# ★★ 경보문이 근거로 매칭되면 주의 신호로 올린다 (2026-08-12 채택) ★★
+#   근거·실측: docs/evaluation/IDF척도이동_A안_2026-08-12.md §4
+#     정상 오판 불변(1/37, 1/10) · 축2 헛경고 불변(2/70, 3/18)
+#     사칭 경고 14→18(확대) / 2→4(홀드) · S22 가 초록에서 경고로 바뀐다
+#   ★ 되돌리기: 이 상수를 False 로 두면 2026-08-12 이전 동작으로 즉시 복귀한다
+#     (임계값 상수·URGENCY_REQUIRES_ACTION 과 같은 방식).
+ALERT_DOC_AS_ATTENTION = True
+
+# 경보문으로 볼 data_type. records_merged.jsonl 의 원본 필드를 그대로 쓴다.
+# ★ press_release(24건)는 넣지 않는다 - "업무협약 체결"·"출범 6개월 성과" 같은
+#   정책·성과 발표가 섞여 있어 경보문이라 부를 수 없다. 사람 검수 후 별도로 다룬다.
+ALERT_DOC_DATA_TYPES = {"warning_case"}
+
 # 문장이 '요구하는 행동'을 텍스트만 보고 고른다.
 # ★ 평가셋의 위험행동 컬럼을 절대 참조하지 않는다 - 그건 라벨 누수이고 배포할 수 없다.
 #   키워드는 요구 행동의 동사에서 뽑았고, 실패 사례를 보고 고르지 않았다.
@@ -381,6 +394,31 @@ def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
             "key": "official_source_found",
             "label": f"공식 통계·자료와 대조했습니다: {doc.publisher} - {doc.title}",
             "severity": "info",
+        })
+
+    # ---- 신호: 근거로 붙은 공식 문서가 '사기 경보문'이면 주의 신호로 올린다.
+    #      ★ 왜 필요한가 (2026-08-12, S22)
+    #        KISA 사칭 문자에 대해 "KISA 보안공지를 사칭한 스미싱 문자 주의"라는
+    #        바로 그 경보문을 0.7023 으로 정확히 찾아 놓고, 경보문이 OFFICIAL_DOCS 에
+    #        있다는 이유로 official_source_found(info)만 붙어 화면에 초록
+    #        "공식 자료를 찾았어요"가 나갔다. 사용자는 "이 문자가 확인됐다"로 읽는다.
+    #        찾은 것은 맞는데 의미가 정반대로 전달된 것이다.
+    #      → "공식 기관이 낸 문서"와 "이 글이 사실이라는 근거"를 구분한다.
+    #
+    #      ★ press_release 는 제외한다. 정책·성과 발표(협약 체결, 출범 성과)가
+    #        섞여 있어 경보문이라 부를 수 없다. 사람 검수 후 별도로 다룬다.
+    #      ★ label 은 고정 문구다. 기관·제목은 references(to_reference)에 이미
+    #        들어가므로 label 에 또 넣으면 중복이다 - no_official_source·
+    #        urgency_pressure 등 다른 attention 키와 같은 형식을 따른다.
+    #      ★ "찾았습니다"를 쓰지 않는다. 초록 화면의 "공식 자료를 찾았어요"와
+    #        같은 표현이라, 고치려는 그 오해를 label 로 다시 만들게 된다.
+    if ALERT_DOC_AS_ATTENTION and any(
+        getattr(d, "data_type", "") in ALERT_DOC_DATA_TYPES for d in matched_official
+    ):
+        signals.append({
+            "key": "official_alert_matched",
+            "label": "받으신 내용과 비슷한 사례를 알리는 공식 안내가 있습니다.",
+            "severity": "attention",
         })
 
     # ---- 신호: 유사 사기 사례 일치 (강한 경고 신호) - 위 official_source_found 와
