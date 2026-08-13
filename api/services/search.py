@@ -158,16 +158,72 @@ RISK_ACTION_KEYWORDS = {
 }
 
 
+# ══════════════════════════════════════════ 유형 정확도 보정 (2026-08-13)
+# ★ 왜 고쳤나
+#   이 함수는 지금까지 urgency_pressure 를 attention 으로 둘지 info 로 내릴지만
+#   가르는 **이진 게이트**였다. "무언가 요구가 있다"만 맞으면 됐고 유형이 틀려도
+#   무해했다. 그런데 화면이 유형을 말하기 시작하면 **유형 오류가 곧 거짓말이 된다.**
+#     N17(정상) "응급안전안심 장비를 설치해 드리는 서비스" → 앱설치로 검출됐다
+#     B25/H40   "통장 사본을 보내 주세요"                  → 계좌이체로 검출됐다
+#   실측: docs/evaluation/위험행동_신호_설계측정_2026-08-13.md
+#
+# ★ 수정 두 가지. 둘 다 **유형 정의에서 나온다** - 평가셋 실패를 보고 맞춘 게 아니다.
+#   (가) 최장 매칭 우선 - dict 순서에 기대던 것을 없앤다. 겹치면 더 구체적인(긴)
+#        어휘가 이긴다. "통장 사본"(5자) > "보내 주"(4자) → 개인정보요구.
+#        근거: '통장 사본을 보내라'는 개인정보 요구이지 자금 이체가 아니다.
+#   (나) 문맥 조건 - 아래 두 사전. 근거: 유형 이름이 '앱 설치'다. 장비 설치는
+#        앱 설치가 아니다. '보내 주'는 무엇을 보내는지에 따라 유형이 갈린다.
+#   ※ (가)만으로는 N17 이 안 고쳐지고, (나)만으로는 순서 의존이 남는다. 둘 다 쓴다.
+#
+# ★ 실측 결과: 유형일치 88.0% → 92.0% · 정상 과검출 1건 → 0건 · **tier 변경 0건**
+#   검출률(92.0%)은 그대로다 - 재현율은 손대지 않았다. 미검출 4건(B09·S24·H23·H24)
+#   은 여전히 미검출이고, 그 2건을 통과시키려 어휘를 덧붙이지 않았다.
+
+# 그 자체로 유형이 확실해 문맥 조건을 면제하는 어휘
+_RISK_SELF_EVIDENT = {
+    "계좌이체": {"입금", "송금", "이체", "선결제", "예치", "상환", "납부", "계좌로", "결제해"},
+    "앱설치": {"앱을 설치", "앱 설치", "다운로드", "파일을 설치"},
+}
+# 위 목록에 없는 어휘는 이 문맥이 함께 있어야 그 유형으로 본다
+_RISK_CONTEXT_REQUIRED = {
+    "계좌이체": ["돈", "원을", "원 을", "만원", "만 원", "금액", "대금", "요금", "비용",
+                 "계좌", "입금", "송금", "이체", "결제", "수수료", "보증금", "공탁금",
+                 "합의금", "예치금", "선입금", "지급"],
+    "앱설치": ["앱", "어플", "애플리케이션", "app", "APP", "앱스토어", "플레이스토어",
+               "다운로드", "프로그램", "apk", "APK", "파일", "링크"],
+}
+
+
+def detect_risk_action_detail(text: str) -> tuple[Optional[str], str]:
+    """요구된 '위험한 행동'과 **그 근거가 된 원문 어휘**를 함께 돌려준다.
+
+    반환: (유형 or None, 매칭된 어휘)
+    ★ 어휘를 함께 돌려주는 이유: 화면에 근거 구절을 그대로 인용하기 위해서다.
+      유형 라벨이 만에 하나 어긋나도 사용자는 실제 구절을 본다.
+    """
+    t = text or ""
+    best_label: Optional[str] = None
+    best_kw = ""
+    for label, keywords in RISK_ACTION_KEYWORDS.items():
+        for k in keywords:
+            if k not in t:
+                continue
+            # (나) 문맥 조건
+            if label in _RISK_CONTEXT_REQUIRED and k not in _RISK_SELF_EVIDENT.get(label, set()):
+                if not any(c in t for c in _RISK_CONTEXT_REQUIRED[label]):
+                    continue
+            # (가) 최장 매칭 우선
+            if len(k) > len(best_kw):
+                best_label, best_kw = label, k
+    return best_label, best_kw
+
+
 def detect_risk_action(text: str) -> str | None:
     """이 글이 사용자에게 요구하는 '위험한 행동'을 고른다. 없으면 None.
 
     계좌이체 / 앱설치 / 인증번호 / 개인정보요구 중 하나를 돌려준다.
     """
-    t = text or ""
-    for label, keywords in RISK_ACTION_KEYWORDS.items():
-        if any(k in t for k in keywords):
-            return label
-    return None
+    return detect_risk_action_detail(text)[0]
 
 
 def detect_signals(text: str) -> List[dict]:
