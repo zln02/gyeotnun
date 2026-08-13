@@ -72,127 +72,168 @@ function firstSentence(label) {
   return s.replace(/입니다\.?$/, '이에요').replace(/습니다\.?$/, '어요')
 }
 
+/** 위험행동 유형 → 행동 프레임 제목. (2026-08-13)
+ *
+ * ★★ 왜 제목을 따로 두는가 ★★
+ *   위험행동만으로 경고가 되는 글에 "확인이 필요한 문자예요"(의심 프레임)를 그대로
+ *   쓰면 안 된다. 그건 "이 글이 수상하다"는 뜻으로 읽히는데, 서버가 실제로 관찰한
+ *   것은 "이 글이 무엇을 요구한다"뿐이다. **정상 문자를 의심으로 표시하지 않는다**는
+ *   절대 조건과 충돌한다(R10 쿠팡 광고 · R11 카드사 당첨이 그런 글이다).
+ *   그래서 tier 'act' 를 따로 두고 색·그림도 경고(빨강)가 아닌 주황을 쓴다.
+ */
+const RISK_ACTION_TITLE = {
+  계좌이체: ['잠깐, 보내기 전에 ', '확인', '해 보세요'],
+  앱설치: ['잠깐, 설치하기 전에 ', '확인', '해 보세요'],
+  인증번호: ['잠깐, 인증하기 전에 ', '확인', '해 보세요'],
+  개인정보요구: ['잠깐, 보내기 전에 ', '확인', '해 보세요'],
+}
+
+/**
+ * ② '사실 블록' - **항상** 만든다. (2026-08-13 구조 변경)
+ *
+ * ★★ 왜 분리했나 ★★
+ *   전에는 ②가 "먼저 걸리는 신호가 이긴다"는 구조여서, 위험행동이 붙는 순간
+ *   경보문 원문 링크가 화면에서 사라졌다(S12·S16·S18·S22·S28·H27).
+ *   위험행동과 경보문은 **경쟁하는 정보가 아니라 서로 다른 자리**다.
+ *     ① 위험행동 블록 - 이 글이 무엇을 하라고 하는가 + 그 앞에 무엇을 할 것인가
+ *     ② 사실 블록     - 우리가 무엇을 찾았는가(또는 못 찾았는가)
+ *   각자 자기 자리에 들어간다.
+ */
+function factBlock(evidence, signals, refs) {
+  const alert = signals.find((s) => s.key === 'official_alert_matched')
+  if (alert) {
+    // ★ 경보문은 제목과 원문 링크를 함께 보여준다 - 어르신이 그 원문을 직접
+    //   읽는 것이 이 블록의 목적이다(2026-08-12 S22 조치).
+    return {
+      fact: '받으신 내용과 비슷한 사례를 알리는 공식 안내가 있어요',
+      factTitle: refs[0]?.title || '',
+      factUrl: refs[0]?.url || '',
+    }
+  }
+  // ★ similar_scam_case 의 원문 label 은 "...사기 수법과 비슷합니다" 처럼 단정적
+  //   금지어를 담고 있다. 뜻은 살리고 표현만 순화한다.
+  const scam = signals.find((s) => s.severity === 'attention' && s.key === 'similar_scam_case')
+  if (scam) return { fact: '이전에 확인된 사례와 비슷한 문장이 있어요' }
+
+  const other = signals.find(
+    (s) => s.severity === 'attention' && ATTENTION_KEYS.includes(s.key)
+      && s.key !== 'similar_scam_case' && s.key !== 'official_alert_matched',
+  )
+  if (other) return { fact: firstSentence(other.label) }
+
+  // ★ verdict_hint 를 우선한다 - refs 가 있어도 초록(찾았어요)으로 올리지 않는다.
+  //   (표시 임계값 우회 방지, 2026-08-06) refs 유무로 '문구만' 나눈다.
+  if (evidence?.verdict_hint !== 'needs_check') {
+    if (refs.length > 0) {
+      let host = ''
+      try { host = refs[0]?.url ? new URL(refs[0].url).hostname.replace(/^www\./, '') : '' } catch { /* noop */ }
+      return {
+        fact: host ? `같은 안내인지는 확인하지 못했어요 · 원문 ${host}` : '같은 안내인지는 확인하지 못했어요',
+        factUrl: refs[0]?.url || '',
+      }
+    }
+    return { fact: '공식 자료를 못 찾았어요 · 기관 대표번호로 확인해 보세요' }
+  }
+
+  // 확신할 만한 공식 근거를 찾았다. (내용이 같은지까지는 확인하지 않았으므로
+  // "맞습니다"라고 쓰지 않는다.)
+  let host = ''
+  try { host = refs[0]?.url ? new URL(refs[0].url).hostname.replace(/^www\./, '') : '' } catch { /* noop */ }
+  return {
+    fact: host ? `원문 보기 → ${host}` : '아래에서 원문을 직접 확인해 보세요',
+    factUrl: refs[0]?.url || '',
+  }
+}
+
 /**
  * 화면에 필요한 것 전부를 한 번에 계산한다.
  * @param evidence  GET /checks/{id}/evidence 응답
  * @param checkData POST /checks 응답 (masked_items 가 여기 있다)
+ *
+ * 반환 - 두 블록이 따로 나간다(2026-08-13)
+ *   risk  ① 위험행동 블록 {quote, fact, action} 또는 null
+ *   fact / factTitle / factUrl  ② 사실 블록 (항상 있다)
  */
 export function judgmentState(evidence, checkData) {
   const signals = evidence?.signals || []
   const refs = evidence?.references || []
   const maskedItems = checkData?.masked_items || []
 
-  // ① 계좌·카드번호가 실제로 검출됐다 → 가장 강한 경고.
-  //    masking.py 의 정규식이 문맥까지 보고 잡아낸 '진짜 숫자'라 신뢰도가 높다.
+  // ── ① 위험행동 블록. tier 와 무관하게, 검출됐으면 항상 만든다.
+  //    ★ quote 는 서버가 마스킹된 텍스트에서만 뽑은 원문 구절이다. 받으신 문장을
+  //      눈으로 직접 대조하게 하는 것이 이 블록의 핵심이다 - 유형 라벨이 만에 하나
+  //      어긋나도 사용자는 실제 문장을 본다.
+  const riskSig = signals.find((s) => s.key === 'risk_action_requested' && RISK_ACTION_TEXT[s.detail])
+  const risk = riskSig
+    ? {
+      detail: riskSig.detail,
+      quote: riskSig.quote || '',
+      fact: RISK_ACTION_TEXT[riskSig.detail][0],
+      action: RISK_ACTION_TEXT[riskSig.detail][1],
+    }
+    : null
+
+  // ── ② 사실 블록. 항상 만든다.
+  const facts = factBlock(evidence, signals, refs)
+
+  // ── 단계와 제목
+  //    ① 계좌·카드번호가 실제로 검출됐다 → 가장 강한 경고.
+  //       masking.py 의 정규식이 문맥까지 보고 잡아낸 '진짜 숫자'라 신뢰도가 높다.
   const money = maskedItems.find((m) => m.type === 'account' || m.type === 'card')
   if (money) {
     return {
       tier: 'danger',
       lead: '지금 ', accent: '멈추세요', tail: '',
+      risk,
+      ...facts,
       fact: MASKED_LABEL[money.type] || '금융 정보가 적혀 있어요',
+      factTitle: '', factUrl: '',
     }
   }
 
-  // ② 주의 신호가 있다 → 확인 필요.
+  // ② 의심 프레임 - 위험행동 말고 다른 주의 신호가 있다.
+  //    ★ 그 신호들(사기사례 유사·경보문 매칭·조건 생략·서두름)은 글 자체에서 관찰된
+  //      의심 근거라 "확인이 필요한 문자예요"가 정당하다.
   const attention = signals.find((s) => s.severity === 'attention' && ATTENTION_KEYS.includes(s.key))
   if (attention) {
-    // ★★ 경고의 '이유'를 바로잡는다 (2026-08-13) ★★
-    //   이 글이 무엇을 요구하는지 서버가 실제로 검출했다면, 그것을 이유로 쓴다.
-    //   ★ tier 는 바꾸지 않는다. 여기는 이미 warn 인 자리이고, 이 분기가 하는 일은
-    //     "왜 경고인지"를 실제 검출한 것으로 교체하는 것뿐이다. 그래서 정상 오판이
-    //     원리적으로 늘지 않는다(서버 스위치 RISK_ACTION_RAISES_TIER=false 와 짝).
-    //   ★ 근거가 된 원문 구절을 그대로 인용한다 - 유형 라벨이 만에 하나 어긋나도
-    //     사용자는 실제 문장을 본다. 눈으로 대조할 수 있어야 한다.
-    const risk = signals.find((s) => s.key === 'risk_action_requested' && RISK_ACTION_TEXT[s.detail])
-    if (risk) {
-      const [fact, action] = RISK_ACTION_TEXT[risk.detail]
-      return {
-        tier: 'warn',
-        lead: '확인이 ', accent: '필요', tail: '한 문자예요',
-        fact: `${fact} ${action}`,
-        factQuote: risk.quote || '',
-      }
-    }
-    // ★ official_alert_matched 는 공식 경보문을 실제로 찾은 경우다. 어르신이 그
-    //   원문을 직접 읽는 것이 이 화면의 목적이므로, 문구를 링크로 걸어 크게 보여
-    //   준다(factUrl 이 있으면 Judgment.jsx 가 <a> 로 렌더링한다).
-    //   ★ "사기"·"가짜" 를 쓰지 않는다 - validate_question 금지어와 같은 기준이다.
-    //     찾은 것은 '비슷한 사례를 알리는 안내'이지 이 글에 대한 판정이 아니다.
-    //   ★ "찾았어요" 도 쓰지 않는다. 초록(④)의 "공식 자료를 찾았어요" 와 같은
-    //     표현이라 S22 에서 사용자를 오도한 그 문구가 된다.
-    if (attention.key === 'official_alert_matched') {
-      return {
-        tier: 'warn',
-        lead: '확인이 ', accent: '필요', tail: '한 문자예요',
-        fact: '받으신 내용과 비슷한 사례를 알리는 공식 안내가 있어요',
-        factUrl: refs[0]?.url || '',
-      }
-    }
-    // ★ similar_scam_case 의 원문 label 은 "...사기 수법과 비슷합니다" 처럼 단정적
-    //   금지어를 담고 있다. 뜻은 살리고 표현만 순화한다.
-    const fact = attention.key === 'similar_scam_case'
-      ? '이전에 확인된 사례와 비슷한 문장이 있어요'
-      : firstSentence(attention.label)
     return {
       tier: 'warn',
       lead: '확인이 ', accent: '필요', tail: '한 문자예요',
-      fact,
+      risk,
+      ...facts,
     }
   }
 
-  // ③ 백엔드가 '확신할 공식 근거 없음'(no_source_found)을 줬다.
-  //    ★ verdict_hint 를 우선한다 - refs 가 있어도 초록(찾았어요)으로 올리지 않는다.
-  //      (표시 임계값 우회 방지, 2026-08-06) 예전에는 refs.length===0 일 때만 여기로
-  //      왔고, no_source_found 인데 refs 가 있으면 ④ 초록으로 떨어져 "찾았습니다"가
-  //      나갔다(배민 문자 → NIA 문서 오매칭). refs 유무로 '문구만' 나눈다.
-  if (evidence?.verdict_hint === 'no_source_found') {
-    if (refs.length > 0) {
-      let host = ''
-      try { host = refs[0]?.url ? new URL(refs[0].url).hostname.replace(/^www\./, '') : '' } catch { /* noop */ }
-      return {
-        tier: 'hold',
-        lead: '비슷한 자료는 ', accent: '찾았', tail: '지만',
-        fact: host ? `같은 안내인지는 확인하지 못했어요 · 원문 ${host}` : '같은 안내인지는 확인하지 못했어요',
-        factUrl: refs[0]?.url || '',
-      }
-    }
-    return {
-      tier: 'hold',
-      lead: '공식 자료를 ', accent: '못 찾았', tail: '어요',
-      fact: '기관 대표번호로 확인해 보세요',
-    }
+  // ③ 행동 프레임 - 위험행동만이 유일한 근거다.
+  //    ★ 의심 프레임을 재사용하지 않는다(위 RISK_ACTION_TITLE 주석 참고).
+  //    ★ severity 를 본다. 서버 스위치 RISK_ACTION_RAISES_TIER 가 꺼져 있으면
+  //      info 로 오고, 그때는 단계를 올리지 않는다 - 스위치가 화면까지 관통한다.
+  if (risk && riskSig.severity === 'attention') {
+    const [lead, accent, tail] = RISK_ACTION_TITLE[risk.detail]
+    return { tier: 'act', lead, accent, tail, risk, ...facts }
   }
 
   // ★★ 초록은 '허용 목록' 방식이다 (2026-08-12) ★★
   //   전에는 배제 방식이었다 - ②의 신호 목록에 걸리면 초록에서 내리고, 안 걸리면
   //   초록으로 갔다. 이러면 **목록에 없는 신호가 새로 생기는 순간 뚫린다.**
-  //   partially_matched 는 ③(no_source_found)을 그냥 지나가므로 ②가 유일한
-  //   방어선이었다. 서버에 attention 신호를 하나 추가하면서 위 ATTENTION_KEYS 에
-  //   넣는 것을 잊으면, 그 글이 초록 "공식 자료를 찾았어요"로 나간다.
-  //   (8/8 에 유사도 0.6207 이 초록으로 나간 사고가 같은 종류였다.)
-  //
   //   그래서 조건을 뒤집는다: **needs_check(확신 매칭)일 때만 초록으로 올린다.**
   //   배제 목록은 빠뜨리면 뚫리지만, 허용 목록은 빠뜨리면 주황으로 안전하게 떨어진다.
-  //
-  //   ★ 채택 시점 기준 동작 변화는 0건이다(평가셋 112 + 홀드아웃 30 전수 대조).
-  //     지금은 needs_check 가 곧 확신 매칭이라 결과가 같다 - 이 변경은 그 등식이
-  //     깨질 때를 대비한 것이지, 오늘 무엇을 고치려는 게 아니다.
   if (evidence?.verdict_hint !== 'needs_check') {
     return {
       tier: 'hold',
-      lead: '같은 안내인지 ', accent: '확인하지 못했', tail: '어요',
-      fact: '기관 대표번호로 확인해 보세요',
+      lead: refs.length > 0 ? '같은 안내인지 ' : '공식 자료를 ',
+      accent: refs.length > 0 ? '확인하지 못했' : '못 찾았',
+      tail: '어요',
+      risk,
+      ...facts,
     }
   }
 
-  // ④ 확신할 만한 공식 근거를 찾았다. '사실 한 줄'은 실제로 찾은 문서의 도메인을
-  //    그대로 보여준다. (내용이 같은지까지는 확인하지 않았으므로 "맞습니다"라고 쓰지 않는다.)
-  let host = ''
-  try { host = refs[0]?.url ? new URL(refs[0].url).hostname.replace(/^www\./, '') : '' } catch { /* noop */ }
+  // ④ 확신할 만한 공식 근거를 찾았다.
   return {
     tier: 'ok',
     lead: '공식 자료를 ', accent: '찾았', tail: '어요',
-    fact: host ? `원문 보기 → ${host}` : '아래에서 원문을 직접 확인해 보세요',
-    factUrl: refs[0]?.url || '',
+    risk,
+    ...facts,
   }
 }

@@ -27,7 +27,11 @@ import arrowRight from '../assets/verify/ic_arrow_right_white.svg'
 
 const SCREEN = 'S3'   // 계측 코드는 기존 S3(확인 흐름)에 묶는다 - 흐름상 같은 단계다
 
-const HERO = { danger: warnHero, warn: warnHero, hold: holdHero, ok: okHero }
+// ★ act(행동 프레임)는 경고 그림을 쓰지 않는다 (2026-08-13).
+//   위험행동만으로 올라간 글에 빨간 경고 그림을 띄우면, 문구를 아무리 고쳐도
+//   그림이 "이 글은 수상하다"고 말한다 - 정상 문자를 의심으로 표시하지 않는다는
+//   절대 조건과 충돌한다. 주황(hold) 그림을 함께 쓴다.
+const HERO = { danger: warnHero, warn: warnHero, act: holdHero, hold: holdHero, ok: okHero }
 
 export default function Judgment({ evidence, checkData, onStart }) {
   const s = judgmentState(evidence, checkData)
@@ -45,13 +49,21 @@ export default function Judgment({ evidence, checkData, onStart }) {
         {s.lead}<span className={`accent ${s.tier}`}>{s.accent}</span>{s.tail}
       </h2>
 
-      {/* ★ 검출 근거가 된 원문 구절을 그대로 인용한다 (2026-08-13).
-          받으신 문장을 눈으로 직접 대조할 수 있어야 한다 - 유형 판단이 만에 하나
-          어긋나도 사용자는 실제 문장을 본다.
+      {/* ── ① 위험행동 블록 (2026-08-13). 검출됐을 때만 나온다.
+          ★ 인용 구절이 먼저다. 받으신 문장을 눈으로 직접 대조하는 것이 목적이라
+            읽히는 것이 먼저다 - 유형 판단이 만에 하나 어긋나도 실제 문장은 보인다.
           ★ 서버가 이미 마스킹된 텍스트에서만 뽑는다(전화번호·계좌가 실릴 수 없다).
-            구절을 못 뽑으면 서버가 빈 값을 주고, 그때는 이 블록이 아예 안 나온다. */}
-      {s.factQuote ? (
-        <p className={`judgment-quote ${s.tier}`}>{`“${s.factQuote}”`}</p>
+            구절을 못 뽑으면 서버가 빈 값을 주고, 그때는 인용 없이 문구만 나간다.
+          ★ ②사실 블록과 경쟁하지 않는다. 서로 다른 자리다 -
+            ①은 "이 글이 무엇을 하라고 하는가", ②는 "우리가 무엇을 찾았는가". */}
+      {s.risk ? (
+        <div className={`judgment-risk ${s.tier}`}>
+          {s.risk.quote ? (
+            <p className="judgment-risk-quote">{`“${s.risk.quote}”`}</p>
+          ) : null}
+          <p className="judgment-risk-fact">{s.risk.fact}</p>
+          <p className="judgment-risk-action">{s.risk.action}</p>
+        </div>
       ) : null}
 
       {/* ★ '사실 한 줄' - 무엇을 보고 이렇게 판단했는지 여기서 바로 알려 준다.
@@ -70,6 +82,9 @@ export default function Judgment({ evidence, checkData, onStart }) {
           }}
         >
           {s.fact}
+          {/* ★ 경보문 제목을 링크 안에 함께 보여준다 (2026-08-13).
+              어르신이 그 원문을 직접 읽는 것이 이 블록의 목적이다. */}
+          {s.factTitle ? <span className="judgment-fact-title">{s.factTitle}</span> : null}
         </a>
       ) : (
         <p className={`judgment-fact ${s.tier}`}>{s.fact}</p>

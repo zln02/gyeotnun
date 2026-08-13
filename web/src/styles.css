@@ -1677,6 +1677,7 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 .judgment-hero.danger .judgment-hero-ring { border-color: rgba(194, 47, 47, .7); }
 .judgment-hero.ok .judgment-hero-ring     { border-color: rgba(36, 153, 103, .6); }
 .judgment-hero.hold .judgment-hero-ring   { border-color: rgba(217, 119, 6, .6); }
+.judgment-hero.act .judgment-hero-ring    { border-color: rgba(217, 119, 6, .6); }
 /* ★ 2026-08-09 리디자인 브랜치(bd62d32)에서 가져온 두 가지: 아이콘을 키우고,
      갈래별로 그림자 색을 맞춘다. 전에는 98px 에 그림자가 없어 178px 원 안에서
      아이콘이 작고 붕 떠 보였다. 링(judgment-hero-ring)만으로는 번짐이 약했다.
@@ -1709,22 +1710,42 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
    못 찾음은 주황, 찾음은 초록 - 정상 안내문에 빨간 경고가 나가면 안 된다. */
 .judgment-title .accent.danger { color: #C22F2F; }
 .judgment-title .accent.warn   { color: #D84747; }
+.judgment-title .accent.act    { color: #B45309; }
 .judgment-title .accent.hold   { color: #B45309; }
 .judgment-title .accent.ok     { color: #249967; }
 
-/* 검출 근거가 된 원문 구절 인용 (2026-08-13).
-   ★ '사실 한 줄'보다 위에, 더 크게 둔다. 어르신이 받으신 문장을 눈으로 직접
-     대조하는 것이 이 블록의 목적이라 읽히는 것이 먼저다.
-   ★ 색은 갈래를 따라가되 배경은 옅게 - 인용이 판정처럼 보이면 안 된다. */
-.judgment-quote {
-  margin: 16px 0 0; padding: 12px 16px;
-  border-left: 4px solid #D9D9D9; border-radius: 4px;
-  background: #F6F6F6; color: #2B2B2B;
-  font-size: 19px; font-weight: 700; line-height: 1.55;
-  text-align: left; word-break: keep-all;
+/* ── ① 위험행동 블록 (2026-08-13)
+   ★ '사실 한 줄'보다 위에 둔다. 어르신이 받으신 문장을 눈으로 직접 대조하는 것이
+     이 블록의 목적이라 읽히는 것이 먼저다.
+   ★ 배경은 중립(회색)이다 - 인용이 판정처럼 보이면 안 된다. 왼쪽 띠 색만
+     갈래를 따라간다. */
+.judgment-risk {
+  margin: 16px 0 0; padding: 14px 16px;
+  border-left: 4px solid #D9D9D9; border-radius: 6px;
+  background: #F6F6F6; text-align: left; word-break: keep-all;
 }
-.judgment-quote.danger { border-left-color: #A82424; }
-.judgment-quote.warn   { border-left-color: #B33B3B; }
+.judgment-risk.danger { border-left-color: #A82424; }
+.judgment-risk.warn   { border-left-color: #B33B3B; }
+.judgment-risk.act    { border-left-color: #B45309; }
+.judgment-risk-quote {
+  margin: 0; color: #2B2B2B;
+  font-size: 19px; font-weight: 700; line-height: 1.55;
+}
+.judgment-risk-fact {
+  margin: 8px 0 0; color: #1F1F1F;
+  font-size: 17px; font-weight: 700; line-height: 1.55;
+}
+/* 다음에 무엇을 할지. 사실보다 조금 옅게 - 지시가 아니라 권유다. */
+.judgment-risk-action {
+  margin: 4px 0 0; color: #4A4A4A;
+  font-size: 16px; font-weight: 500; line-height: 1.55;
+}
+
+/* 경보문 제목 - 링크 안에서 줄을 바꿔 보여준다. 어르신이 무엇을 여는지 알고 눌러야 한다. */
+.judgment-fact-title {
+  display: block; margin-top: 4px;
+  font-size: 15px; font-weight: 500; line-height: 1.45;
+}
 
 /* '사실 한 줄' - 무엇을 보고 그렇게 판단했는지. 다음 화면까지 안 가도 알 수 있게. */
 .judgment-fact {
@@ -1734,6 +1755,7 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 }
 .judgment-fact.danger { background: #FDECEC; color: #A82424; }
 .judgment-fact.warn   { background: #FDEFEF; color: #B33B3B; }
+.judgment-fact.act    { background: #FDF3E4; color: #8A4408; }
 .judgment-fact.hold   { background: #FDF3E4; color: #8A4408; }
 .judgment-fact.ok     { background: #EAF9F1; color: #176947; }
 .judgment-fact.link { text-decoration: underline; text-underline-offset: 3px; }
@@ -1747,6 +1769,7 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 }
 .judgment-cta.danger { background: #E05252; box-shadow: 0 7px 16px rgba(224, 82, 82, .3); }
 .judgment-cta.warn   { background: #f07879; box-shadow: 0 7px 16px rgba(240, 120, 121, .25); }
+.judgment-cta.act    { background: #E8952F; box-shadow: 0 7px 16px rgba(232, 149, 47, .28); }
 .judgment-cta.hold   { background: #E8952F; box-shadow: 0 7px 16px rgba(232, 149, 47, .28); }
 .judgment-cta.ok     { background: var(--fg-primary); box-shadow: 0 7px 16px rgba(71, 216, 153, .25); }
 .judgment-cta:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
