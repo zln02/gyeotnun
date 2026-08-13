@@ -244,7 +244,7 @@ def detect_risk_action(text: str) -> str | None:
 #     "정상을 의심으로 표시하지 않는다"는 절대 조건과 충돌한다.
 #     실측·결정: docs/evaluation/위험행동_신호_설계측정_2026-08-13.md
 RISK_ACTION_SIGNAL = True
-RISK_ACTION_RAISES_TIER = False
+RISK_ACTION_RAISES_TIER = True
 
 # 서버 label 은 고정 문구다(no_official_source·urgency_pressure 와 같은 형식).
 # ★ 화면 문구는 verdict.js 가 detail 로 분기해 따로 정한다 - 60대 대상 문구를

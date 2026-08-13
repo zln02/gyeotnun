@@ -107,19 +107,23 @@ def test_risk_action_signal_is_emitted_with_detail_and_quote():
     assert "찾았" not in sig["label"]
 
 
-def test_risk_action_signal_does_not_raise_tier_by_default():
-    """기본값(안B)은 severity=info 다 - tier 를 올리지 않는다.
+def test_risk_action_raises_tier_is_on_and_paired_with_action_frame():
+    """안A 적용 상태 - severity=attention 으로 나간다 (2026-08-13 3단계).
 
-    ★ 이 단정이 깨지면 정상 문자가 경고로 올라가기 시작한다. 스위치를 켜는 것은
-      화면 변형을 먼저 만든 뒤의 별도 결정이다(의심 프레임 재사용 금지).
+    ★★ 이 스위치를 켜는 데에는 전제가 있다 ★★
+      위험행동만으로 올라간 글은 화면에서 **행동 프레임(tier 'act', 주황)** 으로
+      나가야 한다. 사기사례 유사 화면("확인이 필요한 문자예요", 빨강)을 재사용하면
+      그건 의심 프레임이고 "정상을 의심으로 표시하지 않는다"는 절대 조건과 충돌한다.
+      R10(쿠팡 광고 + 본인인증)·R11(카드사 당첨 + 앱설치)이 그런 글이다.
+
+      화면 쪽 짝은 web/src/verdict.js 의 tier 'act' 분기다. 그쪽이 사라지면
+      이 스위치는 정상 문자에 빨간 경고를 띄우게 된다 - 함께 움직여야 한다.
+      전수 대조 도구: tools/render_verdict.mjs
     """
-    assert search.RISK_ACTION_RAISES_TIER is False, (
-        "안A(tier 올림)로 켜는 것은 화면 변형 승인 뒤의 별도 결정이다. "
-        "docs/evaluation/위험행동_신호_설계측정_2026-08-13.md 참고"
-    )
+    assert search.RISK_ACTION_RAISES_TIER is True
     result = search.collect_evidence("고객님 KB Pay 앱 설치 후 이용해주세요.")
     sig = next(s for s in result.signals if s["key"] == "risk_action_requested")
-    assert sig["severity"] == "info"
+    assert sig["severity"] == "attention"
 
 
 def test_risk_action_signal_can_be_disabled():
