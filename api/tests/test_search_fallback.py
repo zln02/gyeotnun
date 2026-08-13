@@ -111,8 +111,7 @@ def test_weak_embedding_similarity_below_confidence_threshold_yields_no_source_f
       단정을 완화한 게 아니라, 전제에 맞는 문서(제도 안내문)를 고르도록 고쳤다.
       경보문이 붙는 경우는 아래 test_alert_doc_match_raises_attention 이 따로 본다."""
     fake_doc = next(
-        (d for d in corpus_index.OFFICIAL_DOCS
-         if d.data_type not in search.ALERT_DOC_DATA_TYPES), None,
+        (d for d in corpus_index.OFFICIAL_DOCS if not search._is_alert_doc(d)), None,
     )
     if fake_doc is None:
         pytest.skip("OFFICIAL_DOCS 가 로컬에 없다 - 스킵")
@@ -145,8 +144,7 @@ def test_alert_doc_match_raises_attention():
       docs/evaluation/IDF척도이동_A안_2026-08-12.md
     """
     alert_doc = next(
-        (d for d in corpus_index.OFFICIAL_DOCS
-         if d.data_type in search.ALERT_DOC_DATA_TYPES), None,
+        (d for d in corpus_index.OFFICIAL_DOCS if search._is_alert_doc(d)), None,
     )
     if alert_doc is None:
         pytest.skip("OFFICIAL_DOCS 에 경보문이 없다 - 스킵")
@@ -172,6 +170,36 @@ def test_alert_doc_match_raises_attention():
     label = next(s["label"] for s in result.signals if s["key"] == "official_alert_matched")
     assert "찾았" not in label, f"label 에 '찾았' 표현이 있다: {label}"
     assert "사기" not in label and "가짜" not in label, f"금지어가 있다: {label}"
+
+
+def test_alert_allowlist_covers_only_reviewed_press_releases():
+    """press_release 는 '사람이 검수해 올린 8건'만 경보문으로 본다 (2026-08-13).
+
+    ★ 이 테스트가 지키는 것: 누군가 편하다고 ALERT_DOC_DATA_TYPES 에
+      "press_release" 를 넣어 버리면 C 16건(업무협약·시상식·단속실적·성과통계)이
+      함께 경보문이 된다. 그 순간 "사람이 확인한 것만 들어간다"가 깨진다.
+      아래 두 단정이 그 변경을 즉시 빨간불로 만든다.
+      분류 근거: docs/evaluation/press_release_24건_분류초안_2026-08-13.md
+    """
+    docs = {d.id: d for d in corpus_index.OFFICIAL_DOCS}
+    if not docs:
+        pytest.skip("OFFICIAL_DOCS 가 로컬에 없다 - 스킵")
+
+    listed = [docs[i] for i in search.ALERT_DOC_IDS if i in docs]
+    assert len(listed) == len(search.ALERT_DOC_IDS), (
+        "허용목록의 문서 id 중 코퍼스에 없는 것이 있다 - 코퍼스가 바뀌었으면 "
+        "재분류가 필요하다: " + str(search.ALERT_DOC_IDS - set(docs))
+    )
+    assert all(search._is_alert_doc(d) for d in listed), "허용목록 문서가 경보문으로 안 잡힌다"
+
+    others = [d for d in corpus_index.OFFICIAL_DOCS
+              if getattr(d, "data_type", "") == "press_release"
+              and d.id not in search.ALERT_DOC_IDS]
+    assert others, "press_release 가 전부 허용목록이면 이 테스트는 아무것도 지키지 못한다"
+    assert not any(search._is_alert_doc(d) for d in others), (
+        f"허용목록에 없는 press_release {len(others)}건이 경보문으로 잡힌다 - "
+        "ALERT_DOC_DATA_TYPES 에 press_release 가 들어갔는지 확인할 것"
+    )
 
 
 def _reset_fallback_observer():
@@ -224,8 +252,7 @@ def test_search_fallback_rate_is_silent_when_healthy(caplog):
 def test_alert_signal_can_be_disabled():
     """되돌릴 스위치가 실제로 동작하는지 - ALERT_DOC_AS_ATTENTION=False 면 이전 동작."""
     alert_doc = next(
-        (d for d in corpus_index.OFFICIAL_DOCS
-         if d.data_type in search.ALERT_DOC_DATA_TYPES), None,
+        (d for d in corpus_index.OFFICIAL_DOCS if search._is_alert_doc(d)), None,
     )
     if alert_doc is None:
         pytest.skip("OFFICIAL_DOCS 에 경보문이 없다 - 스킵")

@@ -97,9 +97,47 @@ URGENCY_REQUIRES_ACTION = True
 ALERT_DOC_AS_ATTENTION = True
 
 # 경보문으로 볼 data_type. records_merged.jsonl 의 원본 필드를 그대로 쓴다.
-# ★ press_release(24건)는 넣지 않는다 - "업무협약 체결"·"출범 6개월 성과" 같은
-#   정책·성과 발표가 섞여 있어 경보문이라 부를 수 없다. 사람 검수 후 별도로 다룬다.
+# ★ press_release(24건)는 data_type 으로 넣지 않는다 - "업무협약 체결"·"출범 6개월
+#   성과" 같은 정책·성과 발표가 섞여 있어 통째로 경보문이라 부를 수 없다.
+#   대신 사람이 검수한 8건만 아래 ALERT_DOC_IDS 로 개별 지정한다.
 ALERT_DOC_DATA_TYPES = {"warning_case"}
+
+# ★★ 사람이 검수해 확정한 경보문 문서 id 허용목록 (2026-08-13) ★★
+#   press_release 24건을 A/B/C 로 분류한 결과 B(사기 경보문) 8건.
+#   분류 초안·근거: docs/evaluation/press_release_24건_분류초안_2026-08-13.md
+#   기준: 금융코퍼스_수집조사_2026-08-12.md §2 (A·B 둘 다면 B 우선, 애매하면 C)
+#
+#   ★ 왜 data_type 이 아니라 id 목록인가
+#     ALERT_DOC_DATA_TYPES 에 "press_release" 를 넣으면 C 16건(업무협약·시상식·
+#     단속실적·성과통계)이 함께 딸려 온다. 그것들은 사용자가 받은 문자를 대조할
+#     근거도, 사기 수법 설명도 아니다. **id 목록이어야 "사람이 확인한 것만
+#     들어간다"가 코드에서도 성립한다.** 새 문서를 자동으로 포함시키지 않는 것이
+#     이 자료구조의 목적이다 - 늘리려면 사람이 다시 분류해야 한다.
+#
+#   ★ C 로 남긴 것 중 판단이 갈렸던 둘 (2026-08-13 사람 확인 완료, C 유지)
+#     #24 소상공인시장진흥공단 협업 - 수법 1문단이 실려 B 요건을 글자대로는
+#          충족하나 문서 목적이 협약 발표다. "애매하면 C" 규칙 적용.
+#     #17 조달청 노쇼사기 협약 - 제목에 '노쇼 사기'가 있으나 수법 묘사가 없다.
+#          제목 단어만으로 넘기면 협약문이 대거 딸려 들어온다.
+ALERT_DOC_IDS = {
+    "1cd77fbda81a4fef75cf",  # 24.10.16. 나도 모르는 사이에 내 휴대전화가 좀비 폰으로?
+    "37a6132cf4a6384ac918",  # 25.10.2. 국가정보자원관리원 화재 상황을 악용한 피싱 주의
+    "70e0c6e28a0d988ac80f",  # 25.1.22. 갈수록 진짜 같은 전화금융사기, 가스라이팅의 덫
+    "71894b4e7748634ff2f6",  # 24.10.24. 기관사칭형 보이스피싱, 60대 여성을 노린다
+    "8a19ce4581ea7665b51c",  # 25.4.28. 그놈 목소리, 치밀한 각본 주인공이 되시겠습니까
+    "c17b9a29ba832ccb32db",  # 24.11.8. 딥페이크를 악용한 자녀납치형 전화금융사기 주의
+    "cf16ec150722322d2079",  # 26.3.24. 중동 사태 악용 피싱 '주의 경보' 발령
+    "d9537fcb58ca6f781e7a",  # 26.2.12. 신종 스캠 주의보 - 설 명절
+}
+
+
+def _is_alert_doc(doc) -> bool:
+    """이 공식 문서를 '사기 경보문'으로 볼 것인가.
+
+    두 경로다 - data_type 이 warning_case 이거나(134건, 원본 라벨을 그대로 신뢰),
+    사람이 검수해 허용목록에 올린 문서이거나(press_release 중 8건).
+    """
+    return getattr(doc, "data_type", "") in ALERT_DOC_DATA_TYPES or doc.id in ALERT_DOC_IDS
 
 # 문장이 '요구하는 행동'을 텍스트만 보고 고른다.
 # ★ 평가셋의 위험행동 컬럼을 절대 참조하지 않는다 - 그건 라벨 누수이고 배포할 수 없다.
@@ -459,9 +497,7 @@ def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
     #        urgency_pressure 등 다른 attention 키와 같은 형식을 따른다.
     #      ★ "찾았습니다"를 쓰지 않는다. 초록 화면의 "공식 자료를 찾았어요"와
     #        같은 표현이라, 고치려는 그 오해를 label 로 다시 만들게 된다.
-    if ALERT_DOC_AS_ATTENTION and any(
-        getattr(d, "data_type", "") in ALERT_DOC_DATA_TYPES for d in matched_official
-    ):
+    if ALERT_DOC_AS_ATTENTION and any(_is_alert_doc(d) for d in matched_official):
         signals.append({
             "key": "official_alert_matched",
             "label": "받으신 내용과 비슷한 사례를 알리는 공식 안내가 있습니다.",
