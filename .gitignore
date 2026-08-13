@@ -81,3 +81,9 @@ docs/security/internal/
 #   web/live  = nginx 가 실제로 서빙하는 디렉터리. deploy/publish.sh 로만 갱신한다.
 web/live/
 deploy/live_backups/
+
+# ★ 2026-08-13 수집 스테이징
+#   원문 jsonl 은 저장소에 올리지 않는다 - tools/collect_fsc.py 로 언제든 재현 가능하고,
+#   저작권 전부를 기관이 보유하지 않은 자료가 섞여 있을 수 있다(금융위 저작권정책 3항).
+#   사람이 검수하는 분류표(CSV)만 올린다.
+corpus/collect/*.jsonl
