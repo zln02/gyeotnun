@@ -111,3 +111,55 @@ min_score 5.0 유지 결정 기록 / R11 "경고의 이유" 본선 과제 등록
   1. 판정 로직 변경이다. 신호를 새로 내보내면 tier 계산에 영향이 간다. 8/8 사고 경로.
   2. 예선 제출 수치가 재측정 대상이 된다. 축1·축2 양쪽이 움직인다.
   3. 60대 대상 문구를 코드 쪽에서 임의 확정하면 안 된다 (A안 때와 같다).
+
+
+================================================================
+3. press_release 분류 반영 (2026-08-13 추가)
+================================================================
+사람 확인 결과: 초안 그대로 B 8건 확정. #24 · #17 은 C 유지 확정.
+반영: services/search.py ALERT_DOC_IDS (문서 id 허용목록)
+
+★ data_type 에 press_release 를 추가하는 방식은 쓰지 않았다.
+  24건이 전부 같은 data_type 이라 C 16건(업무협약·시상식·단속실적·성과통계)이
+  함께 딸려 온다. id 목록이어야 "사람이 확인한 것만 들어간다"가 코드에서 성립한다.
+  새 문서가 자동으로 포함되지 않는 것이 이 자료구조의 목적이다.
+
+B 8건 (문서 id)
+  1cd77fbda81a4fef75cf  24.10.16. 나도 모르는 사이에 내 휴대전화가 좀비 폰으로?
+  37a6132cf4a6384ac918  25.10.2. 국가정보자원관리원 화재 상황을 악용한 피싱 주의
+  70e0c6e28a0d988ac80f  25.1.22. 갈수록 진짜 같은 전화금융사기, 가스라이팅의 덫
+  71894b4e7748634ff2f6  24.10.24. 기관사칭형 보이스피싱, 60대 여성을 노린다
+  8a19ce4581ea7665b51c  25.4.28. 그놈 목소리, 치밀한 각본 주인공이 되시겠습니까
+  c17b9a29ba832ccb32db  24.11.8. 딥페이크를 악용한 자녀납치형 전화금융사기 주의
+  cf16ec150722322d2079  26.3.24. 중동 사태 악용 피싱 '주의 경보' 발령
+  d9537fcb58ca6f781e7a  26.2.12. 신종 스캠 주의보 - 설 명절
+
+검증 (experiments/verify_alert_ids.py, 확대 112 + 홀드 30 전수)
+  tier 변경 4건 — 의도한 것뿐이고 그 외 0건
+    확대112:S12  hold -> warn   attention [] -> [official_alert_matched]
+    확대112:S28  hold -> warn   attention [] -> [official_alert_matched]
+    홀드30:H23   hold -> warn   attention [] -> [official_alert_matched]
+    홀드30:H27   hold -> warn   attention [] -> [official_alert_matched]
+
+  지표             반영 전        반영 후
+  정상 오판        1/37 · 1/10    1/37 · 1/10   불변
+  축2 헛경고       2/70 · 3/18    2/70 · 3/18   불변
+  사칭 경고        16/37 · 2/10   18/37 · 4/10
+  축2 있음         17/39 · 2/11   19/39 · 4/11
+
+  pytest -q  87 passed (86 -> 87)
+  회귀 방어: test_alert_allowlist_covers_only_reviewed_press_releases
+    ALERT_DOC_DATA_TYPES 에 press_release 를 넣으면 즉시 실패.
+    허용목록 id 가 코퍼스에서 사라져도 실패(재분류 신호).
+
+배포 — 백엔드만. 프론트 변경 없음(official_alert_matched 는 이미 처리 중).
+  docker compose restart api : 5초 -> /health 200, live / 200
+  라이브 실투입 검증
+    N11  ok    needs_check        []                          <- 대조군, 초록 유지
+    S12  warn  partially_matched  [official_alert_matched]  refs 그놈 목소리
+    S28  warn  partially_matched  [official_alert_matched]  refs 그놈 목소리
+    H23  warn  partially_matched  [official_alert_matched]  refs 그놈 목소리
+    H27  warn  partially_matched  [official_alert_matched]  refs 좀비 폰
+    실패: 없음
+
+되돌리기: ALERT_DOC_AS_ATTENTION = False (기존 스위치가 그대로 덮는다)
