@@ -45,6 +45,15 @@ export default function Judgment({ evidence, checkData, onStart }) {
         {s.lead}<span className={`accent ${s.tier}`}>{s.accent}</span>{s.tail}
       </h2>
 
+      {/* ★ 검출 근거가 된 원문 구절을 그대로 인용한다 (2026-08-13).
+          받으신 문장을 눈으로 직접 대조할 수 있어야 한다 - 유형 판단이 만에 하나
+          어긋나도 사용자는 실제 문장을 본다.
+          ★ 서버가 이미 마스킹된 텍스트에서만 뽑는다(전화번호·계좌가 실릴 수 없다).
+            구절을 못 뽑으면 서버가 빈 값을 주고, 그때는 이 블록이 아예 안 나온다. */}
+      {s.factQuote ? (
+        <p className={`judgment-quote ${s.tier}`}>{`“${s.factQuote}”`}</p>
+      ) : null}
+
       {/* ★ '사실 한 줄' - 무엇을 보고 이렇게 판단했는지 여기서 바로 알려 준다.
           전에는 "비슷한 점이 있어요"까지만 있고 무엇이 비슷한지는 다음 화면에
           가야 알 수 있었는데, 어르신이 정작 알고 싶어 하는 게 그거였다. */}

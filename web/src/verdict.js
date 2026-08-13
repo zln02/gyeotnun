@@ -39,6 +39,26 @@ const ATTENTION_KEYS = [
   'official_alert_matched',
 ]
 
+/** 위험행동 유형 → 화면 문구. 서버 signal.detail 로 분기한다.
+ *
+ * ★ 2026-08-13 추가. 전에는 R11(KB국민카드 당첨 + KB Pay 앱 설치)에 경고가 뜨는데
+ *   이유가 similar_scam_case 라 "이전에 확인된 사례와 비슷한 문장이 있어요"가 나갔다.
+ *   실제로 검출한 것은 "앱 설치를 요구한다" 다. **경고는 옳고 이유가 틀렸다.**
+ *   이 머리말이 못 박은 원칙("사실 한 줄은 실제로 검출한 것만 적는다") 위반이었다.
+ *
+ * ★ "…내용이 있어요" 로 쓰고 "…문자예요" 로 쓰지 않는다.
+ *   후자는 글 전체를 규정한다. R10(쿠팡 광고 + 본인인증)·R11 처럼 정상 문자에
+ *   위험행동이 부수적으로 붙은 경우 과하게 읽힌다. 앞은 '부분'을 가리킨다.
+ * ★ '사기'·'가짜' 를 쓰지 않는다(validate_question 금지어와 같은 기준).
+ *   '찾았어요' 도 쓰지 않는다(초록 문구와 겹쳐 S22 를 재생산한다).
+ */
+const RISK_ACTION_TEXT = {
+  계좌이체: ['돈을 보내라는 내용이 있어요.', '보내기 전에 기관 대표번호로 확인해 보세요'],
+  앱설치: ['앱을 설치하라는 내용이 있어요.', '설치 전에 공식 앱스토어에서 직접 찾아보세요'],
+  인증번호: ['본인인증을 하라는 내용이 있어요.', '문자 속 링크 말고 기관 앱에서 해 보세요'],
+  개인정보요구: ['개인정보를 보내라는 내용이 있어요.', '보내기 전에 기관 대표번호로 확인해 보세요'],
+}
+
 /** 마스킹 유형 → 사람이 읽는 이름. masking.py 가 실제로 숫자를 찾아낸 것만 들어온다. */
 const MASKED_LABEL = {
   account: '계좌번호가 적혀 있어요',
@@ -76,6 +96,23 @@ export function judgmentState(evidence, checkData) {
   // ② 주의 신호가 있다 → 확인 필요.
   const attention = signals.find((s) => s.severity === 'attention' && ATTENTION_KEYS.includes(s.key))
   if (attention) {
+    // ★★ 경고의 '이유'를 바로잡는다 (2026-08-13) ★★
+    //   이 글이 무엇을 요구하는지 서버가 실제로 검출했다면, 그것을 이유로 쓴다.
+    //   ★ tier 는 바꾸지 않는다. 여기는 이미 warn 인 자리이고, 이 분기가 하는 일은
+    //     "왜 경고인지"를 실제 검출한 것으로 교체하는 것뿐이다. 그래서 정상 오판이
+    //     원리적으로 늘지 않는다(서버 스위치 RISK_ACTION_RAISES_TIER=false 와 짝).
+    //   ★ 근거가 된 원문 구절을 그대로 인용한다 - 유형 라벨이 만에 하나 어긋나도
+    //     사용자는 실제 문장을 본다. 눈으로 대조할 수 있어야 한다.
+    const risk = signals.find((s) => s.key === 'risk_action_requested' && RISK_ACTION_TEXT[s.detail])
+    if (risk) {
+      const [fact, action] = RISK_ACTION_TEXT[risk.detail]
+      return {
+        tier: 'warn',
+        lead: '확인이 ', accent: '필요', tail: '한 문자예요',
+        fact: `${fact} ${action}`,
+        factQuote: risk.quote || '',
+      }
+    }
     // ★ official_alert_matched 는 공식 경보문을 실제로 찾은 경우다. 어르신이 그
     //   원문을 직접 읽는 것이 이 화면의 목적이므로, 문구를 링크로 걸어 크게 보여
     //   준다(factUrl 이 있으면 Judgment.jsx 가 <a> 로 렌더링한다).
