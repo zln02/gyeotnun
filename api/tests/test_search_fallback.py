@@ -174,6 +174,53 @@ def test_alert_doc_match_raises_attention():
     assert "사기" not in label and "가짜" not in label, f"금지어가 있다: {label}"
 
 
+def _reset_fallback_observer():
+    search._recent_search_fallbacks.clear()
+    search._search_fallback_alerted = False
+
+
+def test_search_fallback_rate_warns_when_repeated(caplog):
+    """폴백이 '반복되고 있다'는 사실이 로그와 EX-006 으로 남는지 (2026-08-13).
+
+    ★ 개별 발생(EX-003)은 이미 남고 있었다. 없던 것은 비율이다.
+      8/9 에 외부 LLM 폴백률이 8시간 동안 100% 였는데 아무도 몰랐던 것과 같은
+      구조라, 질문 생성 쪽 GN-003 과 같은 형식으로 맞춘 것을 검증한다.
+    """
+    _reset_fallback_observer()
+    codes = []
+    with patch(
+        "services.embeddings.match_embedding_docs",
+        side_effect=EmbeddingUnavailableError("모의 실패"),
+    ), patch("services.incident_log.log_incident",
+             side_effect=lambda code, **kw: codes.append(code)):
+        with caplog.at_level(logging.WARNING, logger="gyeotnun.search"):
+            for _ in range(search._SEARCH_FALLBACK_MIN_SAMPLES):
+                search.match_official_docs_safe(TEXT)
+
+    assert any("[search_fallback_rate]" in r.message for r in caplog.records), \
+        "폴백률이 임계를 넘었는데 상태 경고가 없다"
+    assert codes.count("EX-006") == 1, (
+        f"EX-006 은 임계를 넘는 동안 한 번만 남아야 한다(플래핑 방지), 실제={codes}"
+    )
+    _reset_fallback_observer()
+
+
+def test_search_fallback_rate_is_silent_when_healthy(caplog):
+    """임베딩이 정상일 때는 아무 경고도 남기지 않는다 - 관측이 소음이 되면 안 본다."""
+    _reset_fallback_observer()
+    fake_doc = corpus_index.OFFICIAL_DOCS[0] if corpus_index.OFFICIAL_DOCS else None
+    if fake_doc is None:
+        pytest.skip("OFFICIAL_DOCS 가 로컬에 없다 - 스킵")
+
+    with patch("services.embeddings.match_embedding_docs", return_value=[(0.9, fake_doc)]):
+        with caplog.at_level(logging.WARNING, logger="gyeotnun.search"):
+            for _ in range(search._SEARCH_FALLBACK_WINDOW):
+                search.match_official_docs_safe(TEXT)
+
+    assert not any("[search_fallback_rate]" in r.message for r in caplog.records)
+    _reset_fallback_observer()
+
+
 def test_alert_signal_can_be_disabled():
     """되돌릴 스위치가 실제로 동작하는지 - ALERT_DOC_AS_ATTENTION=False 면 이전 동작."""
     alert_doc = next(

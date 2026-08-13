@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
@@ -318,6 +319,49 @@ def match_official_docs_hybrid(
 #   임베딩을 기본으로 쓰되, 실패하면 로컬 BM25 로 즉시 폴백한다. BM25 는 "공짜
 #   보험" - 어떤 이유로든 임베딩이 안 되면 서비스가 멈추는 대신 조용히 BM25 로
 #   내려간다.
+# ══════════════════════════════════════════════ 검색 폴백률 상시 관측 (2026-08-13)
+# ★ 왜 넣는가: 폴백이 발동하는 상황은 **이미 장애 상황**인데, 화면은 평소와 똑같다.
+#   사용자는 지금 임베딩이 아니라 BM25 로 근거를 붙이고 있다는 사실을 알 수 없고,
+#   BM25 하한선(_OFFICIAL_MIN_SCORE=12.0)은 코퍼스가 커질수록 실질적으로 느슨해진다
+#   (docs/evaluation/본선과제_BM25폴백_척도이동.md). 즉 장애 중에 평소보다 무른
+#   기준으로 근거가 붙는다. 그런데 지금은 "계속 이러고 있다"를 말해 주는 게 없다.
+#
+#   개별 발생은 이미 남는다 - log.warning + log_incident("EX-003") → error_logs 테이블.
+#   없는 것은 **비율**이다. 8/9 에 외부 LLM 이 8시간 동안 폴백률 100% 였는데
+#   아무도 인지하지 못한 사건이 정확히 이 구조였고, 그때 질문 생성 쪽에 붙인 관측이
+#   GN-003 이다. 검색 쪽에 같은 형식으로 맞춘다.
+#
+# ★ 관측만 한다. 폴백 동작도, 임계값도, 판정 로직도 건드리지 않는다.
+#   - 프로세스 메모리라 재시작하면 초기화된다. 워커 1개 전제도 GN-003 과 같다.
+#   - 임계를 넘는 동안에는 한 번만 경고하고, 정상으로 돌아오면 다시 무장한다.
+_SEARCH_FALLBACK_WINDOW = 20        # 최근 몇 건을 볼 것인가
+_SEARCH_FALLBACK_MIN_SAMPLES = 5    # 이만큼 쌓이기 전에는 비율을 말하지 않는다
+_SEARCH_FALLBACK_ALERT_RATE = 0.5   # 이 비율을 넘으면 경고 (GN-003 과 같은 값)
+_recent_search_fallbacks: deque = deque(maxlen=_SEARCH_FALLBACK_WINDOW)
+_search_fallback_alerted = False
+
+
+def _observe_search_fallback(is_fallback: bool) -> None:
+    """검색 1건의 폴백 여부를 기록하고, 비율이 임계를 넘으면 EX-006 을 한 번 남긴다."""
+    global _search_fallback_alerted
+    _recent_search_fallbacks.append(bool(is_fallback))
+    if len(_recent_search_fallbacks) < _SEARCH_FALLBACK_MIN_SAMPLES:
+        return
+    n = len(_recent_search_fallbacks)
+    hit = sum(_recent_search_fallbacks)
+    rate = hit / n
+    if rate > _SEARCH_FALLBACK_ALERT_RATE:
+        if not _search_fallback_alerted:
+            _search_fallback_alerted = True
+            log.warning("[search_fallback_rate] 최근 %d건 중 %d건이 BM25 폴백 (%.0f%%) "
+                        "- 임베딩 인덱스·모델 상태를 점검할 것", n, hit, rate * 100)
+            from services.incident_log import log_incident
+            log_incident("EX-006", detail=f"최근 {n}건 중 BM25 폴백 {hit}건 ({rate * 100:.0f}%)")
+    elif _search_fallback_alerted:
+        _search_fallback_alerted = False   # 정상 복귀 - 다음 악화 때 다시 경고할 수 있게 무장
+        log.info("[search_fallback_rate] 폴백률이 임계 아래로 돌아왔다 (%.0f%%)", rate * 100)
+
+
 def match_official_docs_safe(text: str, limit: int = 2) -> tuple:
     """공식 문서 검색 - 임베딩을 우선 쓰고, 실패하면 즉시 BM25 로 폴백한다.
 
@@ -331,6 +375,7 @@ def match_official_docs_safe(text: str, limit: int = 2) -> tuple:
         docs = [d for _, d in hits]
         top_score = hits[0][0] if hits else None
         log.info("[official_search] 임베딩 검색 성공 (%d건)", len(docs))
+        _observe_search_fallback(False)
         return docs, "embedding", top_score
     except embeddings.EmbeddingUnavailableError as e:
         log.warning("[official_search] 임베딩 검색 실패 - BM25 로 폴백: %s", e)
@@ -341,6 +386,8 @@ def match_official_docs_safe(text: str, limit: int = 2) -> tuple:
         log_incident("EX-003", detail=str(e)[:120])
         docs = corpus_index.match_official_docs(text, limit=limit)
         log.info("[official_search] BM25 폴백 완료 (%d건)", len(docs))
+        # ★ 개별 발생(EX-003)은 위에서 이미 남겼다. 여기서는 '반복되고 있다'만 본다.
+        _observe_search_fallback(True)
         return docs, "bm25_fallback", None
 
 
