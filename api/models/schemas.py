@@ -58,6 +58,16 @@ class Signal(BaseModel):
     key: str = Field(..., description="신호 코드 (예: source_missing, number_mismatch)")
     label: str = Field(..., description="사람이 읽는 한 줄 설명")
     severity: Literal["info", "attention"] = "info"
+    # ★ 2026-08-13 추가. risk_action_requested 하나가 유형 4종을 담기 위한 필드다.
+    #   유형마다 키를 따로 만들지 않은 이유: verdict.js 의 ATTENTION_KEYS 는 허용목록
+    #   방식이라(2026-08-12) 키가 늘 때마다 넣는 걸 잊으면 그 글이 조용히 초록으로
+    #   내려간다. 키는 하나로 두고 유형은 이 필드로 나른다.
+    detail: Optional[str] = Field(
+        None, description="유형 (예: 앱설치/계좌이체/인증번호/개인정보요구)")
+    # ★ 검출 근거가 된 원문 구절. 화면이 이걸 그대로 인용한다 - 유형 라벨이 만에 하나
+    #   어긋나도 사용자는 실제 문장을 본다. 거짓말이 구조적으로 어려워진다.
+    #   ★ 이미 마스킹된 텍스트에서만 나온다(collect_evidence 입력이 masked_text 다).
+    quote: Optional[str] = Field(None, description="검출 근거가 된 원문 구절(마스킹 후)")
 
 
 class Reference(BaseModel):

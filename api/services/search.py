@@ -226,6 +226,56 @@ def detect_risk_action(text: str) -> str | None:
     return detect_risk_action_detail(text)[0]
 
 
+# ══════════════════════════════════════ 위험행동을 화면 신호로 내보낸다 (2026-08-13)
+# ★ 왜: R11(KB국민카드 당첨 + 앱설치)은 warn 이 뜨는데 이유가 similar_scam_case 라
+#   화면에 "이전에 확인된 사례와 비슷한 문장이 있어요" 가 나갔다. 실제로 검출한 것은
+#   "앱 설치를 요구한다" 다. **경고는 옳고 이유가 틀렸다.**
+#   verdict.js 머리말 원칙 - "'사실 한 줄'은 실제로 검출한 것만 적는다" - 위반이다.
+#
+# ★★ 되돌리기·단계 적용 스위치 ★★
+#   RISK_ACTION_SIGNAL      False 로 두면 신호 자체를 안 내보낸다 (2026-08-13 이전 동작)
+#   RISK_ACTION_RAISES_TIER False = 안B. severity=info 로 내보내 **tier 를 올리지 않고
+#                                   이미 경고인 글의 '이유'만 바로잡는다.**
+#                                   정상 오판이 원리적으로 늘지 않는다.
+#                           True  = 안A. severity=attention. hold 였던 글이 warn 으로
+#                                   올라간다(확대 26건). 사칭 검출 +10/+5, 축2 38/39.
+#   ★ True 로 켜기 전에 화면 변형이 먼저다. 위험행동 warn 을 사기사례 유사 화면
+#     ("확인이 필요한 문자예요")으로 재사용하면 그건 의심 프레임이라
+#     "정상을 의심으로 표시하지 않는다"는 절대 조건과 충돌한다.
+#     실측·결정: docs/evaluation/위험행동_신호_설계측정_2026-08-13.md
+RISK_ACTION_SIGNAL = True
+RISK_ACTION_RAISES_TIER = False
+
+# 서버 label 은 고정 문구다(no_official_source·urgency_pressure 와 같은 형식).
+# ★ 화면 문구는 verdict.js 가 detail 로 분기해 따로 정한다 - 60대 대상 문구를
+#   서버에서 확정하지 않는다는 기존 기준 그대로다.
+RISK_ACTION_LABEL = {
+    "계좌이체": "돈을 보내라는 내용이 있습니다.",
+    "앱설치": "앱을 설치하라는 내용이 있습니다.",
+    "인증번호": "본인인증을 하라는 내용이 있습니다.",
+    "개인정보요구": "개인정보를 보내라는 내용이 있습니다.",
+}
+_RISK_QUOTE_MAX = 60
+
+
+def risk_action_quote(text: str, keyword: str) -> str:
+    """검출 근거가 된 어휘가 들어 있는 문장을 그대로 뽑는다.
+
+    ★ 입력은 이미 마스킹된 텍스트다 - collect_evidence 가 받는 값이
+      routers/checks.py 의 stored["masked_text"] 이기 때문이다. 그래서 이 인용에는
+      전화번호·계좌·주민번호가 원본 그대로 실릴 수 없다.
+      ★ 그럼에도 어휘가 마스킹으로 사라졌으면 인용하지 않는다(빈 문자열).
+        없는 문장을 지어내느니 유형 문구만 내보내는 편이 낫다.
+    """
+    if not keyword or keyword not in (text or ""):
+        return ""
+    for sentence in re.split(r"(?<=[.!?])\s|\n", text):
+        if keyword in sentence:
+            s = sentence.strip()
+            return s if len(s) <= _RISK_QUOTE_MAX else s[:_RISK_QUOTE_MAX - 1] + "…"
+    return ""
+
+
 def detect_signals(text: str) -> List[dict]:
     """텍스트 자체에서 '요구 행동의 위험도' + '발행기관 명시 여부' 신호를 뽑는다.
 
@@ -559,6 +609,22 @@ def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
             "label": "받으신 내용과 비슷한 사례를 알리는 공식 안내가 있습니다.",
             "severity": "attention",
         })
+
+    # ---- 신호: 이 글이 요구하는 '위험한 행동' (2026-08-13)
+    #   ★ 지금까지 detect_risk_action 의 결과는 urgency_pressure 강등 판단에만 쓰이고
+    #     화면으로 나가지 않았다. 그 탓에 R11 은 경고가 뜨는데 이유가 사기사례 유사로
+    #     표시됐다 - 검출한 것은 '앱 설치 요구'인데 다른 것을 적고 있었다.
+    #   ★ severity 는 스위치가 정한다. 기본값(False)은 tier 를 올리지 않는다.
+    if RISK_ACTION_SIGNAL:
+        _risk, _kw = detect_risk_action_detail(text)
+        if _risk:
+            signals.append({
+                "key": "risk_action_requested",
+                "label": RISK_ACTION_LABEL[_risk],
+                "severity": "attention" if RISK_ACTION_RAISES_TIER else "info",
+                "detail": _risk,
+                "quote": risk_action_quote(text, _kw),
+            })
 
     # ---- 신호: 유사 사기 사례 일치 (강한 경고 신호) - 위 official_source_found 와
     #      명확히 다른 키를 쓴다. 같은 텍스트가 공식 문서와도, 사기 사례와도 동시에

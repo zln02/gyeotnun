@@ -87,3 +87,66 @@ def test_detail_returns_matched_keyword_for_quoting():
 
 def test_no_risk_action_returns_none_and_empty_keyword():
     assert search.detect_risk_action_detail("오늘 날씨가 좋네요.") == (None, "")
+
+
+# ── 화면 신호로 내보내기 (2026-08-13, 안B: tier 를 올리지 않는다)
+def test_risk_action_signal_is_emitted_with_detail_and_quote():
+    """유형(detail)과 근거 구절(quote)이 함께 나가야 한다.
+
+    ★ quote 가 핵심이다. 유형 라벨이 만에 하나 어긋나도 사용자는 실제 문장을 본다.
+      "받으신 것을 그대로 보여주고 눈으로 비교하게 한다"는 프론트 원칙 그대로다.
+    """
+    text = "고객님 안내입니다. KB Pay 앱 설치 후 이용해주세요."
+    result = search.collect_evidence(text)
+    sig = next((s for s in result.signals if s["key"] == "risk_action_requested"), None)
+    assert sig is not None, f"위험행동 신호가 없다: {[s['key'] for s in result.signals]}"
+    assert sig["detail"] == "앱설치"
+    assert sig["quote"] == "KB Pay 앱 설치 후 이용해주세요."
+    # ★ 금지어 - 이 화면은 판정이 아니라 안내다.
+    assert "사기" not in sig["label"] and "가짜" not in sig["label"]
+    assert "찾았" not in sig["label"]
+
+
+def test_risk_action_signal_does_not_raise_tier_by_default():
+    """기본값(안B)은 severity=info 다 - tier 를 올리지 않는다.
+
+    ★ 이 단정이 깨지면 정상 문자가 경고로 올라가기 시작한다. 스위치를 켜는 것은
+      화면 변형을 먼저 만든 뒤의 별도 결정이다(의심 프레임 재사용 금지).
+    """
+    assert search.RISK_ACTION_RAISES_TIER is False, (
+        "안A(tier 올림)로 켜는 것은 화면 변형 승인 뒤의 별도 결정이다. "
+        "docs/evaluation/위험행동_신호_설계측정_2026-08-13.md 참고"
+    )
+    result = search.collect_evidence("고객님 KB Pay 앱 설치 후 이용해주세요.")
+    sig = next(s for s in result.signals if s["key"] == "risk_action_requested")
+    assert sig["severity"] == "info"
+
+
+def test_risk_action_signal_can_be_disabled():
+    """되돌릴 스위치가 실제로 동작하는지."""
+    from unittest.mock import patch
+    with patch("services.search.RISK_ACTION_SIGNAL", False):
+        result = search.collect_evidence("고객님 KB Pay 앱 설치 후 이용해주세요.")
+    assert "risk_action_requested" not in [s["key"] for s in result.signals]
+
+
+def test_quote_is_omitted_when_keyword_survives_masking_removal():
+    """근거 어휘가 인용문에서 사라지면 인용하지 않는다 - 지어내지 않는다."""
+    assert search.risk_action_quote("아무 관계 없는 문장입니다.", "앱 설치") == ""
+    assert search.risk_action_quote("앱 설치 후 이용", "") == ""
+
+
+def test_quote_comes_from_already_masked_text():
+    """collect_evidence 입력은 masked_text 라 인용에 원본 숫자가 실릴 수 없다.
+
+    ★ 여기서는 그 전제가 유지되는지를 마스킹된 문자열로 직접 확인한다.
+    """
+    from services.masking import mask_text
+    raw = "계좌 123-456-789012 로 입금해 주세요. 문의 010-1234-5678"
+    masked = mask_text(raw).text
+    result = search.collect_evidence(masked)
+    sig = next((s for s in result.signals if s["key"] == "risk_action_requested"), None)
+    assert sig is not None
+    import re as _re
+    assert not _re.search(r"\d{2,3}-\d{3,4}-\d{4}|\d{3,}-\d{2,}-\d{4,}", sig["quote"] or ""), \
+        f"인용에 숫자가 살아 있다: {sig['quote']}"
