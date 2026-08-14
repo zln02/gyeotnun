@@ -1,0 +1,356 @@
+곁눈 전체 감사 — 4개 영역 (2026-08-14)
+=====================================================================
+
+읽기 전용 감사다. 코드를 한 줄도 고치지 않았다.
+기준 커밋 ee3f2a6 (origin/main). 라이브 HTTP 200 (0.25s).
+상세 표는 docs/reports/2026-08-14_전체감사.md 를 볼 것.
+보안 상세 대조표는 docs/security/internal/audit_2026-08-14.md (미추적, 공개 저장소 금지).
+
+
+§0. 총평
+---------------------------------------------------------------------
+기술적으로 위험한 것은 거의 나오지 않았다.
+  · 비밀 — 현재 트리 0건, 전체 커밋 이력 0건
+  · 순환 참조 0건
+  · experiments/ 가 services/ 를 침범한 흔적 0건
+  · 이번 신규 코드(위험행동·경보문 신호)의 새 보안 구멍 0건
+
+대신 나온 것은 전부 같은 종류다.
+코드는 8/13까지 갔는데 그것을 설명하는 문서·주석·검증 장치가 8/11에 멈춰 있다.
+가장 무거운 것은 CI 가 아예 없는데 결정 문서 두 곳이 "CI 가 지킨다"를 전제로
+적혀 있다는 것이다. 성능 문제가 아니라, 이 프로젝트가 스스로에게 건 규칙
+("측정하지 않은 것을 측정한 것처럼 쓰지 마라")을 우리 문서가 어긴 상태다.
+
+
+§1. 저장소 정리 상태
+---------------------------------------------------------------------
+[죽은 파일]  2건
+  api/experiments/sim_alert_move.py    — 코드·문서 어디에서도 언급 0건
+  api/experiments/sim_alert_signal.py  — 같음 0건
+  (api/experiments/__init__.py 는 빈 파일이지만 패키지 마커라 정상)
+  중복 스크립트는 없다. 이름이 비슷한 min_score 계열 3종은 목적이 각각 다르다.
+
+[experiments 의 services 침범]  없다
+  experiments·tools 41개 파일이 services 를 import. 역방향 0건.
+  유일한 언급은 corpus_index.py:734 의 주석 한 줄(측정 근거 표시), import 아님.
+
+[docs 구조]  찾기 어렵다
+  evaluation 59개(색인 없음) / reports 37개(README 있음) / security 4 / demo 4
+  evaluation 59개 중 무엇이 유효한 '결정'이고 무엇이 지나간 '측정'인지
+  파일명만으로 구별 불가. 심사자가 아니라 두 달 뒤의 우리가 막힌다.
+
+[README 어긋남]  어긋난다
+  README 최종수정 8/11(efa3e5a), verdict.js 최종수정 8/13(f93207c).
+    화면 단계        코드 5개(danger/warn/act/hold/ok)  ↔  README 언급 없음
+    행동 프레임      8/13 도입                          ↔  grep 0건
+    risk_action_requested                               ↔  grep 0건
+    ALERT_DOC_IDS · EX-006                              ↔  없음
+  코드 주석에도 남아 있다 — web/src/pages/Judgment.jsx:11 "★ 상태는 4개다".
+  같은 파일 34줄에서 자신이 5개짜리 HERO 를 정의한다.
+
+[.gitignore 누락]  1건
+  deploy/purge.log — 서버 로컬 산출물인데 규칙 없음(지금은 미추적).
+  같은 성격의 deploy/nginx-reload.log 는 규칙이 있다. 한쪽만 있는 것이다.
+  그 외 규칙 위반 추적 파일 0건.
+
+[비밀 재스캔]  깨끗하다
+  키/토큰 패턴(sk-ant- / up_ / AKIA / ghp_ / PRIVATE KEY)
+    현재 트리 0건, 전체 커밋 이력(git log --all -p) 0건
+  주민번호·전화번호 검출분은 전부 합성(900101-1234567 · 010-1234-5678 등)
+  docs/security/internal/ 미추적 확인. .env 미추적, .env.example 만 추적.
+
+
+§2. 코드 품질 · 설계
+---------------------------------------------------------------------
+[search.py]  686줄, 책임 5가지
+  ① 검색(BM25·임베딩·RRF·웹)  ② 위험행동 탐지  ③ 신호 조립+인용문 생성
+  ④ 폴백률 관측  ⑤ 판정 힌트
+  실제 문제는 줄 수가 아니다. ②는 검색을 전혀 쓰지 않는다 — 문장만 본다.
+  그런데 ②를 고치려면 검색 모듈을 열어야 하고, 검색 임계값을 고치려면
+  위험행동 어휘 사전을 지나쳐야 한다. 8/13 작업에서 실제로 겪은 비용이다.
+  게다가 detect_risk_action() 은 지금 용도가 둘이다(urgency 강등 게이트 + 화면 신호).
+  유형이 틀려도 무해하던 시절의 함수가, 지금은 틀리면 화면이 거짓말을 한다.
+
+[중복 로직]  폴백률 관측기가 거의 같은 것 2벌
+  routers/dialogue.py (GN-003)  vs  services/search.py (EX-006)
+  상수 20/5/0.5 동일, deque+플래그 동일, 경고/복귀 로직 동일.
+  8/13에 "GN-003 과 똑같이" 만들라는 지시를 복사로 맞춘 결과다.
+  임계 0.5를 바꾸려면 두 곳을 고쳐야 하고, 한 곳만 고쳐도 테스트는 통과한다.
+
+[하드코딩 상수]  환경변수로 빠진 것은 단 2개(EMBED_THREADS, EMBED_DEVICE)
+  판정을 바꾸는 값 (설정화 후보):
+    EMBEDDING_PROVIDER "local"        embeddings.py:57
+    EMBEDDING_MIN_SCORE 0.6155        embeddings.py:341
+    CONFIDENT_MATCH_THRESHOLD 0.6790  search.py:551
+    _OFFICIAL_MIN_SCORE 12.0          corpus_index.py:806
+    match_scam_cases(min_score=5.0)   corpus_index.py
+    HYBRID_WEIGHT_BM25/EMBEDDING 1.0  search.py:416-417
+    QUERY_TIMEOUT_SEC 3.0             embeddings.py:349
+  ★ 다만 "설정으로 빼자"가 자동으로 옳지 않다. 이 값들은 전부 실측 근거 문서와
+    1:1로 묶여 있고, 환경변수로 빼면 근거 없이 서버에서 바꿀 수 있게 된다.
+    지금 코드 상수인 것은 게으름이 아니라 "바꾸려면 커밋해야 한다"는 장치일 수 있다.
+  순수 운영 파라미터(뺄 이유 약함): _MAX_DETAIL_LEN 200 / VISION_MAX_TOKENS 2048 /
+    MAX_ATTEMPTS 3 / MAX_TOKENS 4096 / MAX_SENTENCES 2 / BATCH_SIZE 100 /
+    _CHUNK_TARGET_CHARS 900 / _RISK_QUOTE_MAX 60 / 마스킹 윈도 5개 / events 상한 4개
+
+[스위치 상수]  4개, 전부 search.py, 전부 True
+    URGENCY_REQUIRES_ACTION   :89   껐을 때 = 위험행동 없어도 urgency 가 attention
+    ALERT_DOC_AS_ATTENTION    :97   껐을 때 = 경보문 매칭이 tier 를 안 올림
+    RISK_ACTION_SIGNAL        :246  껐을 때 = 8/13 이전 동작
+    RISK_ACTION_RAISES_TIER   :247  껐을 때 = 안B(이유 문구만)
+  본선 뒤 정리 대상 지시에 그대로 해당한다.
+  단, 4개가 서로 독립이 아니다 — RISK_ACTION_SIGNAL=False 면 RAISES_TIER 는 무의미하고,
+  URGENCY_REQUIRES_ACTION 은 같은 detect_risk_action() 을 쓴다.
+  정리할 때 조합 2^4 가 아니라 '실제로 유효한 상태가 몇 개인가'부터 세야 한다.
+
+[순환 참조]  없다. 그런데 "있다"고 적힌 주석이 있다
+  search.py:42 에서 이미 embeddings 를 최상위 import 하는데,
+  search.py:432 에 "순환 임포트 방지 - embeddings.py 가 corpus_index 를 쓴다"는
+  주석과 함께 지연 import 가 있고, :515 에도 하나 더 있다.
+  실측: corpus_index.py 는 embeddings 를 import 하지 않는다(0건).
+  주석이 사실과 다르고, 지연 import 는 아무것도 방지하지 않는다.
+  남은 것은 다음 사람이 구조를 잘못 읽게 만드는 잘못된 인상뿐이다.
+
+[프론트·백엔드 이중 지식]
+  web/src/verdict.js:35 ATTENTION_KEYS(허용목록, 4개)  ↔  백엔드 attention 부여 5곳.
+  이 대응을 강제하는 테스트가 없다.
+  8/13 배포순서 이탈 때 사용자 영향이 없었던 이유가 정확히 이것이고(안전한 방향 실패),
+  반대로 "경고해야 하는데 안 한다" 방향의 실패도 같은 경로로 조용히 일어난다.
+
+[데드 코드]
+  match_official_docs_hybrid / _reciprocal_rank_fusion 약 80줄은
+  search.py:380 이 스스로 적어 뒀듯 실험·벤치마크용이고 collect_evidence 가 쓰지 않는다.
+
+
+§3. 테스트
+---------------------------------------------------------------------
+[현재]  100 passed, 119초. 8개 파일 / 테스트 함수 87개.
+  smoke 20 · llm_generation 15 · risk_action 13 · masking 12 · ocr_vision 11 ·
+  search_fallback 10 · guardrail_adversarial 4 · scam_threshold_regression 2
+
+[커버리지 — services 13개 중 5개 무커버]
+  두터움: masking(4) search(4) prompt_chain(3)
+  얇음:   corpus_index(2) embeddings(1) ocr(1) tagger(1) incident_log(1)
+  없음:   rag · scam_taxonomy · local_ocr · local_embeddings · error_codes
+  → 무커버 중 실제로 아픈 것은 scam_taxonomy 하나다. 사기사례 카테고리 판정에
+    직접 들어가고(corpus_index.py:672,748) 하한선 5.0 결정의 전제에 얹혀 있는데
+    자기 테스트가 없다. 나머지 4개는 판정 경로가 아니거나 벤치로 검증됐다.
+
+[커버리지 — routers 9개 중 7개 무커버]
+  있음: verdict(4) reports(1)
+  없음: checks · dialogue · events · errors · onboarding · training · _common
+  → checks.py 무커버가 눈에 걸린다. IDOR 방지 require_owner() 가 이 파일에 있다.
+    8/6에 라이브로 손으로 검증했고 그 뒤 회귀 감시가 없다.
+
+[★ CI 가 존재하지 않는다]
+  실측: .github 없음 · .gitlab-ci.yml 없음 · Jenkinsfile 없음 · .circleci 없음 ·
+        .pre-commit-config.yaml 없음 · .git/hooks 에 sample 외 없음 · Makefile 없음.
+        저장소 전체 .yml/.yaml 은 docker-compose.yml 하나뿐.
+  그런데:
+    docs/evaluation/하한선_결정_2026-08-13.md:77
+      "CI 회귀 테스트가 기준선을 지킨다 — api/tests/test_scam_threshold_regression.py"
+    docs/evaluation/IDF척도이동_A안_2026-08-12.md:122
+      "회귀 테스트에 넣어 재교정을 잊으면 CI 가 알려 주게 한다"
+  min_score = 5.0 유지 결정의 명시적 전제가 성립하지 않는다.
+  테스트 파일은 실재하고 내용도 옳다. 그것을 자동으로 돌리는 것이 아무것도 없을 뿐이다.
+
+[테스트가 운영 DB 를 오염시킨다 — 실측·정량]
+  이번 감사의 pytest 1회 실행이 error_logs 에 5행 삽입(EX-003 3 · GN-001 2).
+  누적: GN-001 150행 · EX-003 135행 · GN-002 3 · EX-001 2 · ST-001/IN-002/GN-003 각 1
+  → GET /errors/summary 가 지금 사실이 아닌 수치를 반환한다.
+    엔드포인트는 운영자 게이트로 닫혀 있어 시연에는 나오지 않는다.
+  분리 방안(제시만, 채택은 사람이):
+    ㄱ conftest.py 에 log_incident autouse patch (5줄, 낮은 위험)   ← 권함
+    ㄴ incident_log 가 PYTEST_CURRENT_TEST 를 봄 (프로덕션에 테스트 분기 유입)
+    ㄷ 테스트 전용 DB (가장 옳지만 본선 전에 손댈 크기 아님)
+    ㄹ 285행 청소 (ㄱ 없이 하면 다음 pytest 에 다시 쌓여 무의미)
+  → ㄱ 로 원인을 막고 그다음 ㄹ 로 청소하는 순서가 아니면 둘 다 헛일이다.
+
+[라이브 실투입 검증의 자동화 가능성]
+  가능·즉시   ?mock=1 전 엔드포인트 왕복 (DB 무기록, 비용 0원)
+  가능·도구있음 화면 출력 전수 대조(tools/render_verdict.mjs + dump_screen_payloads.py)
+              → 8/13에 경보문 링크가 6건에서 조용히 사라진 것을 잡아낸 그 도구다.
+                스냅샷을 커밋하면 그대로 회귀 테스트가 된다. 값이 가장 크다.
+  가능        require_owner IDOR 4가지 거부 경로 (TestClient, DB 불필요)
+  하면 안 됨  실제 POST /checks (mock=0) — 운영 DB 에 행이 쌓이고 비용이 난다
+
+
+§4. 보안 — 8/6 리뷰 이후 재점검
+---------------------------------------------------------------------
+※ 미해결 항목의 위치·재현·수정안은 이 공개 파일에 적지 않는다.
+   상세는 docs/security/internal/audit_2026-08-14.md (미추적).
+
+[대조 결과]  8/6 이 추적하던 17개 항목 전수 대조
+  완전 해소  2건
+  부분 해소  2건
+  잔존      13건 (높음 1 · 중간 3 · 낮음 4 · 그 외 5)
+  신규 구멍  0건
+
+[해소 2건 — 이름을 밝혀도 공격 표면이 아니라서 적는다]
+  · 마스킹 전 원본 이미지의 외부 전송
+    운영 컨테이너 실측 OCR_PROVIDER=local, ocr.py:261 이 PaddleOCR 오프라인 경로.
+    이미지가 외부로 나가지 않는다. 8/6에 "높음·정책 결정 필요"였던 항목이
+    로컬 OCR 프로덕션 승격으로 닫혔다.
+  · 프로덕션 --reload
+    docker-compose.yml:52 운영 command 에서 제거됨. (--workers 1 은 그대로)
+
+[부분 해소·잔존의 성격만]
+  · 부분 해소 하나는 집계 엔드포인트 접근 통제다. 두 집계는 운영자 게이트로 닫혔고
+    (라이브 404 확인), 같은 지적에 묶여 있던 정적 응답 하나가 열린 채 남았다.
+    의도적 결정이고 코드에 근거가 적혀 있으나, 원 지적이 문제 삼은 필드가 그대로 있다.
+  · 부분 해소 다른 하나는 의존성 계열. 직접 지정 패키지는 올렸고,
+    FastAPI 핀에 막힌 전이 의존성이 남았다.
+  · 잔존 중 높음은 1건 — 앱 계층 비용 상한. 네트워크 계층에서 부분 완화(nginx),
+    앱 계층은 여전히 없음. 8/6 판정 "부분 조치" 그대로.
+  · device_id 위조 가능성은 그대로. 코드가 스스로 한계를 명시(checks.py:37).
+  · mock=1 우선순위: bool(mock) or DEMO_FALLBACK_TO_MOCK 그대로.
+    운영 실측 DEMO_FALLBACK_TO_MOCK = False — 자동 mock 폴백은 꺼져 있다.
+
+[★ 신규 기능 점검 — 위험행동 탐지·인용 구절]  네 지점 전부 해당 없음
+  1) 인용문에 원본 개인정보가 실리는가 — 없다
+     checks.py:163 이 stored["masked_text"] 를 넘긴다. 원문은 애초에 저장되지 않는다.
+  2) 사용자 입력이 정규식으로 컴파일되는가 — 없다
+     search.py 의 정규식은 2개뿐이고 둘 다 리터럴. 탐지는 전부 in 부분문자열 비교.
+     → ReDoS·정규식 인젝션 불가.
+  3) 인용문이 LLM 프롬프트로 들어가는가 — 들어가지 않는다
+     prompt_chain.py:263 · tagger.py:198 둘 다 s.get('label', s) — label 만 쓴다.
+     label 은 우리 고정 사전이고, 사용자 제어값인 quote 는 프롬프트에 실리지 않는다.
+     8/13에 Signal 에 detail·quote 를 추가하면서 프롬프트 조립부를 안 고친 것이
+     결과적으로 옳았다 — 사용자 텍스트가 프롬프트로 가는 경로를 하나 더 만들지 않았다.
+  4) 인용문이 화면에서 XSS 가 되는가 — 되지 않는다
+     Judgment.jsx:62 는 JSX 텍스트 보간이라 React 가 자동 이스케이프.
+     web/src 전체에서 dangerouslySetInnerHTML · innerHTML · eval( 각 0건.
+     _RISK_QUOTE_MAX=60 이 길이도 자른다.
+  (마스킹된 본문 자체가 프롬프트에 들어가는 것은 8/6의 기존 항목이고 이번 작업이 만든 게 아니다.)
+
+[pip-audit 재실행 (2026-08-14, 컨테이너 내부)]  24건 / 6패키지
+  8/6 의 22건에서 늘었는데 의존성을 바꿔서가 아니라 같은 버전에 새 CVE 가 공개돼서다.
+    starlette      0.41.3   9건   런타임 도달   FastAPI 핀에 막힘 → 본선 뒤
+    transformers   4.57.6   5건   런타임 도달   수정본이 5.x 메이저 → 임계값 재측정 없이 금지
+    pip            24.0     6건   비도달
+    setuptools     79.0.1   2건   비도달
+    pytest         8.3.4    1건   비도달(테스트 전용)
+    python-dotenv  1.0.1    1건   코드에서 import 되지 않는다 → 제거하면 사라짐
+    torch 2.5.1+cpu         감사 불가 — 로컬 CPU 휠이라 PyPI 대조 불가.
+                            "0건"이 아니라 "모름"이다.
+  실질 대상은 starlette 9 + transformers 5 = 14건.
+  transformers 는 로컬 임베딩 모델의 유사도 척도를 바꿀 수 있고,
+  그러면 0.6155 · 0.6790 두 임계값의 근거가 무너진다. 본선 전 승급 금지.
+
+
+§5. 서버 사양 실측 (다른 프로젝트 동시 서빙 검토용)
+---------------------------------------------------------------------
+[인스턴스]
+  AWS EC2 t3.xlarge / ap-northeast-2a (서울) / i-05729eb9a032b55d2 / 가동 51일
+
+[자원]
+  CPU     4 vCPU — Intel Xeon Platinum 8175M @ 2.50GHz (2코어 × 2스레드)
+  메모리  15 GiB — 사용 4.8Gi / 가용 10Gi / buff-cache 10Gi
+  스왑    8.0Gi 중 850Mi 사용 중   ← 과거 메모리 압박 흔적. 51일 가동 전제로 볼 것
+  디스크  309G 중 130G 여유 (59% 사용)
+  load    0.21 / 0.54 / 0.40
+
+[★ 디스크 — 회수 가능 용량이 매우 크다]
+  docker build cache   106.5 GB   → 회수 가능 106.3 GB (99.8%)
+  docker images         33.5 GB   → 회수 가능   9.4 GB (28%)
+  api/data (모델·인덱스) 11 GB    → 필요
+  node_modules 2곳       81 MB / live_backups 15 MB / corpus 8.8 MB
+  빌드 캐시 하나가 디스크의 34%를 먹고 있다. 정리하면 여유가 130G → 236G.
+  동시 서빙 검토의 결론이 바뀔 정도의 차이다.
+
+[컨테이너별 상주 (평시, 3회 샘플 · 값 안정)]
+  api      845 MiB (5.35%)   CPU 0.16~0.20%   ← 로컬 임베딩 모델 상주 포함
+  db       92.6~92.9 MiB     CPU 0% (체크포인트 시 순간 5.15%)
+  nginx    7.34 MiB          CPU 0%
+  certbot  15.49 MiB         CPU 0%
+  합계     약 961 MiB        CPU 1% 미만
+
+[확인 1건 처리 중 피크 — ★ 측정 방법을 먼저 밝힌다]
+  어떻게 쟀나: api 컨테이너 '안에서 별도 파이썬 프로세스'를 띄워
+    search.collect_evidence() 를 3회 호출하고 0.4초 간격으로 docker stats 샘플링.
+    라이브 POST /checks 를 쏘지 않았다 — 그건 운영 DB 에 행을 넣기 때문이다.
+  결과: 1회차(콜드) 9.06s / 2회차 0.17s / 3회차 0.24s
+        api CPU  0.2% → 피크 226% (4 vCPU 중 약 2.3코어)
+        api MEM  845 MiB → 1.42 GiB
+        db  CPU  0% → 4.5%
+  ★ 이 수치를 그대로 라이브 요청 비용으로 읽으면 안 된다.
+    별도 프로세스가 모델을 처음부터 로드했으므로 콜드 9.06초와 1.42GiB 에는
+    그 로드분이 들어 있다. 라이브 uvicorn 은 모델이 이미 상주(845MiB)하므로
+    웜 경로인 0.17~0.24초 쪽이 실제 요청에 가깝다.
+    CPU 226%는 로드 구간을 포함하므로 실제 요청 피크의 '상한'으로 읽어야 한다.
+  ★ 정확한 라이브 피크는 재지 않았다. 재려면 실제 확인 1건을 넣어야 하고
+    그건 운영 DB 에 테스트 데이터를 넣지 말라는 지시에 걸린다. "모른다"로 남긴다.
+
+[동시 서빙 여력]
+  메모리     충분 — 곁눈 전체 961MiB, 가용 10GiB
+  디스크     충분(정리 후) — 130G → 236G
+  CPU 평시   거의 유휴 — load 0.21, 컨테이너 합 1% 미만
+  CPU 피크   여기가 제약이다. 확인 1건이 순간 2코어 이상을 먹는다.
+             4 vCPU 에서 동시 확인 2건이면 포화하고, 그 위에 다른 프로젝트가
+             얹히면 서로 밀어낸다.
+  결론: 상시 자원(메모리·디스크)은 여유가 크고 순간 CPU 만 좁다.
+        상대가 CPU 를 지속적으로 쓰는 성격(다른 로컬 모델 추론 등)이면 충돌하고,
+        I/O·메모리 위주면 무난하다. 얹기 전에 빌드 캐시 정리부터가 순서다.
+
+
+§6. 3단 분류
+---------------------------------------------------------------------
+[지금 고쳐야 함] — 시연을 깨뜨릴 수 있는 것만. 2건
+  지시를 좁게 지켰다. 기술적 결함 중 시연을 실제로 깨뜨리는 것은 찾지 못했다.
+  아래 2건은 문서·주석이 코드와 어긋난 것이고, 심사 중 대조되면 드러난다.
+
+  1. README·Judgment.jsx:11 이 "4단계"라고 적혀 있다. 실제는 5단계(act 포함).
+     README 에 행동 프레임·위험행동 신호·ALERT_DOC_IDS·EX-006 이 전부 없다.
+     → 심사자가 읽는 첫 문서다. 화면에는 주황 행동 프레임이 나오는데 README 에는
+       그런 단계가 없다. 8/13 작업 전체가 문서에서 통째로 빠져 있다.
+
+  2. 하한선_결정:77 과 IDF척도이동_A안:122 가 "CI 가 지킨다"를 전제하는데 CI 가 없다.
+     → min_score 5.0 결정의 명시적 전제다. 심사에서 "어떻게 회귀를 막나"를 물으면
+       답할 수 없다. 그리고 우리가 우리 규칙을 어긴 상태다.
+     고침은 두 갈래고 사람이 정해야 한다:
+       ㄱ) 문서를 사실대로 고친다("수동 실행 전제")
+       ㄴ) CI 를 실제로 만든다
+     ㄴ 을 고르면 §3의 DB 오염 차단(ㄱ안)을 먼저 해야 한다.
+     안 그러면 CI 가 돌 때마다 운영 DB 에 행이 쌓인다.
+
+[본선 뒤] — 값은 크지만 지금 손대면 위험한 것
+  0  docs/evaluation 59개 색인 (결정 / 측정자료 / 폐기 구분)
+  0  deploy/purge.log 를 .gitignore 에 추가
+  0  죽은 파일 2개 처리
+  1  search.py 686줄 분리 — 위험행동 탐지가 검색을 전혀 안 쓰는 것이 가장 명확한 절단면
+  1  폴백률 관측기 2벌 통합 (GN-003 / EX-006)
+  1  스위치 상수 4개 정리 — 조합이 아니라 '유효 상태 수'부터 셀 것
+  1  search.py:432,515 의 거짓 "순환 임포트 방지" 주석 제거
+  1  프론트 ATTENTION_KEYS ↔ 백엔드 키 집합 일치 테스트
+  2  테스트의 운영 DB 오염 차단(ㄱ) → 그다음 285행 청소(ㄹ)
+  2  scam_taxonomy.py 테스트 (무커버 5개 중 유일하게 판정 경로)
+  2  checks.py require_owner IDOR 4경로 회귀 테스트
+  2  render_verdict.mjs 스냅샷을 회귀 테스트로 승격
+  3  starlette 9건 · transformers 5건 (transformers 는 임계값 재측정 없이 금지)
+  3  잔존 13건 + 부분 해소 2건의 잔가지 (상세는 internal 문서)
+  4  docker build cache 106GB 정리 — 동시 서빙 검토 전에
+
+[안 고쳐도 됨] — 확인했고, 문제가 아니다
+  · 비밀 유출 — 트리·커밋 이력 전체 0건. PII 는 전부 합성
+  · experiments 의 services 침범 — 0건. 방향이 옳다
+  · 순환 참조 — 0건 (거짓 주석만 있음 → 본선 뒤)
+  · 신규 기능(위험행동·인용)의 보안 — 인젝션·XSS·PII 유출 전부 해당 없음
+  · mock=1 자동 폴백 — 운영 DEMO_FALLBACK_TO_MOCK = False 실측
+  · 관측 엔드포인트 노출 — 운영자 게이트로 닫힘. 라이브 404 확인
+  · pip/setuptools/pytest/python-dotenv 10건 — 런타임 비도달 경로
+  · 하드코딩 임계값 — 의도된 것일 수 있다. 코드 상수라 "바꾸려면 커밋해야 한다"
+  · 중복 스크립트 — 없음. 이름만 비슷하고 목적이 다름
+  · 메모리·디스크 여력 — 곁눈 전체 961MiB / 가용 10GiB
+
+
+§7. 못 잰 것 (추측하지 않고 남긴다)
+---------------------------------------------------------------------
+  · 라이브 POST /checks 1건의 실제 CPU·지연 피크
+    — 재려면 운영 DB 에 테스트 행이 들어간다. §5는 별도 프로세스 측정이라
+      콜드 로드가 섞여 있다.
+  · torch 2.5.1+cpu 의 CVE
+    — 로컬 CPU 휠이라 pip-audit 이 PyPI 대조를 못 한다. "0건"이 아니라 "모름".
+  · 라인 커버리지 %
+    — pytest-cov 미설치. §3은 "모듈이 테스트에서 언급되는가"이지 라인 커버리지가 아니다.
+  · 프론트(web/) 테스트 커버리지
+    — 프론트 단위 테스트가 없다(tests/*.mjs 는 스크린샷·검증 스크립트).
