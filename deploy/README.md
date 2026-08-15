@@ -71,6 +71,35 @@ Rate Limit(동일 도메인 1주일 5회)에 걸리니 dry-run 이 성공한 뒤
 동작하는 `sudo`(NOPASSWD 설정됨) 를 그대로 썼다. 로그는
 `deploy/nginx-reload.log` 에 쌓인다(.gitignore 대상).
 
+### 5. 서버 cron 전체 (등록 완료, `crontab -l` 로 확인)
+
+| 시각(UTC) | 하는 일 | 로그 |
+|---|---|---|
+| 03:00 | nginx reload (갱신된 인증서 반영) | `deploy/nginx-reload.log` |
+| 04:00 | 보관 90일 초과 관측 로그 삭제 (`tools.purge_old_records`) | `deploy/purge.log` |
+| 05:00 | **회귀 검사** (`tools.regression_check`) | `deploy/regression.log` |
+
+```
+0 5 * * * cd /home/ubuntu/gyeotnun && sudo docker compose exec -T api python -m tools.regression_check >> /home/ubuntu/gyeotnun/deploy/regression.log 2>&1
+```
+
+회귀 검사는 정상 오판 기준선(확대 평가셋 / 홀드아웃)과 `SCAM_CASES` 규모를 매일 재고
+`tests/test_scam_threshold_regression.py` 3건을 돌린다. 통과/실패만이 아니라 **실측한
+숫자 자체**를 남기므로, "언제부터 늘었나"를 로그만 보고 되짚을 수 있다.
+
+```
+[regression] 2026-08-15 11:04:59 UTC OK passed=3 failed=0 skipped=0 | SCAM_CASES=51건 / 확대평가셋 정상오판=1/37 / 홀드아웃 정상오판=1/10
+```
+
+- 실패 확인: `grep '\[regression\] FAIL' deploy/regression.log`
+- ★ **스킵도 실패로 센다.** 코퍼스가 마운트되지 않으면 테스트는 실패가 아니라 스킵이고,
+  스킵은 초록불처럼 보인다. 아무것도 검사하지 않은 초록불이 가장 위험하다.
+- ★ GitHub Actions 를 쓰지 않는 이유가 그것이다. 검색 코퍼스는 저장소에 없어서
+  호스트 러너에서는 이 테스트가 전부 스킵된다. 공개 저장소에 셀프호스트 러너를
+  붙이는 것은 보안 사고 경로이기도 하다. 코퍼스가 실제로 있는 이 서버에서 돌린다.
+- 운영 DB 에는 쓰지 않는다. pytest 는 `tests/conftest.py` 가 `DATABASE_URL` 을
+  임시 SQLite 로 덮어쓴 상태에서 돈다.
+
 ## 파일 구조
 
 ```

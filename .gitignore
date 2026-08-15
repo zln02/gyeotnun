@@ -65,8 +65,13 @@ deploy/certbot/conf/*
 deploy/certbot/www/*
 !deploy/certbot/www/.gitkeep
 
-# nginx reload crontab 로그 (서버 로컬 산출물)
+# crontab 로그 (서버 로컬 산출물). 서버마다 내용이 달라 커밋 대상이 아니다.
+#   nginx-reload.log = 인증서 갱신 반영(03:00)
+#   purge.log        = 보관기간 초과 관측 로그 삭제(04:00)
+#   regression.log   = 회귀 검사(05:00, tools/regression_check.py)
 deploy/nginx-reload.log
+deploy/purge.log
+deploy/regression.log
 
 # Figma Make 내보내기 원본 (참고용, 프로젝트 본체가 아니다) - 여기서 필요한 값만
 # 손으로 옮겨 web/src 에 반영한다(web/src/styles.css "Figma 이식" 절 참고).
