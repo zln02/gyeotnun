@@ -717,20 +717,8 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   cursor: pointer;
 }
 .hero-cta:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
-.hero-cta-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--home2-gold-bg);
-  font-size: 14px;
-  font-weight: 900;
-  line-height: 1;
-}
-.hero-cta-badge .g { color: var(--home2-gold); }
-.hero-cta-badge .pt { color: var(--home2-body); }
+/* .hero-cta-badge (G 120) 는 2026-08-15 에 지웠다 - 포인트 제도가 존재하지 않는다.
+   Home.jsx 의 HeroCard 주석 참고. */
 
 /* ---- 확인 카드 묶음 ---- */
 /* ★ 2026-08-15 Figma 이식: 묶음에 배경 일러스트를 깔고 2단 격자로 바꿨다.
@@ -830,29 +818,10 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
 }
 
 
-/* ---- 포인트 배너 ---- */
-.point-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 4px 2px;
-  margin: 0 0 8px;
-}
-.point-g-badge {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 29px;
-  height: 29px;
-  border-radius: 14.5px;
-  background: var(--home2-gold-bg);
-  color: var(--home2-gold);
-  font-size: 15px;
-  font-weight: 900;
-}
-.point-text { margin: 0; font-size: 15px; font-weight: 700; color: var(--home2-body); line-height: 1.5; } /* ★ 12→15 */
-.point-text b { color: var(--fg-ink-title); font-weight: 900; }
-.point-text b.pt { color: var(--home2-gold); }
+/* ---- 포인트 배너 (2026-08-15 삭제) ----
+   .point-banner / .point-g-badge / .point-text 를 지웠다. 배너 문구 전체가
+   지어낸 값이었다(일어나지 않은 사건 · 없는 금액 · 존재하지 않는 포인트).
+   자세한 경위는 Home.jsx 의 PointBanner 자리 주석 참고. */
 
 /* ---- 하단 네비 위 페이드 막 ---- */
 /* 스크롤 위치와 무관하게, 네비 뒤로 지나가는 콘텐츠가 어중간하게 잘려
@@ -1480,10 +1449,20 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   position: fixed;
   /* ★ inset:0 이면 데스크톱에서 초록 그라데이션이 화면 전체를 덮어 앱 기둥
      밖으로 튀어나왔다. 다른 화면과 같은 폭 안에 세운다. */
+  /* ★★ 2026-08-15 버그 수정 ★★
+     전에는 left:50% + transform:translateX(-50%) 로 가운데를 잡았다. 그런데 이
+     요소에는 animation: practiceFadeIn ... **both** 가 걸려 있고, 그 키프레임의
+     끝 상태가 transform: translateY(0) 이다. fill-mode 가 both 라 애니메이션이
+     끝난 뒤에도 그 값이 남아 요소 자신의 translateX(-50%) 를 덮어썼다.
+     결과: 마무리 화면이 화면 절반만큼 오른쪽으로 밀려 잘렸다(계산된 transform 이
+     matrix(1,0,0,1,0,0) = 아무것도 안 함으로 나온다). 라이브에서도 그랬다.
+     → transform 을 쓰지 않고 좌우 0 + margin auto 로 가운데를 잡는다.
+       애니메이션이 transform 을 건드려도 정렬이 흔들리지 않는다. */
   top: 0;
   bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   width: min(100%, var(--app-max));
   z-index: 60;
   display: flex;
@@ -1507,8 +1486,11 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   font-weight: 800;
   color: #249967;
 }
-.practice-reward-coin { width: 175px; height: auto; margin: 64px 0 40px; border-radius: 18px; }
-.practice-reward-body { text-align: center; margin-bottom: 40px; }
+/* .practice-reward-coin 은 2026-08-15 에 지웠다 - 포인트 제도가 없는데 화폐
+   그림을 두면 글자를 고쳐도 "뭔가 받았다"로 읽힌다. Training.jsx 주석 참고. */
+/* 동전이 빠지면서 위쪽이 허전해졌다 - 본문을 배지와 버튼 사이 가운데로 띄운다
+   (아래 .practice-reward-actions 의 margin-top:auto 와 짝을 이룬다). */
+.practice-reward-body { text-align: center; margin-top: auto; margin-bottom: 40px; }
 .practice-reward-label { margin: 0; font-size: 16px; font-weight: 700; color: rgba(255,255,255,0.9); }
 .practice-reward-title { margin: 9px 0 0; font-size: 30px; font-weight: 900; letter-spacing: -1.2px; color: #fff; }
 .practice-reward-sub { margin: 9px 0 0; font-size: 15px; font-weight: 600; color: rgba(255,255,255,0.9); }

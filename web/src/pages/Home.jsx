@@ -145,12 +145,12 @@ function HeroCard({ onLearn }) {
           <p className="hero-sub">공식 출처와 조건을 함께 찾아봐요.</p>
         </div>
       </section>
+      {/* ★ 2026-08-15: 여기 있던 'G 120' 배지를 뺐다. 포인트 제도가 어디에도 없다 -
+          서버에도, 이 기기에도 포인트를 세는 곳이 없다. 받지 못할 보상을 걸어
+          훈련을 누르게 만드는 셈이라, 곁눈이 막으려는 수법을 곁눈이 쓰는 게 된다.
+          포인트 API 가 실제로 생기면 그때 되살린다. */}
       <button type="button" className="hero-cta" onClick={onLearn}>
         <span>오늘의 훈련</span>
-        {/* ★ 포인트 시스템 백엔드 없음 - G/120 은 고정값. TODO: 포인트 API 나오면 교체 */}
-        <span className="hero-cta-badge">
-          <b className="g">G</b><b className="pt">120</b>
-        </span>
       </button>
     </div>
   )
@@ -187,19 +187,17 @@ function ConfirmCluster({ onPhoto, onLink, onText }) {
   )
 }
 
-function PointBanner() {
-  return (
-    <section className="point-banner" aria-label="최근 포인트 적립 소식">
-      {/* ★ 포인트 시스템 백엔드 없음 - 아래 내용 전체가 고정값이다.
-          TODO: /points 류 API 가 생기면 실제 최근 적립 내역으로 교체한다. */}
-      <span className="point-g-badge" aria-hidden="true">G</span>
-      <p className="point-text">
-        <b>방금 전</b> · 순자 님이 의심스러운 결제를 멈추고<br />
-        280,000원을 지켜 <b className="pt">30 포인트</b>를 받았어요.
-      </p>
-    </section>
-  )
-}
+/**
+ * ★★ 2026-08-15: PointBanner 를 삭제했다 ★★
+ *   여기 있던 문장은 이랬다.
+ *     "방금 전 · 순자 님이 의심스러운 결제를 멈추고 280,000원을 지켜 30 포인트를 받았어요."
+ *   이 중 사실인 것은 하나도 없다. 일어나지 않은 사건, 있지도 않은 금액,
+ *   존재하지 않는 포인트다. 게다가 사용자 이름을 넣어 "당신이 한 일"처럼 읽힌다.
+ *   곁눈은 "서버가 실제로 관찰한 것만 화면에 낸다"는 원칙 위에 서 있는 서비스다.
+ *   지어낸 성과로 사람을 안심시키는 건, 지어낸 위협으로 겁주는 것과 같은 종류의
+ *   거짓말이다. 포인트·적립 내역 API 가 실제로 생기면 그때 실제 값으로 되살린다.
+ *   (관련 CSS: .point-banner / .point-g-badge / .point-text 도 함께 지웠다.)
+ */
 
 export default function Home({ onSubmit, notice, onTraining }) {
   const fileRef = useRef(null)
@@ -406,14 +404,12 @@ export default function Home({ onSubmit, notice, onTraining }) {
         onText={busy ? undefined : openTextModal}
       />
 
-      <PointBanner />
-
       {/* 하단 고정 네비 아래에 콘텐츠가 가리지 않도록 여백 확보 */}
       <div aria-hidden="true" style={{ height: 110 }} />
-      {/* ★ 짧은 화면(360x800 등)에서는 포인트 배너 등이 하단 네비 뒤로 일부만
-          비치며 글자가 잘려 보이는("깨진" 것처럼 보이는) 문제가 있었다 - 기기별
-          여백을 딱 맞추는 대신, 네비 위에 배경색으로 자연스럽게 페이드되는 막을
-          깔아 어떤 화면 크기에서도 텍스트가 어중간하게 잘려 보이지 않게 했다. */}
+      {/* ★ 짧은 화면(360x800 등)에서는 마지막 요소가 하단 네비 뒤로 일부만 비치며
+          글자가 잘려 보이는("깨진" 것처럼 보이는) 문제가 있었다 - 기기별 여백을
+          딱 맞추는 대신, 네비 위에 배경색으로 자연스럽게 페이드되는 막을 깔아
+          어떤 화면 크기에서도 텍스트가 어중간하게 잘려 보이지 않게 했다. */}
       <div className="bottom-scrim" aria-hidden="true" />
       <BottomNav active="home" onTap={handleNavTap} />
       <div className="nav-toast-wrap" aria-live="polite">

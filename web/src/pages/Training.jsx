@@ -15,9 +15,10 @@
  *
  * ★ 2026-08 2차 이식(node 196:434 정답/217:1521 오답/196:1406 학습 완료/
  *   272:22 리워드): 4단계를 다 마치면 기존처럼 바로 주간 리포트로 보내지 않고
- *   학습 완료(카테고리별 정답 요약) → 리워드(G적립) 를 먼저 보여주고,
- *   리워드 화면의 "리포트 보러가기"를 눌러야 주간 리포트(getWeeklyReport)로
- *   간다. 카테고리별 "N건" 은 이번 실습 회차의 정답 여부만 반영한다 - 여러
+ *   학습 완료(카테고리별 정답 요약) → 마무리 화면을 먼저 보여주고, 그 화면의
+ *   "리포트 보러가기"를 눌러야 주간 리포트(getWeeklyReport)로 간다.
+ *   (Figma 의 '리워드(G적립)' 화면이었으나 2026-08-15 에 포인트 표시를 걷어냈다 -
+ *    적립되는 곳이 없다. 아래 RewardScreen 주석 참고.) 카테고리별 "N건" 은 이번 실습 회차의 정답 여부만 반영한다 - 여러
  *   회차를 누적한 카테고리별 이력 API가 없어서다(TODO: 생기면 교체).
  *   정답/오답 시 O·X 버튼 자체가 초록 체크·빨강 경고로 바뀌는 것도 이번에
  *   새로 반영한 디자인이다(전엔 버튼 아래 피드백 문구로만 표시했다).
@@ -43,15 +44,16 @@ import completeIcTitle from '../assets/training/complete_ic_title.png'
 import completeIcOrg from '../assets/training/complete_ic_org.png'
 import completeIcNumber from '../assets/training/complete_ic_number.png'
 import completeIcAll from '../assets/training/complete_ic_all.png'
-import rewardCoin from '../assets/training/reward_coin.jpg'
 import icRewardReport from '../assets/training/ic_reward_report.svg'
 import icRewardHome from '../assets/training/ic_reward_home.svg'
 
 const SCREEN = 'S5'
 
-// 오늘의 훈련 보상 포인트. 홈 화면 배너("오늘의 훈련 G 120")와 같은 값으로
-// 맞춘다 - 실제 포인트 지급 API가 없어 고정값이다(TODO: 생기면 교체).
-const REWARD_POINTS = 120
+// ★★ 2026-08-15: REWARD_POINTS(120) 를 지웠다 ★★
+//   포인트를 세는 곳이 서버에도 이 기기에도 없다. 적립되지 않는 보상을
+//   "적립 완료"라고 알리는 건 지어낸 성과다. 이 화면이 실제로 알릴 수 있는
+//   사실은 하나뿐이다 - 오늘 훈련을 끝냈다는 것. 그것만 적는다.
+//   포인트 지급 API 가 생기면 그때 실제 값으로 되살린다.
 
 // 이번 실습이 다루는 문자 - 실제 사례를 각색한 고정 예시(연습1: 122:9 /
 // 곁눈 화면 옮기는중(복사): 151:1656 에서 실측).
@@ -359,11 +361,12 @@ function CompleteScreen({ firstAnswers, report, onConfirm }) {
 function RewardScreen({ onReport, onHome }) {
   return (
     <div className="practice-reward">
-      <span className="practice-reward-badge">리워드 적립</span>
-      <img className="practice-reward-coin" src={rewardCoin} alt="" aria-hidden="true" />
+      {/* 동전 그림도 함께 뺐다 - 포인트가 없는데 화폐 그림을 두면 글자를 고쳐도
+          "뭔가 받았다"로 읽힌다. 그림 하나가 문장 하나만큼 말을 한다. */}
+      <span className="practice-reward-badge">훈련 완료</span>
       <div className="practice-reward-body">
-        <p className="practice-reward-label">오늘의 훈련 보상</p>
-        <h2 className="practice-reward-title">G {REWARD_POINTS} 적립 완료</h2>
+        <p className="practice-reward-label">오늘의 훈련</p>
+        <h2 className="practice-reward-title">오늘 훈련을 마쳤어요</h2>
         <p className="practice-reward-sub">내일도 5분 연습으로 이어가 볼까요?</p>
       </div>
       <div className="practice-reward-actions">
