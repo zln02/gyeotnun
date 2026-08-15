@@ -40,6 +40,11 @@ import icSms from '../assets/home/ic_sms.png'
 import icPencil from '../assets/home/ic_pencil.svg'
 import icBell from '../assets/home/ic_bell.svg'
 import icChevron from '../assets/home/ic_chevron.svg'
+// ★ 2026-08-15 Figma 이식: 모달 버튼의 이모지(✓ 🖼️ →)를 아이콘으로 교체한다.
+//   이모지는 안드로이드·iOS·삼성 순정 브라우저가 각자 다른 그림으로 그려서
+//   기기마다 버튼 모양이 달라졌다. SVG 로 고정한다.
+import buttonCheckIcon from '../assets/home/button-check.svg'
+import photoSelectIcon from '../assets/home/photo-select.svg'
 
 const SCREEN = 'S1'
 
@@ -121,8 +126,10 @@ function HomeHeader({ displayName, onEditName, onBell }) {
           <img src={icPencil} width="14" height="14" alt="" aria-hidden="true" className="home-title-edit" />
         </button>
       </div>
+      {/* 종 그림만 있으면 무슨 버튼인지 못 알아보신다 - 글자를 같이 낸다 */}
       <button type="button" className="home-bell" aria-label="알림" onClick={onBell}>
         <img src={icBell} width="20" height="20" alt="" aria-hidden="true" />
+        <span>알림</span>
       </button>
     </div>
   )
@@ -139,7 +146,6 @@ function HeroCard({ onLearn }) {
         </div>
       </section>
       <button type="button" className="hero-cta" onClick={onLearn}>
-        <img src={icPencil} width="18" height="18" alt="" aria-hidden="true" />
         <span>오늘의 훈련</span>
         {/* ★ 포인트 시스템 백엔드 없음 - G/120 은 고정값. TODO: 포인트 API 나오면 교체 */}
         <span className="hero-cta-badge">
@@ -150,13 +156,17 @@ function HeroCard({ onLearn }) {
   )
 }
 
-function ConfirmCard({ icon, title, desc, onClick }) {
+/**
+ * ★ 2026-08-15 Figma 이식: 카드에서 설명 줄("클릭하여 사진 선택하기")을 뺐다.
+ *   대신 아이콘을 종류별로 키워(iconClass) 사진·링크·문자를 그림으로 구분한다.
+ *   제목만 남아 한 줄이 되면서 카드 높이가 낮아지고 세 장이 한 눈에 들어온다.
+ */
+function ConfirmCard({ icon, iconClass, title, onClick }) {
   return (
     <button type="button" className="confirm-card" onClick={onClick}>
-      <img src={icon} className="confirm-card-icon" alt="" aria-hidden="true" />
+      <img src={icon} className={`confirm-card-icon ${iconClass}`} alt="" aria-hidden="true" />
       <span className="confirm-card-text">
         <b className="confirm-card-title">{title}</b>
-        <span className="confirm-card-desc">{desc}</span>
       </span>
       <span className="confirm-card-arrow" aria-hidden="true">
         <img src={icChevron} width="10" height="10" alt="" />
@@ -169,9 +179,9 @@ function ConfirmCluster({ onPhoto, onLink, onText }) {
   return (
     <section className="confirm-cluster" aria-label="확인 방법 고르기">
       <div className="confirm-cards">
-        <ConfirmCard icon={icPhoto} title="사진 확인" desc="클릭하여 사진 선택하기" onClick={onPhoto} />
-        <ConfirmCard icon={icLink} title="링크 확인" desc="클릭하여 주소 붙여넣기" onClick={onLink} />
-        <ConfirmCard icon={icSms} title="문자 확인" desc="클릭하여 내용 입력하기" onClick={onText} />
+        <ConfirmCard icon={icPhoto} iconClass="confirm-card-icon--photo" title="사진 확인" onClick={onPhoto} />
+        <ConfirmCard icon={icLink} iconClass="confirm-card-icon--link" title="링크 확인" onClick={onLink} />
+        <ConfirmCard icon={icSms} iconClass="confirm-card-icon--sms" title="문자 확인" onClick={onText} />
       </div>
     </section>
   )
@@ -422,12 +432,14 @@ export default function Home({ onSubmit, notice, onTraining }) {
                 <span aria-hidden="true">↺</span> 다시 고르기
               </button>
               <button type="button" className="action-primary" onClick={confirmPhoto}>
-                <span aria-hidden="true">✓</span> 네, 맞아요
+                <img className="action-primary-check-icon" src={buttonCheckIcon} width="21" height="21" alt="" aria-hidden="true" />
+                <span>네, 맞아요</span>
               </button>
             </div>
           ) : (
             <button type="button" className="action-primary" onClick={pickPhoto}>
-              <span aria-hidden="true">🖼️</span> 사진 선택하기
+              <img src={photoSelectIcon} width="23" height="23" alt="" aria-hidden="true" />
+              <span>사진 선택하기</span>
             </button>
           )}
         >
@@ -462,12 +474,14 @@ export default function Home({ onSubmit, notice, onTraining }) {
                 <span aria-hidden="true">↺</span> 다시 입력
               </button>
               <button type="button" className="action-primary" onClick={confirmText}>
-                <span aria-hidden="true">→</span> 이 내용으로
+                <img className="action-primary-check-icon" src={buttonCheckIcon} width="21" height="21" alt="" aria-hidden="true" />
+                <span>네, 맞아요</span>
               </button>
             </div>
           ) : (
             <button type="button" className="action-primary" disabled={!textDraft.trim()} onClick={reviewText}>
-              <span aria-hidden="true">✓</span> 입력한 내용 보기
+              <img className="action-primary-check-icon" src={buttonCheckIcon} width="21" height="21" alt="" aria-hidden="true" />
+              <span>입력한 내용 보기</span>
             </button>
           )}
         >
@@ -513,12 +527,14 @@ export default function Home({ onSubmit, notice, onTraining }) {
                 <span aria-hidden="true">↺</span> 다시 입력
               </button>
               <button type="button" className="action-primary" onClick={confirmLink}>
-                <span aria-hidden="true">→</span> 이 주소로
+                <img className="action-primary-check-icon" src={buttonCheckIcon} width="21" height="21" alt="" aria-hidden="true" />
+                <span>네, 맞아요</span>
               </button>
             </div>
           ) : (
             <button type="button" className="action-primary" disabled={!linkDraft.trim()} onClick={reviewLink}>
-              <span aria-hidden="true">✓</span> 입력한 주소 보기
+              <img className="action-primary-check-icon" src={buttonCheckIcon} width="21" height="21" alt="" aria-hidden="true" />
+              <span>입력한 주소 보기</span>
             </button>
           )}
         >
@@ -571,8 +587,9 @@ export default function Home({ onSubmit, notice, onTraining }) {
                   나중에 할게요
                 </button>
               )}
-              <button type="button" className="action-primary" disabled={!nameDraft.trim()} onClick={confirmNameModal}>
-                <span aria-hidden="true">✓</span> 이렇게 부를게요
+              <button type="button" className="action-primary name-confirm-action" disabled={!nameDraft.trim()} onClick={confirmNameModal}>
+                <img className="action-primary-check-icon" src={buttonCheckIcon} width="21" height="21" alt="" aria-hidden="true" />
+                <span>이렇게 부를게요</span>
               </button>
             </div>
           }
