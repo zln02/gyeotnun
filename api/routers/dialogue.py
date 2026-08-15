@@ -19,7 +19,7 @@ from mocks import fixtures
 from models.schemas import DialogueRequest, DialogueResponse
 from routers._common import MockFlag, not_implemented, use_mock
 from routers.checks import require_owner
-from services import prompt_chain, search
+from services import fallback_watch, prompt_chain, search
 from services.incident_log import log_incident
 
 router = APIRouter(prefix="/checks", tags=["dialogue"])
@@ -36,10 +36,10 @@ log = logging.getLogger("gyeotnun.dialogue")
 #     (docker-compose.yml 이 --workers 1 로 고정. _MEMORY_STORE 와 같은 제약).
 #   - 매 요청 경고하면 로그가 시끄러워지므로, 임계를 넘는 동안에는 한 번만 남기고
 #     정상으로 돌아오면 다시 무장한다(플래핑 방지).
-_FALLBACK_WINDOW = 20          # 최근 몇 건을 볼 것인가
-_FALLBACK_MIN_SAMPLES = 5      # 이만큼 쌓이기 전에는 비율을 말하지 않는다
-_FALLBACK_ALERT_RATE = 0.5     # 이 비율을 넘으면 경고
-_recent_fallbacks: deque = deque(maxlen=_FALLBACK_WINDOW)
+#   - 창 크기·최소 표본·임계는 검색 쪽 관측(EX-006)과 **같은 판단**이므로 한곳에서
+#     가져온다(services/fallback_watch.py). 전에는 양쪽에 값을 복사해 둬서, 한쪽만
+#     고쳐도 테스트가 통과하고 두 관측이 조용히 다른 기준으로 도는 상태였다.
+_recent_fallbacks: deque = deque(maxlen=fallback_watch.FALLBACK_WINDOW)
 _fallback_alerted = False
 
 
@@ -47,10 +47,10 @@ def _observe_fallback(is_fallback: bool) -> None:
     """질문 생성 1건의 폴백 여부를 기록하고, 비율이 임계를 넘으면 경고한다."""
     global _fallback_alerted
     _recent_fallbacks.append(bool(is_fallback))
-    if len(_recent_fallbacks) < _FALLBACK_MIN_SAMPLES:
+    if len(_recent_fallbacks) < fallback_watch.FALLBACK_MIN_SAMPLES:
         return
     rate = sum(_recent_fallbacks) / len(_recent_fallbacks)
-    if rate > _FALLBACK_ALERT_RATE:
+    if rate > fallback_watch.FALLBACK_ALERT_RATE:
         if not _fallback_alerted:
             _fallback_alerted = True
             log.warning("[fallback_rate] 최근 %d건 중 %d건이 기본 질문으로 대체됨 (%.0f%%) "

@@ -236,14 +236,22 @@ class EventSummaryResponse(BaseModel):
 
 # ---------------------------------------------------------------- 오류 코드 체계 (2026-08)
 class ErrorCodeItem(BaseModel):
-    """GET /api/v1/errors/codes 의 원소 1개. services/error_codes.py 가 단일 소스이고,
-    이 스키마는 그 내용을 그대로 실어 보내는 그릇일 뿐이다."""
+    """GET /api/v1/errors/codes 의 원소 1개.
+
+    ★ 2026-08-15: 이 엔드포인트는 무인증 공개다(프론트가 앱 시작 시 받아 쓴다).
+      그래서 **프론트가 실제로 쓰는 두 필드만** 내보낸다.
+      전에는 services/error_codes.py 의 6개 필드를 그대로 실어 보냈는데,
+      그중 situation·internal_handling 은 "어떤 실패에 어떤 폴백을 타는지"를
+      적어 둔 내부 문서다. 누구나 읽을 수 있는 자리에 둘 이유가 없다.
+      단일 소스 원칙은 그대로다 - 정의처는 여전히 error_codes.py 한 곳이고,
+      여기서 무엇을 공개할지만 고른다. 전체 표는 docs/error_codes.md 에 있다.
+
+      프론트 사용처 전수 확인(web/src/errorCodes.js): `c.code` 와
+      `found?.user_message` 둘뿐이다. area·situation·recovery·internal_handling 은
+      web/src 어디에서도 참조되지 않는다.
+    """
     code: str = Field(..., examples=["EX-001"])
-    area: str = Field(..., description="입력/인식/마스킹/검색/생성/저장/외부연동/공통")
-    situation: str
     user_message: str = Field(..., description="시니어가 이해할 수 있는 안내 문구 (빈 문자열이면 화면에 노출 안 됨 - 자동 폴백)")
-    recovery: str
-    internal_handling: str = Field(..., description="내부 처리 방식(팀 문서용) - 화면에는 보이지 않는다")
 
 
 class ErrorSummaryItem(BaseModel):

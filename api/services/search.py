@@ -39,7 +39,10 @@ from typing import List, Optional
 
 from config import MissingKeyError, settings
 from services import corpus_index
-from services import embeddings as embeddings_mod
+from services import fallback_watch
+# ★ 최상위 import 다. 순환하지 않는다 - embeddings → corpus_index → scam_taxonomy 로
+#   내려갈 뿐, 어느 쪽도 search 를 다시 import 하지 않는다(2026-08-15 확인).
+from services import embeddings
 
 log = logging.getLogger("gyeotnun.search")
 
@@ -429,8 +432,6 @@ def match_official_docs_hybrid(
     한쪽이 후보를 못 찾아도(예: 임베딩 인덱스 파일이 아직 없음) 나머지 하나만으로
     계속 동작한다 - 하이브리드가 반쪽만 살아 있어도 서비스가 죽지 않는다.
     """
-    from services import embeddings  # 순환 임포트 방지 - embeddings.py 가 corpus_index 를 쓴다
-
     bm25_docs = corpus_index.match_official_docs(text, limit=max(limit, 10))
     bm25_ranking = [d.id for d in bm25_docs]
 
@@ -478,10 +479,10 @@ def match_official_docs_hybrid(
 # ★ 관측만 한다. 폴백 동작도, 임계값도, 판정 로직도 건드리지 않는다.
 #   - 프로세스 메모리라 재시작하면 초기화된다. 워커 1개 전제도 GN-003 과 같다.
 #   - 임계를 넘는 동안에는 한 번만 경고하고, 정상으로 돌아오면 다시 무장한다.
-_SEARCH_FALLBACK_WINDOW = 20        # 최근 몇 건을 볼 것인가
-_SEARCH_FALLBACK_MIN_SAMPLES = 5    # 이만큼 쌓이기 전에는 비율을 말하지 않는다
-_SEARCH_FALLBACK_ALERT_RATE = 0.5   # 이 비율을 넘으면 경고 (GN-003 과 같은 값)
-_recent_search_fallbacks: deque = deque(maxlen=_SEARCH_FALLBACK_WINDOW)
+#   - 창 크기·최소 표본·임계는 GN-003 과 **같은 판단**이므로 한곳에서 가져온다
+#     (services/fallback_watch.py). 전에는 값을 복사해 둬서, 한쪽만 고쳐도
+#     테스트가 통과하고 두 관측이 조용히 다른 기준으로 도는 상태였다.
+_recent_search_fallbacks: deque = deque(maxlen=fallback_watch.FALLBACK_WINDOW)
 _search_fallback_alerted = False
 
 
@@ -489,12 +490,12 @@ def _observe_search_fallback(is_fallback: bool) -> None:
     """검색 1건의 폴백 여부를 기록하고, 비율이 임계를 넘으면 EX-006 을 한 번 남긴다."""
     global _search_fallback_alerted
     _recent_search_fallbacks.append(bool(is_fallback))
-    if len(_recent_search_fallbacks) < _SEARCH_FALLBACK_MIN_SAMPLES:
+    if len(_recent_search_fallbacks) < fallback_watch.FALLBACK_MIN_SAMPLES:
         return
     n = len(_recent_search_fallbacks)
     hit = sum(_recent_search_fallbacks)
     rate = hit / n
-    if rate > _SEARCH_FALLBACK_ALERT_RATE:
+    if rate > fallback_watch.FALLBACK_ALERT_RATE:
         if not _search_fallback_alerted:
             _search_fallback_alerted = True
             log.warning("[search_fallback_rate] 최근 %d건 중 %d건이 BM25 폴백 (%.0f%%) "
@@ -512,8 +513,6 @@ def match_official_docs_safe(text: str, limit: int = 2) -> tuple:
     반환값: (문서 리스트, 실제 쓰인 방식("embedding"|"bm25_fallback"),
     임베딩 최상위 유사도 - BM25 폴백이면 None, 척도가 달라 비교 불가하다).
     """
-    from services import embeddings
-
     try:
         hits = embeddings.match_embedding_docs(text, limit=limit)
         docs = [d for _, d in hits]
@@ -548,7 +547,7 @@ def match_official_docs_safe(text: str, limit: int = 2) -> tuple:
 #     ※ 간격이 0.006 으로 좁다(Upstage 는 0.032). 표본 30건 기준이므로, 실사용
 #       데이터가 쌓이면 재보정할 것.
 _CONFIDENT_BY_PROVIDER = {"upstage": 0.52, "local": 0.6790}
-CONFIDENT_MATCH_THRESHOLD = _CONFIDENT_BY_PROVIDER[embeddings_mod.EMBEDDING_PROVIDER]
+CONFIDENT_MATCH_THRESHOLD = _CONFIDENT_BY_PROVIDER[embeddings.EMBEDDING_PROVIDER]
 
 
 def collect_evidence(text: str, domain: str | None = None) -> SearchResult:

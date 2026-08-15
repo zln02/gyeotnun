@@ -18,7 +18,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services import corpus_index, search  # noqa: E402
+from services import corpus_index, fallback_watch, search  # noqa: E402
 from services.embeddings import EmbeddingUnavailableError  # noqa: E402
 
 TEXT = "농어가목돈마련저축 저축장려금 지급 안내입니다."
@@ -222,7 +222,7 @@ def test_search_fallback_rate_warns_when_repeated(caplog):
     ), patch("services.incident_log.log_incident",
              side_effect=lambda code, **kw: codes.append(code)):
         with caplog.at_level(logging.WARNING, logger="gyeotnun.search"):
-            for _ in range(search._SEARCH_FALLBACK_MIN_SAMPLES):
+            for _ in range(fallback_watch.FALLBACK_MIN_SAMPLES):
                 search.match_official_docs_safe(TEXT)
 
     assert any("[search_fallback_rate]" in r.message for r in caplog.records), \
@@ -242,7 +242,7 @@ def test_search_fallback_rate_is_silent_when_healthy(caplog):
 
     with patch("services.embeddings.match_embedding_docs", return_value=[(0.9, fake_doc)]):
         with caplog.at_level(logging.WARNING, logger="gyeotnun.search"):
-            for _ in range(search._SEARCH_FALLBACK_WINDOW):
+            for _ in range(fallback_watch.FALLBACK_WINDOW):
                 search.match_official_docs_safe(TEXT)
 
     assert not any("[search_fallback_rate]" in r.message for r in caplog.records)
@@ -268,3 +268,21 @@ def test_alert_signal_can_be_disabled():
 
     assert "official_alert_matched" not in [s["key"] for s in result.signals]
     assert result.verdict_hint == "needs_check", "스위치를 끄면 이전 동작이어야 한다"
+
+
+def test_both_fallback_observers_share_one_setting():
+    """폴백률 관측이 두 곳(GN-003 · EX-006)인데 기준은 하나여야 한다 (2026-08-15).
+
+    ★ 왜 이 테스트가 있는가
+      8/13 에 검색 쪽 관측을 붙일 때 "질문 생성 쪽과 똑같은 형식으로" 맞추느라
+      창 크기·최소 표본·임계 세 값을 **복사**했다. 값이 우연히 같은 게 아니라
+      같은 판단을 두 번 적은 것이다. 그 상태에서는 한쪽만 고쳐도 테스트가 전부
+      통과하고, 두 관측이 조용히 다른 기준으로 돌아간다(2026-08-14 감사 §1-2).
+      지금은 services/fallback_watch.py 한 곳에서 가져온다. 이 테스트가 그것을 지킨다.
+    """
+    from routers import dialogue
+
+    assert search._recent_search_fallbacks.maxlen == fallback_watch.FALLBACK_WINDOW
+    assert dialogue._recent_fallbacks.maxlen == fallback_watch.FALLBACK_WINDOW, (
+        "질문 생성 쪽 관측 창이 검색 쪽과 다르다 - 값을 다시 복사해 넣지 말 것"
+    )

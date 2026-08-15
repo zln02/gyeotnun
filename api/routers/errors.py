@@ -32,7 +32,11 @@ router = APIRouter(prefix="/errors", tags=["errors"])
 async def codes():
     # ★ 공개 유지: 프론트가 오류 문구 단일 소스로 이걸 받아 쓴다(web/src/errorCodes.js).
     #   개인정보·집계가 아니라 정적 코드표라 인증 대상이 아니다.
-    return ERROR_CODES
+    # ★ 2026-08-15: 다만 **프론트가 실제로 쓰는 두 필드만** 내보낸다.
+    #   situation·internal_handling 은 "어떤 실패에 어떤 폴백을 타는지"를 적어 둔
+    #   내부 문서다. 무인증 공개 자리에 둘 이유가 없다. response_model 이 걸러 주지만
+    #   여기서도 명시적으로 골라서, 나중에 필드가 늘어도 조용히 새어 나가지 않게 한다.
+    return [{"code": c["code"], "user_message": c["user_message"]} for c in ERROR_CODES]
 
 
 @router.get("/summary", response_model=ErrorSummaryResponse, summary="오류 코드별 집계")
