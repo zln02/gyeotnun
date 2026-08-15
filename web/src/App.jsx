@@ -67,6 +67,17 @@ export default function App() {
     return () => logScreenLeave(code)
   }, [screen])
 
+  /**
+   * ★ 2026-08-15: 화면이 바뀌면 맨 위로 올린다.
+   *   S3(질문)은 스크롤이 길다. 거기서 아래까지 내려간 채 S4(응답)로 넘어가면
+   *   새 화면이 중간부터 보인다 - 제목을 못 보고 선택지부터 마주치게 된다.
+   *   behavior 를 'auto' 로 둔 것은 의도적이다. 화면이 바뀌는 순간에 부드럽게
+   *   흘러내리면 '뭐가 움직이는지' 알기 어렵다.
+   *   (feat/web-ui-update 는 이걸 Decision 안에만 넣었는데, 같은 문제가
+   *    모든 전환에 있으므로 흐름을 쥔 여기에 한 번만 둔다.)
+   */
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'auto' }) }, [screen])
+
   // 탭을 닫거나 컴포넌트가 사라질 때 마지막 objectURL 을 반드시 회수한다.
   useEffect(() => () => { if (photoUrl) URL.revokeObjectURL(photoUrl) }, [photoUrl])
 

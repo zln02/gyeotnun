@@ -16,6 +16,8 @@ function NavItem({ itemKey, label, icon, active, onTap }) {
       type="button"
       className={`nav-item${active ? ' active' : ''}`}
       onClick={() => onTap(itemKey)}
+      /* 지금 어느 메뉴에 있는지를 색만이 아니라 보조기기에도 알린다 */
+      aria-current={active ? 'page' : undefined}
     >
       <img src={icon} width="26" height="26" alt="" aria-hidden="true" />
       <span>{label}</span>
@@ -31,7 +33,8 @@ export default function BottomNav({ active, onTap }) {
       <span className="nav-gap" aria-hidden="true" />
       <NavItem itemKey="growth" label="성장" icon={navGrowthIcon} active={active === 'growth'} onTap={onTap} />
       <NavItem itemKey="me" label="내 정보" icon={navMeIcon} active={active === 'me'} onTap={onTap} />
-      <button type="button" className="nav-fab" onClick={() => onTap('fab')}>
+      {/* 글자가 '바로<br/>확인' 로 끊겨 있어 보조기기가 붙여 읽는다 - 이름을 따로 준다 */}
+      <button type="button" className="nav-fab" aria-label="바로 확인" onClick={() => onTap('fab')}>
         <img src={navCheckIcon} width="33" height="33" alt="" aria-hidden="true" />
         <span>바로<br />확인</span>
       </button>
