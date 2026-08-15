@@ -175,7 +175,20 @@ mock 이 아닐 때 키가 없으면 **501 + 안내 메시지**를 돌려줍니�
 
 ## 4. 팀 · 기여
 
-폴더별 담당자·협업 규칙은 [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) 참고.
+**팀 Second Look** — 역할은 두 층으로 적는다. 기획서에 실린 대외 직함(표 1)과,
+저장소에서 어느 폴더를 맡는지(표 2)는 기준이 달라서 이름이 다를 수 있다.
+둘 다 사실이며 모순이 아니다.
+
+| 이름 | 팀 역할 (기획서) | 코드 폴더 담당 (저장소) |
+|---|---|---|
+| **박진** | PM · 데이터 통합 | 인식 · 마스킹 (`services/ocr.py`, `services/masking.py`) |
+| **김태희** | 공식 근거 검증 | 프롬프트 (`services/prompt_chain.py`) |
+| **장지석** | 사례 분석 | 태깅 · RAG · 코퍼스 (`services/tagger.py`, `corpus/`) |
+| **박진영** | 백엔드 · 배포 | API · DB · 배포 (`api/routers/`, `deploy/`) |
+| **김유리** | 프론트 · 시니어 UX | 검색 · 공공데이터 대조 (`services/search.py`) |
+| **조희진** | UX 검증 · 데모 시나리오 · 성과 시각화 | 프론트 (`web/`) |
+
+두 표의 전체 내용과 협업 규칙은 [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) 참고.
 
 ---
 
