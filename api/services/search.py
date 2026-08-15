@@ -40,6 +40,7 @@ from typing import List, Optional
 from config import MissingKeyError, settings
 from services import corpus_index
 from services import fallback_watch
+from services import url_expand
 # ★ 최상위 import 다. 순환하지 않는다 - embeddings → corpus_index → scam_taxonomy 로
 #   내려갈 뿐, 어느 쪽도 search 를 다시 import 하지 않는다(2026-08-15 확인).
 from services import embeddings
@@ -681,5 +682,34 @@ def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
         hint = "no_source_found"
     else:
         hint = "needs_check"
+
+    # ---- 신호: 문자 속 주소가 최종적으로 어디로 가는가 (2026-08-15)
+    #      ★★ 판정이 끝난 뒤에 붙인다. 이 신호는 tier 에 영향을 주지 않는다. ★★
+    #        위 risky / has_confident_source 계산이 이미 끝난 자리라, 여기서 무엇을
+    #        붙여도 hint 가 바뀌지 않는다. 위치 자체가 보장이다 - 위로 올리지 말 것.
+    #        (verdict.js 의 ATTENTION_KEYS 허용목록이 화면 쪽 두 번째 보장이다.)
+    #      ★ 실측 근거: 확대 112건의 단축·추적 URL 6건이 전부 정상 문자였다.
+    #        이 기능으로 잡히는 사칭은 0건이다. 사용자에게 사실을 하나 더 주는 것뿐이다.
+    #        docs/evaluation/URL펼치기_설계_2026-08-15.md
+    if url_expand.URL_EXPAND_ENABLED:
+        try:
+            expanded = url_expand.expand_first_url(text)
+        except Exception as e:  # noqa: BLE001 - 부가 정보 하나 때문에 확인 흐름을 막지 않는다
+            expanded = None
+            log.warning("[url_expand] 예상 밖 오류(무시하고 계속): %s", type(e).__name__)
+        if expanded is not None:
+            sig = url_expand.build_signal(expanded)
+            if sig:
+                signals.append(sig)
+            elif expanded.failure:
+                # ★ 실패는 화면에 알리지 않는다(EX-007 user_message 는 빈 문자열).
+                #   private_ip 는 따로 구분해 남긴다 - 단순 실패가 아니라 누군가
+                #   우리 서버를 내부망 탐색에 쓰려 한 흔적일 수 있다.
+                from services.incident_log import log_incident
+                log_incident(
+                    "EX-007",
+                    detail=("사설IP 차단" if expanded.blocked_private
+                            else f"펼치기 실패: {expanded.failure}"),
+                )
 
     return SearchResult(verdict_hint=hint, signals=signals, references=refs)

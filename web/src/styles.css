@@ -1796,6 +1796,26 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   font-size: 15px; font-weight: 500; line-height: 1.45;
 }
 
+/* ③ 주소 블록 (2026-08-15) - 문자 속 주소가 최종적으로 어디로 가는지.
+   ★ tier 색을 쓰지 않는다. 이건 판정이 아니라 사실이라, 빨강·주황·초록 어디에도
+     물들지 않아야 한다. 회색 중립으로 둔다.
+   ★ 링크가 아니다(a 태그를 쓰지 않는다). 어르신이 실수로 눌러 그 주소로 이동하면
+     이 기능의 취지가 뒤집힌다. */
+.judgment-link {
+  margin: 12px 0 0; padding: 12px 16px;
+  border: 1px solid #E0E0E0; border-radius: 8px;
+  background: #FAFAFA; text-align: left; word-break: break-all;
+}
+.judgment-link-fact {
+  margin: 0; color: #2B2B2B;
+  font-size: 17px; font-weight: 700; line-height: 1.55;
+}
+/* 공공기관 접미사(go.kr/or.kr)일 때만 나오는 둘째 줄. 그 외에는 아예 없다. */
+.judgment-link-public {
+  margin: 4px 0 0; color: #176947;
+  font-size: 16px; font-weight: 600; line-height: 1.55;
+}
+
 /* '사실 한 줄' - 무엇을 보고 그렇게 판단했는지. 다음 화면까지 안 가도 알 수 있게. */
 .judgment-fact {
   display: inline-block; margin: 14px 0 0; padding: 10px 16px;

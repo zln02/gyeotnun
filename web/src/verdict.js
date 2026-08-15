@@ -104,6 +104,38 @@ const RISK_ACTION_TITLE = {
  *     ② 사실 블록     - 우리가 무엇을 찾았는가(또는 못 찾았는가)
  *   각자 자기 자리에 들어간다.
  */
+/**
+ * ③ '주소 블록' - 문자 속 주소가 최종적으로 어디로 가는지. (2026-08-15)
+ *
+ * ★★ 사실만 말한다. 판정하지 않는다. ★★
+ *   서버(url_expand.py)가 HEAD 로 펼친 최종 도메인을 그대로 옮긴다.
+ *   설계·실측: docs/evaluation/URL펼치기_설계_2026-08-15.md
+ *
+ * ★ go.kr / or.kr 일 때만 한 줄을 더한다.
+ *   그 접미사는 **등록 자격이 정부·공공기관으로 제한**돼 있어서, "공공기관
+ *   주소다"가 판정이 아니라 등록 제도에서 나오는 사실이 된다. 누구나 살 수 있는
+ *   .com 과 다르다(사칭 S03 gov24-refund-event.com · S08 nhis-refund24.com 이
+ *   전부 .com 이었다).
+ *
+ * ★★ 그 외 도메인에는 아무 말도 하지 않는다 ★★
+ *   실측에서 kt.com · coupang.com · play.google.com 이 **전부 정상 문자**였다.
+ *   "공공기관 주소가 아닙니다"를 띄우면 그 셋이 전부 의심을 받는다 -
+ *   '정상 문자를 의심으로 표시하지 않는다'는 절대 조건 위반이다.
+ *   ★ "안전합니다" 도 쓰지 않는다. 공공 도메인이라는 것이 안전을 뜻하지 않는다.
+ *
+ * ★ 펼쳐지지 않았으면(시작 == 최종) 서버가 신호 자체를 안 보낸다. 실패해도
+ *   안 보낸다(EX-007, 침묵). 그러면 이 줄은 화면에 없다 - 없는 것은 없는 것이다.
+ */
+function linkBlock(signals) {
+  const s = signals.find((x) => x.key === 'url_expanded' && x.detail)
+  if (!s) return null
+  return {
+    fact: `받으신 주소는 최종적으로 ${s.detail} 로 연결됩니다`,
+    // 공공기관 접미사일 때만 채운다. 아니면 빈 문자열 = 화면에 줄이 없다.
+    publicNote: s.public_domain ? '정부·공공기관 주소(go.kr)로 연결됩니다' : '',
+  }
+}
+
 function factBlock(evidence, signals, refs) {
   const alert = signals.find((s) => s.key === 'official_alert_matched')
   if (alert) {
@@ -158,6 +190,7 @@ function factBlock(evidence, signals, refs) {
  * 반환 - 두 블록이 따로 나간다(2026-08-13)
  *   risk  ① 위험행동 블록 {quote, fact, action} 또는 null
  *   fact / factTitle / factUrl  ② 사실 블록 (항상 있다)
+ *   link  ③ 주소 블록 {fact, publicNote} 또는 null (2026-08-15, tier 영향 없음)
  */
 export function judgmentState(evidence, checkData) {
   const signals = evidence?.signals || []
@@ -181,6 +214,9 @@ export function judgmentState(evidence, checkData) {
   // ── ② 사실 블록. 항상 만든다.
   const facts = factBlock(evidence, signals, refs)
 
+  // ── ③ 주소 블록. 서버가 펼치기에 성공했을 때만 있다. tier 에 영향을 주지 않는다.
+  const link = linkBlock(signals)
+
   // ── 단계와 제목
   //    ① 계좌·카드번호가 실제로 검출됐다 → 가장 강한 경고.
   //       masking.py 의 정규식이 문맥까지 보고 잡아낸 '진짜 숫자'라 신뢰도가 높다.
@@ -190,6 +226,7 @@ export function judgmentState(evidence, checkData) {
       tier: 'danger',
       lead: '지금 ', accent: '멈추세요', tail: '',
       risk,
+      link,
       ...facts,
       fact: MASKED_LABEL[money.type] || '금융 정보가 적혀 있어요',
       factTitle: '', factUrl: '',
@@ -205,6 +242,7 @@ export function judgmentState(evidence, checkData) {
       tier: 'warn',
       lead: '확인이 ', accent: '필요', tail: '한 문자예요',
       risk,
+      link,
       ...facts,
     }
   }
@@ -215,7 +253,7 @@ export function judgmentState(evidence, checkData) {
   //      info 로 오고, 그때는 단계를 올리지 않는다 - 스위치가 화면까지 관통한다.
   if (risk && riskSig.severity === 'attention') {
     const [lead, accent, tail] = RISK_ACTION_TITLE[risk.detail]
-    return { tier: 'act', lead, accent, tail, risk, ...facts }
+    return { tier: 'act', lead, accent, tail, risk, link, ...facts }
   }
 
   // ★★ 초록은 '허용 목록' 방식이다 (2026-08-12) ★★
@@ -230,6 +268,7 @@ export function judgmentState(evidence, checkData) {
       accent: refs.length > 0 ? '확인하지 못했' : '못 찾았',
       tail: '어요',
       risk,
+      link,
       ...facts,
     }
   }
@@ -239,6 +278,7 @@ export function judgmentState(evidence, checkData) {
     tier: 'ok',
     lead: '공식 자료를 ', accent: '찾았', tail: '어요',
     risk,
+    link,
     ...facts,
   }
 }

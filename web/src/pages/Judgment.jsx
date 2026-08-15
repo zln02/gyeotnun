@@ -93,6 +93,23 @@ export default function Judgment({ evidence, checkData, onStart }) {
         <p className={`judgment-fact ${s.tier}`}>{s.fact}</p>
       )}
 
+      {/* ── ③ 주소 블록 (2026-08-15). 서버가 주소를 펼치는 데 성공했을 때만 나온다.
+          ★ 사실만 적는다. "안전합니다"도 "위험합니다"도 쓰지 않는다.
+          ★ 두 번째 줄(공공기관 주소)은 최종 도메인이 go.kr/or.kr 일 때만 채워진다.
+            그 외 도메인에는 아무 말도 하지 않는다 - 실측에서 kt.com·coupang.com·
+            play.google.com 이 전부 정상 문자였다. "공공 주소가 아닙니다"는
+            그 셋을 의심으로 만든다.
+          ★ 도메인은 그대로 텍스트로 넣는다. 링크로 만들지 않는다 -
+            어르신이 실수로 눌러 그 주소로 이동하면 이 기능의 취지가 뒤집힌다. */}
+      {s.link ? (
+        <div className="judgment-link">
+          <p className="judgment-link-fact">{s.link.fact}</p>
+          {s.link.publicNote ? (
+            <p className="judgment-link-public">{s.link.publicNote}</p>
+          ) : null}
+        </div>
+      ) : null}
+
       <button
         type="button"
         className={`judgment-cta ${s.tier}`}
