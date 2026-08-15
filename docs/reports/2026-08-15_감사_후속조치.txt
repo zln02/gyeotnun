@@ -180,12 +180,23 @@ GitHub Actions 를 쓰지 않은 이유 (지시대로)
 pytest 103 passed (102 + 관측 상수 공유 테스트 1)
 
 
-6. docker builder prune  — ★ 실행 안 함. 확인 요청 중
------------------------------------------------------
-  build cache 106.5GB (회수가능 106.3GB)
-  회수하면 디스크 여유 130G -> 약 236G
-  실행 중 컨테이너·사용 중 이미지는 건드리지 않는 명령이지만,
-  지시하신 대로 확인 요청 후에 실행한다.
+6. docker builder prune  — 사람 승인 후 실행 완료
+-------------------------------------------------
+  확인 요청 -> 승인 -> `docker builder prune -f` 실행.
+  미사용 이미지(9.4GB)는 건드리지 않았다(승인 범위가 빌드 캐시였다).
+
+  실측
+    Build Cache   106.5GB -> 208.1MB  (회수 106.3GB)
+    디스크 여유   130G -> 217G        (사용률 59% -> 30%)
+    Images        33.48GB 그대로 (미사용 9.447GB 남아 있음)
+
+  실행 후 확인
+    컨테이너 4개 전부 Up (api / db healthy / nginx / certbot)
+    https://gyeotnun.duckdns.org/  HTTP 200 (0.22s)
+    /api/v1/errors/codes           HTTP 200
+
+  ★ 부작용: 다음 `docker compose build` 는 캐시 없이 처음부터 돈다.
+    api 이미지는 PaddleOCR·torch 때문에 재빌드가 길다. 배포 전에 여유를 둘 것.
 
 
 커밋 이력 (전부 origin/main)
