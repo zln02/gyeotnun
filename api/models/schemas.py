@@ -68,6 +68,14 @@ class Signal(BaseModel):
     #   어긋나도 사용자는 실제 문장을 본다. 거짓말이 구조적으로 어려워진다.
     #   ★ 이미 마스킹된 텍스트에서만 나온다(collect_evidence 입력이 masked_text 다).
     quote: Optional[str] = Field(None, description="검출 근거가 된 원문 구절(마스킹 후)")
+    # ★ 2026-08-15 추가. url_expanded 전용 - 펼친 최종 도메인이 .go.kr/.or.kr 인가.
+    #   화면은 True 일 때만 "정부·공공기관 주소(go.kr)로 연결됩니다" 한 줄을 더한다.
+    #   ★ False 라고 해서 아무 말도 하지 않는다. kt.com·coupang.com·play.google.com
+    #     이 전부 정상 문자였다 - "공공 주소가 아닙니다"는 정상을 의심으로 만든다.
+    #   ★ 이 필드를 여기 선언하지 않으면 응답에서 조용히 사라진다(2026-08-15 라이브
+    #     검증에서 실제로 겪었다 - 서버는 붙였는데 화면까지 안 갔다).
+    public_domain: Optional[bool] = Field(
+        None, description="url_expanded 전용: 최종 도메인이 공공기관 접미사인가")
 
 
 class Reference(BaseModel):
