@@ -239,3 +239,129 @@ def test_live_no_references_means_no_invented_links():
 
     assert vq.evidence_refs == []
     assert pc.find_forbidden(vq.question) is None
+
+
+# ==================================================== 5) 비동기판 (2026-08-16, #33 2단계)
+#
+# ★★ 왜 이 묶음이 필요한가 ★★
+#   agenerate_question 은 동기판과 **같은 _question_driver** 를 돌린다. 그래도
+#   "같은 드라이버를 쓴다"는 주장을 코드 읽기로만 남겨 두지 않는다 - 언젠가 누가
+#   비동기판만 손대면 그 순간 가드레일이 갈라지고, 원칙을 어긴 질문이 화면에 나간다.
+#   그래서 **같은 입력에 같은 결과가 나오는지를 직접 단정한다.**
+#
+# pytest-asyncio 를 쓰지 않는다. asyncio.run 하나면 되고, 의존성을 늘리지 않는다.
+import asyncio  # noqa: E402
+
+
+@pytest.fixture
+def fake_async_llm(monkeypatch):
+    """_acall_claude 를 비동기 스텁으로 갈아 끼운다. fake_llm 과 같은 규약."""
+    pc.reset_guardrail_stats()
+    monkeypatch.setattr(pc.settings, "ANTHROPIC_API_KEY", "test-key-not-real")
+
+    def _install(payloads):
+        seq = list(payloads)
+        calls = {"n": 0}
+
+        async def _stub(messages):
+            calls["n"] += 1
+            return seq[min(calls["n"] - 1, len(seq) - 1)], "{}"
+
+        monkeypatch.setattr(pc, "_acall_claude", _stub)
+        return calls
+
+    return _install
+
+
+def test_async_falls_back_after_all_attempts_fail(fake_async_llm):
+    """비동기판도 판정어 3연속이면 폴백으로 내려간다."""
+    fake_async_llm([_payload("이 글은 가짜입니다.")])
+
+    vq = asyncio.run(pc.agenerate_question(TEXT, SIGNALS, REFERENCES))
+
+    assert vq.fallback is True
+    assert vq.question == pc.FALLBACK_QUESTION
+    stats = pc.guardrail_stats()
+    assert stats["attempts"] == pc.MAX_ATTEMPTS == 3
+    assert stats["forbidden_word"] == 3
+    assert stats["fallback"] == 1
+
+
+def test_async_regenerates_on_forbidden_word(fake_async_llm):
+    calls = fake_async_llm([_payload("이건 사기입니다."), _payload(GOOD_Q)])
+
+    vq = asyncio.run(pc.agenerate_question(TEXT, SIGNALS, REFERENCES))
+
+    assert calls["n"] == 2
+    assert vq.fallback is False
+    assert vq.question == GOOD_Q
+    assert pc.guardrail_stats()["forbidden_word"] == 1
+
+
+def test_async_api_error_is_retried(fake_async_llm, monkeypatch):
+    """호출이 터져도 비동기판이 같은 횟수만큼 재시도하고 폴백한다."""
+    pc.reset_guardrail_stats()
+    monkeypatch.setattr(pc.settings, "ANTHROPIC_API_KEY", "test-key-not-real")
+    calls = {"n": 0}
+
+    async def _boom(messages):
+        calls["n"] += 1
+        raise RuntimeError("연결 실패")
+
+    monkeypatch.setattr(pc, "_acall_claude", _boom)
+
+    vq = asyncio.run(pc.agenerate_question(TEXT, SIGNALS, REFERENCES))
+
+    assert calls["n"] == pc.MAX_ATTEMPTS
+    assert vq.fallback is True
+    assert pc.guardrail_stats()["api_error"] == pc.MAX_ATTEMPTS
+
+
+def test_async_missing_key_raises_missing_key_error(monkeypatch):
+    monkeypatch.setattr(pc.settings, "ANTHROPIC_API_KEY", "")
+    with pytest.raises(MissingKeyError):
+        asyncio.run(pc.agenerate_question(TEXT, SIGNALS, REFERENCES))
+
+
+@pytest.mark.parametrize("payloads", [
+    [_payload(GOOD_Q)],                                   # 한 번에 통과
+    [_payload("이건 사기입니다."), _payload(GOOD_Q)],        # 한 번 재생성
+    [_payload("이 글은 가짜입니다.")],                       # 전부 실패 → 폴백
+    [_payload(GOOD_Q, refs=["https://evil.example/x"])],   # 허용 밖 링크
+])
+def test_sync_and_async_agree(payloads, monkeypatch):
+    """★ 같은 응답 열에 대해 동기·비동기 결과가 **완전히 같아야** 한다.
+
+    질문·why·보기·링크·폴백 여부까지 본다. 여기가 깨지면 드라이버가 갈라진 것이다.
+    """
+    monkeypatch.setattr(pc.settings, "ANTHROPIC_API_KEY", "test-key-not-real")
+
+    def _shape(vq):
+        return (vq.question, vq.why, vq.evidence_refs, vq.options,
+                vq.fallback, vq.dropped_refs, vq.is_final)
+
+    seq = list(payloads)
+    n = {"i": 0}
+
+    def _sync_stub(messages):
+        n["i"] += 1
+        return seq[min(n["i"] - 1, len(seq) - 1)], "{}"
+
+    pc.reset_guardrail_stats()
+    monkeypatch.setattr(pc, "_call_claude", _sync_stub)
+    sync_out = _shape(pc.generate_question(TEXT, SIGNALS, REFERENCES))
+    sync_stats = pc.guardrail_stats()
+
+    n["i"] = 0
+
+    async def _async_stub(messages):
+        n["i"] += 1
+        return seq[min(n["i"] - 1, len(seq) - 1)], "{}"
+
+    pc.reset_guardrail_stats()
+    monkeypatch.setattr(pc, "_acall_claude", _async_stub)
+    async_out = _shape(asyncio.run(pc.agenerate_question(TEXT, SIGNALS, REFERENCES)))
+    async_stats = pc.guardrail_stats()
+
+    assert sync_out == async_out, "동기·비동기 결과가 다르다 - 가드레일이 갈라졌다"
+    assert sync_stats == async_stats, "재생성 통계가 다르다 - 루프가 갈라졌다"

@@ -129,12 +129,14 @@ def _start_prewarm() -> None:
         if settings.OCR_PROVIDER == "local":
             try:
                 t0 = time.perf_counter()
-                import numpy as np
-
                 from services import ocr
 
                 # 흰 이미지 1장으로 가중치까지 완전히 초기화한다(디스크 기록 없음).
-                ocr._get_paddle().predict(input=np.full((64, 160, 3), 255, dtype=np.uint8))
+                # ★ 2026-08-16: 여기서 직접 predict 하지 않는다. 프리워밍은 백그라운드
+                #   스레드라, 그 스레드에서 예측기를 만들면 **이후 모든 요청이 죽는다**
+                #   (Paddle 예측기는 만들어진 스레드에 묶인다 - services/ocr.py 주석).
+                #   전용 스레드에서 만들도록 ocr 쪽 함수를 통해 간다.
+                ocr.prewarm_local()
                 _log.info("[prewarm] 로컬 OCR 준비 완료 %.1fs", time.perf_counter() - t0)
             except Exception as e:  # noqa: BLE001
                 _log.warning("[prewarm] 로컬 OCR 준비 실패(무시): %s", e)

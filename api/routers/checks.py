@@ -10,6 +10,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from config import settings
 from mocks import fixtures
@@ -78,7 +79,8 @@ async def create_check(
         if text:
             extracted = ocr.extract_from_text(text)
         elif link:
-            extracted = ocr.extract_from_link(link)
+            # ★ 링크 본문 가져오기는 네트워크 대기다 - 루프 밖으로.
+            extracted = await run_in_threadpool(ocr.extract_from_link, link)
         elif image:
             raw = await image.read()
             if len(raw) > settings.MAX_UPLOAD_MB * 1024 * 1024:
@@ -95,7 +97,8 @@ async def create_check(
                     ),
                 )
             try:
-                extracted = ocr.extract_from_image(raw)
+                # ★ OCR 은 요청당 2.2초짜리 CPU 작업이다 - 루프 밖으로.
+                extracted = await run_in_threadpool(ocr.extract_from_image, raw)
             finally:
                 masking.discard_original(raw)   # ★ 원본 즉시 파기
         else:
@@ -161,7 +164,11 @@ async def get_evidence(
 
     stored = require_owner(check_id, device_id)   # ★ IDOR 방지: 소유자만 통과
     try:
-        result = search.collect_evidence(stored["masked_text"], domain=stored.get("domain"))
+        # ★ 2026-08-16 (#33 2단계) — 이벤트 루프 밖에서 돈다.
+        #   임베딩 추론(CPU)과 url_expand 의 외부 HEAD(최대 3초)가 여기 들어 있다.
+        #   전에는 async def 안에서 동기로 불러 그 동안 다른 사용자가 전부 멈췄다.
+        result = await run_in_threadpool(
+            search.collect_evidence, stored["masked_text"], domain=stored.get("domain"))
     except Exception as e:  # noqa: BLE001
         raise not_implemented(e, "SR-001", screen="S2", device_id=stored.get("device_id")) from e
     return EvidenceResponse(

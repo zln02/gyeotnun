@@ -13,6 +13,7 @@ import logging
 from collections import deque
 
 from fastapi import APIRouter
+from fastapi.concurrency import run_in_threadpool
 
 from config import MissingKeyError
 from mocks import fixtures
@@ -86,8 +87,15 @@ async def next_question(check_id: str, body: DialogueRequest, mock: int = MockFl
         history.append(f"사용자 답변: {body.user_reply}")
 
     try:
-        evidence = search.collect_evidence(stored["masked_text"], domain=stored.get("domain"))
-        vq = prompt_chain.generate_question(
+        # ★ 2026-08-16 (#33 2단계) — 둘 다 이벤트 루프 밖에서 돈다.
+        #   collect_evidence 는 CPU(임베딩) + 외부 HEAD 라 스레드풀로 빼고,
+        #   질문 생성은 공식 비동기 클라이언트로 부른다.
+        #   전에는 async def 안에서 동기로 불러 **워커 전체가 멈췄다** -
+        #   실측으로 동시 3명의 dialogue 가 5.8 / 10.2 / 14.8초 계단이었다.
+        #   ★ 판정·가드레일 로직은 그대로다. 실행 방식만 바꿨다.
+        evidence = await run_in_threadpool(
+            search.collect_evidence, stored["masked_text"], domain=stored.get("domain"))
+        vq = await prompt_chain.agenerate_question(
             extracted_text=stored["masked_text"],
             signals=evidence.signals,
             references=evidence.references,

@@ -21,6 +21,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+import os
 import uuid
 
 BASE = "http://127.0.0.1:8010/api/v1"
@@ -30,7 +31,8 @@ IMG = "/home/ubuntu/gyeotnun/api/tests/fixtures/kakao_sample.jpg"
 TEXT = ("기초연금은 만 65세 이상이면서 소득인정액이 선정기준액 이하인 분께 매달 "
         "지급됩니다. 신청은 주소지 주민센터나 국민연금공단 지사에서 하실 수 있습니다.")
 
-LLM_BUDGET = 15          # ★ 승인된 상한. 넘으면 멈춘다.
+LLM_BUDGET = int(os.getenv("LLM_BUDGET", "15"))   # ★ 승인된 상한. 넘으면 멈춘다.
+SKIP_IMAGE = os.getenv("SKIP_IMAGE") == "1"
 _llm_calls = 0
 _budget_lock = threading.Lock()
 
@@ -134,7 +136,8 @@ if __name__ == "__main__":
     _take_budget()
     post_dialogue(cid)
 
-    run("text", 1, 3, "0-A 텍스트 여정 · 단독")
-    run("text", 3, 2, "0-B 텍스트 여정 · 동시 3명")
-    run("image", 3, 1, "0-C 사진 여정 · 동시 3명")
+    run("text", 1, int(os.getenv("R1", "3")), "텍스트 여정 · 단독")
+    run("text", 3, int(os.getenv("R3", "2")), "텍스트 여정 · 동시 3명")
+    if not SKIP_IMAGE:
+        run("image", 3, 1, "사진 여정 · 동시 3명")
     print(f"\nLLM 실호출 {_llm_calls}건 (상한 {LLM_BUDGET})")

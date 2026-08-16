@@ -18,6 +18,7 @@ import base64
 import json
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Optional
 
@@ -159,8 +160,47 @@ def _restore_boundary_spaces(text: str) -> str:
     return _LATIN_HANGUL.sub(r"\1 \2", _HANGUL_LATIN.sub(r"\1 \2", text))
 
 
+# ★★ Paddle 예측기는 '만들어진 스레드'에 묶인다 (2026-08-16, #33 2단계 실측) ★★
+#
+#   2단계에서 OCR 을 이벤트 루프 밖(스레드풀)으로 빼자 사진 경로가 무너졌다.
+#   격리 측정(배포 전):
+#       동시 1명 3건 전부 실패 · 동시 3명 9건 실패 · 동시 5명 15건 중 12건 실패
+#       서버 로그: EX-001 "로컬 OCR(PaddleOCR) 추론 실패: std::exception"
+#   ★ 배포 전 격리 측정이 아니었다면 그대로 장애가 됐다.
+#
+#   ★ 처음엔 "동시 실행이 문제"라 보고 threading.Lock 으로 직렬화했다. **그래도 실패했다.**
+#     원인은 동시 실행이 아니라 **스레드가 바뀌는 것**이다. 스레드풀은 요청마다 다른
+#     스레드를 쓰는데, Paddle 의 C++ 예측기는 자기를 만든 스레드에서만 안전하다.
+#     (순차 요청이 우연히 통과한 것은 스레드풀이 같은 유휴 스레드를 재사용해서였다.)
+#
+#   그래서 **전용 스레드 한 개**에 고정한다. 로드도 추론도 전부 이 스레드에서 돈다.
+#   max_workers=1 이라 직렬화도 자동으로 따라온다(락이 따로 필요 없다).
+#   ★ 이벤트 루프는 그대로 자유롭다. 2단계의 목적은 "OCR 을 병렬로 돌리는 것"이 아니라
+#     "OCR 이 도는 동안 서버가 멈추지 않는 것"이다. 그 목적은 이걸로 달성된다.
+_paddle_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="paddle")
+
+
+def _on_paddle_thread(fn):
+    """Paddle 관련 작업을 전용 스레드에서 돌리고 결과를 기다린다."""
+    return _paddle_executor.submit(fn).result()
+
+
+def prewarm_local() -> None:
+    """기동 시 로컬 OCR 모델을 미리 올린다. ★ 반드시 전용 스레드에서 만든다.
+
+    다른 스레드에서 만들면 이후 모든 추론이 std::exception 으로 죽는다.
+    """
+    import numpy as np
+
+    _on_paddle_thread(
+        lambda: _get_paddle().predict(input=np.full((64, 160, 3), 255, dtype=np.uint8)))
+
+
 def _get_paddle():
-    """PaddleOCR 싱글턴(임베딩의 로컬 모델 싱글턴과 같은 구조). 최초 1회 로드."""
+    """PaddleOCR 싱글턴(임베딩의 로컬 모델 싱글턴과 같은 구조). 최초 1회 로드.
+
+    ★ 반드시 _on_paddle_thread 안에서만 부를 것 (위 주석 참고).
+    """
     global _paddle_ocr
     if _paddle_ocr is None:
         from paddleocr import PaddleOCR
@@ -202,7 +242,8 @@ def _extract_local(image_bytes: bytes) -> ExtractResult:
         return ExtractResult(text="", status="failed")
 
     try:
-        res = _get_paddle().predict(input=arr)
+        # ★ 전용 스레드에서만 부른다 (_paddle_executor 주석 참고).
+        res = _on_paddle_thread(lambda: _get_paddle().predict(input=arr))
     except Exception as e:  # noqa: BLE001 - 로드/추론 실패는 서비스가 시도조차 못한 경우
         raise RuntimeError(f"로컬 OCR(PaddleOCR) 추론 실패: {e}") from e
 

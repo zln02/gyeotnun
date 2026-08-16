@@ -393,16 +393,39 @@ def _get_client():
     return _client
 
 
-def _call_claude(messages: list) -> tuple[dict, str]:
-    """Claude 를 한 번 호출해 (파싱된 payload, 원문 JSON) 을 돌려준다."""
-    resp = _get_client().messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        system=_system_blocks(),
-        messages=messages,
+_async_client = None
+
+
+def _get_async_client():
+    """비동기 Anthropic 클라이언트 싱글턴 (2026-08-16, #33 2단계).
+
+    ★ 동기 클라이언트와 별개 객체지만 같은 키·같은 모델·같은 인자를 쓴다.
+      동기 클라이언트를 async 라우터에서 부르면 그 5초 동안 이벤트 루프가 통째로
+      멈춘다(실측: 동시 3명이 5.8 / 10.2 / 14.8초 계단).
+    """
+    global _async_client
+    if _async_client is None:
+        import anthropic
+
+        _async_client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    return _async_client
+
+
+def _call_kwargs(messages: list) -> dict:
+    """호출 인자를 한곳에서 만든다. ★ 동기·비동기가 다른 인자를 쓰면 안 된다."""
+    return {
+        "model": MODEL,
+        "max_tokens": MAX_TOKENS,
+        "system": _system_blocks(),
+        "messages": messages,
         # 짧은 생성이라 낮은 effort 로 충분하다. thinking 은 Sonnet 5 기본값(adaptive)을 쓴다.
-        output_config={"effort": EFFORT, "format": {"type": "json_schema", "schema": RESPONSE_SCHEMA}},
-    )
+        "output_config": {"effort": EFFORT,
+                          "format": {"type": "json_schema", "schema": RESPONSE_SCHEMA}},
+    }
+
+
+def _finish_call(resp) -> tuple[dict, str]:
+    """응답 처리도 한곳에서. ★ 동기·비동기가 갈라지면 한쪽만 고쳐진다."""
     usage = resp.usage
     log.info(
         "[llm] model=%s in=%s cache_write=%s cache_read=%s out=%s",
@@ -416,6 +439,16 @@ def _call_claude(messages: list) -> tuple[dict, str]:
 
     raw = "".join(b.text for b in resp.content if b.type == "text")
     return json.loads(raw), raw
+
+
+def _call_claude(messages: list) -> tuple[dict, str]:
+    """Claude 를 한 번 호출해 (파싱된 payload, 원문 JSON) 을 돌려준다."""
+    return _finish_call(_get_client().messages.create(**_call_kwargs(messages)))
+
+
+async def _acall_claude(messages: list) -> tuple[dict, str]:
+    """_call_claude 의 비동기판. 하는 일이 같아야 한다 - 인자·후처리를 공유한다."""
+    return _finish_call(await _get_async_client().messages.create(**_call_kwargs(messages)))
 
 
 def _screen_payload(payload: dict, allowed: Sequence[str]) -> ValidatedQuestion:
@@ -468,25 +501,36 @@ def _fallback_question(allowed: Sequence[str]) -> ValidatedQuestion:
     return vq
 
 
-def generate_question(
+def _question_driver(
     extracted_text: str,
     signals: list,
     references: list,
     history: list | None = None,
     max_attempts: int = MAX_ATTEMPTS,
-) -> ValidatedQuestion:
-    """Claude 로 확인 질문 1개를 만들고, 검증을 통과할 때까지 재생성한다.
+):
+    """★★ 가드레일(재생성·검증) 로직 **한 벌**. 실제 API 호출만 바깥에 맡긴다. ★★
 
-    흐름
+    왜 이렇게 나눴나 (2026-08-16, #33 2단계)
+      비동기 호출을 넣으려면 이 재시도 루프가 필요한데, 동기용·비동기용으로 사본을
+      두 벌 두면 **한쪽만 고쳐지는 날이 온다.** 그 순간 원칙을 어긴 질문이 화면에
+      나간다 - 이 파일이 막으려는 바로 그 일이다. 그래서 루프는 여기 하나만 두고,
+      "Claude 를 어떻게 부르는가"만 호출자가 정한다.
+
+    프로토콜
+        drv = _question_driver(...)
+        messages = next(drv)                       # 보낼 messages
+        while True:
+            try:
+                messages = drv.send(("ok", payload, raw))   # 호출 성공
+                # 호출이 실패했으면  drv.send(("error", exc, None))
+            except StopIteration as stop:
+                return stop.value                  # ValidatedQuestion
+
+    흐름 자체는 예전 generate_question 과 같다
       1) Claude 호출 (system 은 프롬프트 캐시, 응답은 structured outputs 로 강제)
       2) validate_question + why/보기 금지어 검사
       3) 실패하면 무엇이 틀렸는지 알려 주고 재생성 (최대 max_attempts 회)
       4) 전부 실패하면 FALLBACK_QUESTION 으로 내려가고 그 사실을 로그로 남긴다
-
-    재생성 사유(forbidden_word / too_long / bad_ref / empty)는 _STATS 에 누적된다.
-    guardrail_stats() 로 조회한다.
-
-    키가 없으면 MissingKeyError → 라우터가 501 + 안내 메시지로 변환한다.
     """
     if not settings.has_llm:
         raise MissingKeyError("ANTHROPIC_API_KEY", owner="김태희")
@@ -499,14 +543,14 @@ def generate_question(
         _STATS["attempts"] += 1
         last = attempt == max_attempts
 
-        try:
-            payload, raw = _call_claude(messages)
-        except Exception as e:  # noqa: BLE001 - API/파싱 오류는 모두 재시도 대상
+        kind, first, second = yield messages
+        if kind == "error":
             _STATS["api_error"] += 1
-            log.warning("[llm] attempt=%d/%d 호출 실패: %s", attempt, max_attempts, e)
+            log.warning("[llm] attempt=%d/%d 호출 실패: %s", attempt, max_attempts, first)
             if last:
                 return _fallback_question(allowed)
             continue
+        payload, raw = first, second
 
         try:
             vq = _screen_payload(payload, allowed)
@@ -544,3 +588,57 @@ def generate_question(
         return vq
 
     return _fallback_question(allowed)  # 도달하지 않지만 방어적으로 둔다
+
+
+def generate_question(
+    extracted_text: str,
+    signals: list,
+    references: list,
+    history: list | None = None,
+    max_attempts: int = MAX_ATTEMPTS,
+) -> ValidatedQuestion:
+    """확인 질문 1개를 만든다 (동기). 가드레일은 _question_driver 가 전부 처리한다.
+
+    이 함수가 하는 일은 **호출 방식뿐**이다 - 동기 클라이언트로 부르고 결과를
+    드라이버에 넘긴다. 검증·재생성·폴백 판단은 여기 없다.
+
+    키가 없으면 MissingKeyError → 라우터가 501 + 안내 메시지로 변환한다.
+    """
+    drv = _question_driver(extracted_text, signals, references, history, max_attempts)
+    try:
+        messages = next(drv)
+        while True:
+            try:
+                payload, raw = _call_claude(messages)
+                outcome = ("ok", payload, raw)
+            except Exception as e:  # noqa: BLE001 - API/파싱 오류는 모두 재시도 대상
+                outcome = ("error", e, None)
+            messages = drv.send(outcome)
+    except StopIteration as stop:
+        return stop.value
+
+
+async def agenerate_question(
+    extracted_text: str,
+    signals: list,
+    references: list,
+    history: list | None = None,
+    max_attempts: int = MAX_ATTEMPTS,
+) -> ValidatedQuestion:
+    """generate_question 의 비동기판 (2026-08-16, #33 2단계).
+
+    ★ 같은 드라이버를 돌린다. 다른 것은 `await _acall_claude` 한 줄뿐이다.
+      가드레일이 동기판과 다를 수 없는 구조다 - 그게 이 설계의 목적이다.
+    """
+    drv = _question_driver(extracted_text, signals, references, history, max_attempts)
+    try:
+        messages = next(drv)
+        while True:
+            try:
+                payload, raw = await _acall_claude(messages)
+                outcome = ("ok", payload, raw)
+            except Exception as e:  # noqa: BLE001 - 동기판과 같은 취급
+                outcome = ("error", e, None)
+            messages = drv.send(outcome)
+    except StopIteration as stop:
+        return stop.value
