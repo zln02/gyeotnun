@@ -13,7 +13,7 @@ from mocks import fixtures
 from models.schemas import VerdictRequest, VerdictResponse
 from routers._common import MockFlag, not_implemented, use_mock
 from routers.checks import require_owner
-from services import search, tagger
+from services import check_store, search, tagger
 
 router = APIRouter(prefix="/checks", tags=["verdict"])
 
@@ -41,7 +41,16 @@ async def record_verdict(check_id: str, body: VerdictRequest, mock: int = MockFl
     except Exception as e:  # noqa: BLE001 - tag_error_type_llm() 은 실패해도 예외를 던지지
         # 않으므로(자체적으로 규칙 기반 GN-002 로 대체) 여기 도달하는 예외는 정말 예상 밖의
         # 버그다. 특정 영역으로 분류할 근거가 없어 미분류 안전망(SYS-000)을 쓴다.
-        raise not_implemented(e, "SYS-000", screen="S4", device_id=stored.get("device_id")) from e
+        raise not_implemented(e, "SYS-000", screen="S4", device_id=body.device_id) from e
+
+    # ★ 2026-08-16 (#33 3단계): 판단·오판유형을 taggings 에 남긴다.
+    #   전에는 응답만 하고 어디에도 저장하지 않아 테이블이 늘 0행이었다. 저장을
+    #   시작해야 purge 의 'taggings 90일' 이 빈 약속이 아니게 된다.
+    #   ★ 저장 실패는 삼킨다(check_store 안에서 처리) - 부가 기록 때문에 화면을 막지 않는다.
+    check_store.save_tagging(
+        check_id, device_id=body.device_id, decision=body.decision,
+        error_type=error_type, confidence=confidence,
+    )
 
     return VerdictResponse(
         check_id=check_id,

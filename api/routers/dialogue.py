@@ -20,7 +20,7 @@ from mocks import fixtures
 from models.schemas import DialogueRequest, DialogueResponse
 from routers._common import MockFlag, not_implemented, use_mock
 from routers.checks import require_owner
-from services import fallback_watch, prompt_chain, search
+from services import check_store, fallback_watch, prompt_chain, search
 from services.incident_log import log_incident
 
 router = APIRouter(prefix="/checks", tags=["dialogue"])
@@ -82,9 +82,13 @@ async def next_question(check_id: str, body: DialogueRequest, mock: int = MockFl
 
     stored = require_owner(check_id, body.device_id)   # ★ IDOR 방지: 소유자만 통과
 
-    history = stored.setdefault("history", [])
+    # ★ 2026-08-16: 이력이 DB 에 있다. 예전처럼 dict 를 제자리 수정하면 아무 데도
+    #   안 남는다 - 새로 쌓은 줄만 모아 뒤에서 한 번에 저장한다.
+    history = list(stored.get("history") or [])
+    new_lines: list[str] = []
     if body.user_reply:
-        history.append(f"사용자 답변: {body.user_reply}")
+        new_lines.append(f"사용자 답변: {body.user_reply}")
+        history.append(new_lines[-1])
 
     try:
         # ★ 2026-08-16 (#33 2단계) — 둘 다 이벤트 루프 밖에서 돈다.
@@ -107,10 +111,11 @@ async def next_question(check_id: str, body: DialogueRequest, mock: int = MockFl
         #   폴백하므로(services/prompt_chain.py), 여기까지 올라오는 다른 예외는 대부분
         #   collect_evidence() 쪽 예상 밖 버그(SR-001)다.
         code = "EX-002" if isinstance(e, MissingKeyError) else "SR-001"
-        raise not_implemented(e, code, screen="S3", device_id=stored.get("device_id")) from e
+        raise not_implemented(e, code, screen="S3", device_id=body.device_id) from e
 
     _observe_fallback(getattr(vq, "fallback", False))   # 관측만 - 응답은 바꾸지 않는다
-    history.append(f"질문{body.turn}: {vq.question}")
+    new_lines.append(f"질문{body.turn}: {vq.question}")
+    check_store.append_history(check_id, new_lines)
 
     return DialogueResponse(
         turn=body.turn,

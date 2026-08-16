@@ -286,3 +286,81 @@ def test_both_fallback_observers_share_one_setting():
     assert dialogue._recent_fallbacks.maxlen == fallback_watch.FALLBACK_WINDOW, (
         "질문 생성 쪽 관측 창이 검색 쪽과 다르다 - 값을 다시 복사해 넣지 말 것"
     )
+
+
+# ══════════════════════════════════════════════ 임베딩 모델 로드 경합 (2026-08-16)
+#
+# ★★ 왜 이 테스트가 있나 - 라이브 장애 재발 방지 ★★
+#   #33 2단계에서 요청을 스레드풀로 옮기자, 프리워밍 스레드와 요청 스레드가 동시에
+#   지연 로더에 들어갔다. 둘 다 로드를 시작하고 한쪽이 반쯤 만들어진 객체를 전역에
+#   대입해, 이후 모든 질의가 이렇게 죽었다:
+#       "Cannot copy out of meta tensor" → 임베딩 검색 실패 → BM25 폴백(EX-003)
+#   ★ 사용자에겐 200 이 나가고 근거 품질만 떨어지는 **조용한 저하**였다.
+#     pytest(단일 스레드)도, render_verdict 대조(별도 프로세스)도 통과했다.
+#
+#   그래서 "동시에 들어가도 로드는 한 번뿐"을 직접 단정한다. 락이 없으면 생성 횟수가
+#   2 이상이 되어 **결정적으로** 깨진다(운에 기대는 테스트가 아니다).
+import threading as _threading  # noqa: E402
+import time as _time  # noqa: E402
+
+
+def test_local_model_is_loaded_exactly_once_under_concurrency(monkeypatch):
+    from services import embeddings as emb
+
+    calls = {"n": 0}
+    lock = _threading.Lock()
+
+    class _SlowFake:
+        def __init__(self, *a, **kw):
+            with lock:
+                calls["n"] += 1
+            # 로드가 느려야 경합이 드러난다. 락이 없으면 이 사이에 다른 스레드가 들어온다.
+            _time.sleep(0.05)
+
+        def encode(self, *a, **kw):
+            return []
+
+    import sys as _sys
+    import types as _types
+    fake_mod = _types.ModuleType("sentence_transformers")
+    fake_mod.SentenceTransformer = _SlowFake
+    monkeypatch.setitem(_sys.modules, "sentence_transformers", fake_mod)
+    monkeypatch.setattr(emb, "_local_model", None)
+
+    got = []
+    def _load():
+        got.append(emb._get_local_model())
+
+    threads = [_threading.Thread(target=_load) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert calls["n"] == 1, f"모델이 {calls['n']}번 로드됐다 - 로더에 락이 없다"
+    assert len({id(x) for x in got}) == 1, "스레드마다 다른 모델 객체를 받았다"
+    monkeypatch.setattr(emb, "_local_model", None)   # 뒷정리
+
+
+def test_failed_load_does_not_poison_the_singleton(monkeypatch):
+    """★ 로드가 실패하면 전역은 None 으로 남아야 한다.
+
+    반쯤 만들어진 객체가 남으면 그 프로세스는 재시작 전까지 영구히 BM25 로만 답한다.
+    """
+    from services import embeddings as emb
+
+    import sys as _sys
+    import types as _types
+
+    class _Boom:
+        def __init__(self, *a, **kw):
+            raise RuntimeError("로드 실패")
+
+    fake_mod = _types.ModuleType("sentence_transformers")
+    fake_mod.SentenceTransformer = _Boom
+    monkeypatch.setitem(_sys.modules, "sentence_transformers", fake_mod)
+    monkeypatch.setattr(emb, "_local_model", None)
+
+    with pytest.raises(RuntimeError):
+        emb._get_local_model()
+    assert emb._local_model is None, "실패한 로드가 전역을 오염시켰다"

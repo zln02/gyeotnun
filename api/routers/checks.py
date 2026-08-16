@@ -6,6 +6,7 @@ GET  /api/v1/checks/{check_id}/evidence
 """
 from __future__ import annotations
 
+import hashlib
 import uuid
 from typing import Optional
 
@@ -16,17 +17,25 @@ from config import settings
 from mocks import fixtures
 from models.schemas import CheckCreateResponse, EvidenceResponse
 from routers._common import MockFlag, not_implemented, use_mock
-from services import masking, ocr, search
+from services import check_store, masking, ocr, search
 
 router = APIRouter(prefix="/checks", tags=["checks"])
 
-# 메모리 임시 저장소 (해커톤용). TODO(박진영): DB 세션으로 교체.
-_MEMORY_STORE: dict[str, dict] = {}
+# ★ 2026-08-16 (#33 3단계): 프로세스 메모리 dict 를 걷어내고 Postgres 로 옮겼다.
+#   전에는 여기 `_MEMORY_STORE: dict[str, dict]` 가 있었고 그래서
+#     - 재시작하면 진행 중인 확인이 전부 사라졌고
+#     - 워커를 늘리면 create 한 워커와 evidence/dialogue 를 받는 워커가 달라 404 가 났다.
+#   저장·조회는 services/check_store.py 가 맡는다.
+#   ★ 저장되는 소유자 값은 device_id 원문이 아니라 sha256 해시다(README 7장 원칙).
 
 # ★ 소유자로 인정하지 않는 값. create_check 의 device_id 기본값이 "anonymous" 라,
 #   이를 소유자로 허용하면 "anonymous" 를 보내는 누구나 서로의 기록을 읽는 구멍이 된다.
 #   정상 프론트는 항상 실제 UUID(deviceId())를 보내므로 이 거부는 정상 흐름을 깨지 않는다.
 _NON_OWNER_IDS = {"", "anonymous"}
+# 위 값들의 해시. 저장된 소유자 값이 해시라서, 비교도 해시끼리 해야 한다.
+# (None 은 device_id 가 아예 없던 기록 - 역시 아무도 못 읽는다.)
+_NON_OWNER_HASHES = {None} | {hashlib.sha256(v.encode()).hexdigest()
+                              for v in _NON_OWNER_IDS if v}
 
 
 def require_owner(check_id: str, device_id: Optional[str]) -> dict:
@@ -39,14 +48,16 @@ def require_owner(check_id: str, device_id: Optional[str]) -> dict:
       "아무 id 나 넣으면 남의 기록이 나오는" 접근 통제 부재만 막는다. 서명 토큰·
       세션 발급 같은 근본 인증은 별도 과제다(docs/security 참조).
     """
-    stored = _MEMORY_STORE.get(check_id)
-    owner = stored.get("device_id") if stored else None
+    # ★ 익명값은 DB 를 보기 전에 거른다. 해시로 비교하므로 "익명 소유자" 판정도
+    #   해시끼리 한다 - anonymous 의 해시를 미리 만들어 두고 대조한다.
+    stored = check_store.get(check_id) if check_id else None
+    owner = stored.get("device_hash") if stored else None
     if (
         not device_id
         or device_id in _NON_OWNER_IDS      # 요청자가 익명값을 내밀면 거부
         or stored is None
-        or owner in _NON_OWNER_IDS          # 익명으로 만들어진 기록은 아무도 못 읽음
-        or owner != device_id
+        or owner in _NON_OWNER_HASHES       # 익명으로 만들어진 기록은 아무도 못 읽음
+        or owner != check_store.hash_device(device_id)
     ):
         raise HTTPException(
             status_code=404,
@@ -129,11 +140,19 @@ async def create_check(
         masked = masking.mask_text(extracted.text)    # ★ DB 저장 전 비식별화
     except Exception as e:  # noqa: BLE001 - 이 지점은 기존에 보호되지 않던 곳이라 새로 감쌌다
         raise not_implemented(e, "MK-001", screen="S1", device_id=device_id) from e
-    _MEMORY_STORE[check_id] = {
-        "masked_text": masked.text,
-        "domain": extracted.detected_domain,
-        "device_id": device_id,
-    }
+    # ★ 여기서 비로소 DB 에 남는다. 담기는 것은 마스킹된 텍스트와 device_id 의
+    #   sha256 뿐이다 - 원본 이미지도, 원문 텍스트도, 원문 device_id 도 저장하지 않는다.
+    check_store.create(
+        check_id,
+        device_id=device_id,
+        input_type=("text" if text else ("link" if link else "image")),
+        masked_text=masked.text,
+        masked_items=[m.model_dump() if hasattr(m, "model_dump") else dict(m)
+                      for m in masked.masked_items],
+        detected_domain=extracted.detected_domain,
+        status=extracted.status,
+        source_url=link,
+    )
     return CheckCreateResponse(
         check_id=check_id,
         extracted_text=masked.text,
@@ -170,7 +189,7 @@ async def get_evidence(
         result = await run_in_threadpool(
             search.collect_evidence, stored["masked_text"], domain=stored.get("domain"))
     except Exception as e:  # noqa: BLE001
-        raise not_implemented(e, "SR-001", screen="S2", device_id=stored.get("device_id")) from e
+        raise not_implemented(e, "SR-001", screen="S2", device_id=device_id) from e
     return EvidenceResponse(
         check_id=check_id,
         verdict_hint=result.verdict_hint,

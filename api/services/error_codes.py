@@ -131,11 +131,16 @@ ERROR_CODES: List[ErrorCodeDef] = [
     {
         "code": "ST-001",
         "area": "저장",
-        "situation": "요청한 확인 건을 임시 저장소에서 찾을 수 없음(서버 재시작·만료 등)",
+        "situation": "요청한 확인 건을 찾을 수 없음(보관 90일 경과·소유자 불일치 등)",
         "user_message": "확인 중이던 내용을 찾지 못했습니다. 처음 화면으로 돌아가 다시 시작해 주세요.",
         "recovery": "홈 화면으로 돌아가 사진이나 글을 다시 올립니다.",
-        "internal_handling": "_MEMORY_STORE.get() 실패를 501 로 변환한다(routers/checks.py, dialogue.py, "
-                              "verdict.py 공통).",
+        # ★ 2026-08-16 (#33 3단계): 저장소가 프로세스 메모리에서 DB 로 바뀌었다.
+        #   그래서 "서버 재시작" 은 더 이상 이 오류의 원인이 아니다 - 기록이 남는다.
+        #   남은 원인은 보관기간 경과(purge)와 소유자 불일치(IDOR 차단)다.
+        "internal_handling": "check_store.get() 이 None 이거나 소유자가 다르면 404 로 막는다"
+                              "(routers/checks.py require_owner - dialogue.py·verdict.py 공통). "
+                              "★ 없는 id 와 남의 id 를 같은 404 로 돌려준다 - 구분하면 "
+                              "check_id 존재 여부가 새어나간다.",
     },
     {
         "code": "ST-002",

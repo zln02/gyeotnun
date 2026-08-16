@@ -28,6 +28,7 @@ BM25(corpus_index.match_official_docs)와는 완전히 다른, 의미 기반 검
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -133,6 +134,8 @@ def _embed_upstage(
 
 
 _local_model = None
+# ★ 로드 경합 방지 락. 자세한 이유는 _get_local_model() 주석 참고.
+_local_model_lock = threading.Lock()
 
 
 def _get_local_model():
@@ -140,16 +143,44 @@ def _get_local_model():
 
     ★ 기동 시점에 로드하지 않고 첫 질의 때 지연 로드한다 - 서버가 뜨는 속도를
       늦추지 않기 위해서다. 첫 질의만 모델 로드 시간(약 3초)이 더 걸린다.
+
+    ★★ 락이 반드시 필요하다 (2026-08-16, #33 3단계에서 라이브 장애로 발견) ★★
+      전에는 락이 없었다. 요청이 이벤트 루프에서만 돌던 시절엔 로더에 들어오는
+      스레드가 프리워밍 스레드 하나뿐이라 우연히 안전했다. 2단계에서 요청을
+      스레드풀로 빼자 **프리워밍 스레드와 요청 스레드가 동시에 로더에 들어갔다.**
+      둘 다 `_local_model is None` 을 보고 각자 로드를 시작하고, 한쪽이 반쯤
+      만들어진 객체를 전역에 대입하면 다른 쪽 encode() 가 이렇게 죽는다:
+
+          Cannot copy out of meta tensor; no data!
+          → [official_search] 임베딩 검색 실패 - BM25 로 폴백  (EX-003)
+
+      ★ 무서운 점은 **터지지 않고 조용히 나빠진다**는 것이다. 폴백이 있어서
+        사용자에겐 200 이 나가고, 근거 품질만 떨어진다. pytest 는 단일 스레드라
+        통과하고, render_verdict 대조는 별도 프로세스에서 계산해 통과한다.
+        서버 로그를 직접 읽고서야 보였다.
+
+      대책 두 가지를 같이 쓴다.
+        1) 이중 검사 락 - 로드는 한 번만, 한 스레드에서만.
+        2) **완성된 객체만 전역에 대입한다.** 지역 변수로 다 만든 뒤 대입하므로,
+           로드가 실패하면 전역은 None 으로 남고 다음 요청이 다시 시도한다
+           (반쯤 만들어진 것이 남아 프로세스를 영구히 망가뜨리지 않는다).
+
+    ★ encode() 자체는 잠그지 않는다. 로드가 끝난 모델에 대한 동시 추론은
+      실측으로 안전했다 - 같은 질의를 10스레드로 돌려 최고 점수가 비트 단위까지
+      동일했다(0.6938501596). 여기까지 잠그면 2단계의 이득이 사라진다.
     """
     global _local_model
     if _local_model is None:
-        import torch
-        from sentence_transformers import SentenceTransformer
+        with _local_model_lock:
+            if _local_model is None:      # ★ 락을 잡은 뒤 다시 본다
+                import torch
+                from sentence_transformers import SentenceTransformer
 
-        torch.set_num_threads(int(__import__("os").cpu_count() or 1))
-        log.info("[embeddings] 로컬 모델 로드: %s", LOCAL_EMBED_MODEL)
-        _local_model = SentenceTransformer(LOCAL_EMBED_MODEL, device="cpu",
-                                           revision=LOCAL_EMBED_REVISION)
+                torch.set_num_threads(int(__import__("os").cpu_count() or 1))
+                log.info("[embeddings] 로컬 모델 로드: %s", LOCAL_EMBED_MODEL)
+                model = SentenceTransformer(LOCAL_EMBED_MODEL, device="cpu",
+                                            revision=LOCAL_EMBED_REVISION)
+                _local_model = model      # ★ 다 만들어진 뒤에야 전역에 둔다
     return _local_model
 
 

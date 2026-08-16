@@ -60,6 +60,10 @@ class Check(Base):
 
     id = Column(String(40), primary_key=True)                       # chk_xxx
     user_id = Column(String(40), ForeignKey("users.id"), nullable=True)
+    # ★ 2026-08-16 (#33 3단계). 비회원 소유자 대조용. **원문 device_id 는 넣지 않는다** -
+    #   README 7장의 "device_id 는 SHA-256 해시만 사용" 서술을 지키기 위해서다
+    #   (events·error_logs·users 와 같은 방식). services/check_store.py 참고.
+    device_hash = Column(String(64), nullable=True, index=True)     # sha256(device_id)
     input_type = Column(String(16), nullable=False)                 # image | link | text
     source_url = Column(Text, nullable=True)                        # link 입력 시 원본 URL
     masked_text = Column(Text, nullable=False, default="")          # ★ 마스킹 완료 텍스트만 저장
@@ -67,6 +71,9 @@ class Check(Base):
     detected_domain = Column(String(32), nullable=True)             # health/finance/policy/news
     status = Column(String(24), default="extracted")
     image_discarded = Column(Boolean, default=True, nullable=False) # 원본 파기 여부 감사 플래그
+    # ★ 2026-08-16. 확인 질문 대화 이력(["질문1: ...", "사용자 답변: ...", ...]).
+    #   전에는 프로세스 메모리 dict 안에 있어 재시작 시 사라졌다.
+    history = Column(JSON, default=list)
     created_at = Column(DateTime, default=_now)
 
     user = relationship("User", back_populates="checks")
@@ -100,6 +107,8 @@ class Tagging(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     check_id = Column(String(40), ForeignKey("checks.id"), nullable=False)
     user_id = Column(String(40), ForeignKey("users.id"), nullable=True)
+    # ★ 2026-08-16. 비회원 태깅의 주체. 원문이 아니라 해시다(checks.device_hash 와 동일).
+    device_hash = Column(String(64), nullable=True, index=True)     # sha256(device_id)
     decision = Column(String(16), nullable=False)                   # apply|not_apply|hold|ask_family
     reason_tags = Column(JSON, default=list)
     error_type = Column(String(32), nullable=False)                 # title_dependent 등 4종
