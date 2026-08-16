@@ -76,6 +76,15 @@ class Signal(BaseModel):
     #     검증에서 실제로 겪었다 - 서버는 붙였는데 화면까지 안 갔다).
     public_domain: Optional[bool] = Field(
         None, description="url_expanded 전용: 최종 도메인이 공공기관 접미사인가")
+    # ★ 2026-08-16 추가. org_domain_mismatch 전용 - 두 주소를 나란히 보여주기 위한 값.
+    #   detail 에는 기관명이 들어간다(키마다 detail 의 뜻이 다르다 - 위 주석 참고).
+    #   ★★ 새 필드를 여기 선언하지 않으면 응답에서 조용히 사라진다. 8/15 에
+    #     public_domain 이 정확히 그렇게 사라졌다(서버는 붙였는데 화면까지 안 갔다).
+    #     단위 테스트는 통과한다 - 스키마를 통과한 뒤의 모양은 실투입에서만 보인다.
+    official_domain: Optional[str] = Field(
+        None, description="org_domain_mismatch 전용: 매핑표의 공식 도메인")
+    received_domain: Optional[str] = Field(
+        None, description="org_domain_mismatch 전용: 실제로 받은(펼친) 도메인")
 
 
 class Reference(BaseModel):

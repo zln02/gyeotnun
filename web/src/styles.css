@@ -1816,6 +1816,16 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   font-size: 16px; font-weight: 600; line-height: 1.55;
 }
 
+/* 기관 주소 대조 (2026-08-16). 두 줄을 같은 크기·같은 무게로 둔다.
+   ★ 한쪽을 빨갛게 하거나 크게 하면 그 순간 '판정'이 된다. 나란히 놓기만 한다.
+   ★ 색은 tier 와 무관한 회색 계열이다 - 위 .judgment-link 상자를 그대로 쓴다. */
+.judgment-org-official,
+.judgment-org-received {
+  margin: 0; color: #2B2B2B;
+  font-size: 17px; font-weight: 700; line-height: 1.55;
+}
+.judgment-org-received { margin-top: 4px; }
+
 /* '사실 한 줄' - 무엇을 보고 그렇게 판단했는지. 다음 화면까지 안 가도 알 수 있게. */
 .judgment-fact {
   display: inline-block; margin: 14px 0 0; padding: 10px 16px;

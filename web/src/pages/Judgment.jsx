@@ -110,6 +110,18 @@ export default function Judgment({ evidence, checkData, onStart }) {
         </div>
       ) : null}
 
+      {/* ③-2 기관 주소 대조 (2026-08-16). 두 주소를 나란히 놓기만 한다.
+          ★ 판정 문구를 쓰지 않는다 - "가짜"·"사칭"·"위험" 전부 금지다.
+            비교는 어르신이 눈으로 한다. 그게 곁눈이 하는 일 그대로다.
+          ★ tier 색을 쓰지 않는다(주소 블록과 같은 회색). 판정이 아니라 사실이다.
+          ★ 여기도 링크로 만들지 않는다 - 받은 주소를 눌러 그리로 가면 취지가 뒤집힌다. */}
+      {s.org ? (
+        <div className="judgment-link">
+          <p className="judgment-org-official">{s.org.official}</p>
+          <p className="judgment-org-received">{s.org.received}</p>
+        </div>
+      ) : null}
+
       <button
         type="button"
         className={`judgment-cta ${s.tier}`}

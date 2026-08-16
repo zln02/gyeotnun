@@ -24,6 +24,8 @@ const out = rows.map((r) => {
     // ③ 주소 블록 (2026-08-15). 여기 빠뜨리면 주소 줄이 조용히 바뀌어도 못 잡는다
     //   - 8/13 에 경보문 링크가 그렇게 사라진 적이 있다.
     link: s.link ? `${s.link.fact} | ${s.link.publicNote}` : '',
+    // ③-2 기관 주소 대조 (2026-08-16). 같은 이유로 여기 넣는다.
+    org: s.org ? `${s.org.official} | ${s.org.received}` : '',
   }
 })
 writeFileSync(process.argv[3], JSON.stringify(out, null, 1))

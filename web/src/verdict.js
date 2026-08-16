@@ -126,6 +126,32 @@ const RISK_ACTION_TITLE = {
  * ★ 펼쳐지지 않았으면(시작 == 최종) 서버가 신호 자체를 안 보낸다. 실패해도
  *   안 보낸다(EX-007, 침묵). 그러면 이 줄은 화면에 없다 - 없는 것은 없는 것이다.
  */
+/**
+ * ③-2 '기관 주소 대조' - 문자가 말하는 기관의 공식 주소와 받은 주소를 나란히. (2026-08-16)
+ *
+ * ★★ 판정하지 않는다. 두 주소를 나란히 놓는 것 자체가 사실이고, 비교는 어르신이 한다. ★★
+ *   "가짜입니다"·"사칭입니다"·"위험합니다" 를 쓰지 않는다(validate_question 금지어와
+ *   같은 기준). 서버(org_domain.py)가 이미 판정 문구 없이 값만 내려준다.
+ *
+ * ★ 발동이 아주 좁다. 표(corpus/기관_공식도메인_2026-08-15.csv)에 있는 기관 이름이
+ *   본문에 있고 + 본문에 URL 이 있고 + 도메인이 다를 때만이다. 표에 없는 기관
+ *   (지자체 전부 포함)·URL 없는 문자·도메인 일치는 전부 **침묵**한다.
+ *   실측(2026-08-15): 확대 112건 중 2건(S03·S08, 둘 다 사칭)만 걸리고 정상은 0건.
+ *
+ * ★ "안전합니다" 는 여기서도 금지다. 그래서 **일치하면 아무 줄도 나오지 않는다** -
+ *   일치가 안전을 뜻하지 않기 때문이다.
+ */
+function orgBlock(signals) {
+  const s = signals.find(
+    (x) => x.key === 'org_domain_mismatch' && x.detail && x.official_domain && x.received_domain,
+  )
+  if (!s) return null
+  return {
+    official: `${s.detail}의 공식 주소는 ${s.official_domain}입니다`,
+    received: `받으신 주소는 ${s.received_domain}입니다`,
+  }
+}
+
 function linkBlock(signals) {
   const s = signals.find((x) => x.key === 'url_expanded' && x.detail)
   if (!s) return null
@@ -191,6 +217,7 @@ function factBlock(evidence, signals, refs) {
  *   risk  ① 위험행동 블록 {quote, fact, action} 또는 null
  *   fact / factTitle / factUrl  ② 사실 블록 (항상 있다)
  *   link  ③ 주소 블록 {fact, publicNote} 또는 null (2026-08-15, tier 영향 없음)
+ *   org   ③-2 기관 주소 대조 {official, received} 또는 null (2026-08-16, tier 영향 없음)
  */
 export function judgmentState(evidence, checkData) {
   const signals = evidence?.signals || []
@@ -216,6 +243,8 @@ export function judgmentState(evidence, checkData) {
 
   // ── ③ 주소 블록. 서버가 펼치기에 성공했을 때만 있다. tier 에 영향을 주지 않는다.
   const link = linkBlock(signals)
+  // ── ③-2 기관 주소 대조. 매핑표 기관 + URL + 도메인 불일치일 때만. tier 영향 없음.
+  const org = orgBlock(signals)
 
   // ── 단계와 제목
   //    ① 계좌·카드번호가 실제로 검출됐다 → 가장 강한 경고.
@@ -227,6 +256,7 @@ export function judgmentState(evidence, checkData) {
       lead: '지금 ', accent: '멈추세요', tail: '',
       risk,
       link,
+      org,
       ...facts,
       fact: MASKED_LABEL[money.type] || '금융 정보가 적혀 있어요',
       factTitle: '', factUrl: '',
@@ -243,6 +273,7 @@ export function judgmentState(evidence, checkData) {
       lead: '확인이 ', accent: '필요', tail: '한 문자예요',
       risk,
       link,
+      org,
       ...facts,
     }
   }
@@ -253,7 +284,7 @@ export function judgmentState(evidence, checkData) {
   //      info 로 오고, 그때는 단계를 올리지 않는다 - 스위치가 화면까지 관통한다.
   if (risk && riskSig.severity === 'attention') {
     const [lead, accent, tail] = RISK_ACTION_TITLE[risk.detail]
-    return { tier: 'act', lead, accent, tail, risk, link, ...facts }
+    return { tier: 'act', lead, accent, tail, risk, link, org, ...facts }
   }
 
   // ★★ 초록은 '허용 목록' 방식이다 (2026-08-12) ★★
@@ -269,6 +300,7 @@ export function judgmentState(evidence, checkData) {
       tail: '어요',
       risk,
       link,
+      org,
       ...facts,
     }
   }

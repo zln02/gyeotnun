@@ -40,6 +40,7 @@ from typing import List, Optional
 from config import MissingKeyError, settings
 from services import corpus_index
 from services import fallback_watch
+from services import org_domain
 from services import url_expand
 # ★ 최상위 import 다. 순환하지 않는다 - embeddings → corpus_index → scam_taxonomy 로
 #   내려갈 뿐, 어느 쪽도 search 를 다시 import 하지 않는다(2026-08-15 확인).
@@ -691,6 +692,7 @@ def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
     #      ★ 실측 근거: 확대 112건의 단축·추적 URL 6건이 전부 정상 문자였다.
     #        이 기능으로 잡히는 사칭은 0건이다. 사용자에게 사실을 하나 더 주는 것뿐이다.
     #        docs/evaluation/URL펼치기_설계_2026-08-15.md
+    expanded = None   # ★ 펼치기가 꺼져 있어도 아래 org_domain 이 참조한다
     if url_expand.URL_EXPAND_ENABLED:
         try:
             expanded = url_expand.expand_first_url(text)
@@ -711,5 +713,21 @@ def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
                     detail=("사설IP 차단" if expanded.blocked_private
                             else f"펼치기 실패: {expanded.failure}"),
                 )
+
+    # ---- 신호: 문자가 말하는 기관의 공식 주소와 받은 주소를 나란히 (2026-08-16)
+    #      ★★ 여기도 판정이 끝난 뒤다. tier 에 영향을 주지 않는다. ★★
+    #      ★ 위 펼치기 결과(expanded)를 그대로 넘긴다 - 외부 접속을 다시 하지 않는다.
+    #        펼치기가 꺼져 있거나 실패했으면 expanded 는 None 이고, 그때는 본문의
+    #        주소만으로 대조한다(둘 다 침묵 규칙을 통과해야 발동한다).
+    #      ★ 실측 근거: 확대 112건에서 2건(S03·S08, 둘 다 사칭)만 걸리고 정상은 0건,
+    #        실사용 11건도 0건. docs/evaluation/기관도메인_매핑_조사_2026-08-15.md
+    if org_domain.ORG_DOMAIN_ENABLED:
+        try:
+            org_sig = org_domain.build_signal(text, expanded)
+        except Exception as e:  # noqa: BLE001 - 부가 정보 하나 때문에 확인 흐름을 막지 않는다
+            org_sig = None
+            log.warning("[org_domain] 예상 밖 오류(무시하고 계속): %s", type(e).__name__)
+        if org_sig:
+            signals.append(org_sig)
 
     return SearchResult(verdict_hint=hint, signals=signals, references=refs)
