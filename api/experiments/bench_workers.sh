@@ -27,5 +27,5 @@ case "$URL" in sqlite*) ;; *) echo "  ★ 중단 — DATABASE_URL 이 sqlite 가
 for i in $(seq 1 40); do ok=$(docker logs $NAME 2>&1 | grep -c "prewarm.*준비 완료"); [ "$ok" -ge $((2*N)) ] && break; sleep 5; done
 sleep 5
 echo "  워커 $N — prewarm $ok 줄 · 메모리 $(docker stats --no-stream --format '{{.MemUsage}}' $NAME)"
-python3 /home/ubuntu/gyeotnun/api/experiments/_bench_ocr_client.py
+python3 "${BENCH_CLIENT:-/home/ubuntu/gyeotnun/api/experiments/_bench_ocr_client.py}"
 docker rm -f $NAME >/dev/null

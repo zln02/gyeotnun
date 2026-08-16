@@ -39,6 +39,18 @@ services:
       #   경계 공백 보정(ocr._restore_boundary_spaces) 추가로 10/10 회복·정상 오판 0
       #   → local 채택. 문제 재발 시 vision 으로 한 줄 롤백.
       OCR_PROVIDER: local
+      # ★ 모델 내부 스레드를 1개로 묶는다 (2026-08-16, #33 1단계).
+      #   근거: 요청 1건이 이미 CPU 2.5코어를 먹는데(피크 248.8%, 이 서버는 4 vCPU)
+      #   그 스레드들이 서로를 밀어낸다. 1개로 묶으면 동시 요청이 서로 덜 방해한다.
+      #   실측(격리 컨테이너, 3회 반복 - docs/reports/2026-08-16_동시접속_1단계.txt)
+      #     텍스트 경로 동시 5명 마지막 완료   0.95~1.10s -> 0.40~0.58s
+      #     사진 경로  동시 5명                 차이 없음 (느려지지 않는다)
+      #     단독 1건(사진)                      2.48s -> 2.20s
+      #   ★ 되돌리려면 이 5줄을 지우고 docker compose up -d api. 코드 변경 없음.
+      OMP_NUM_THREADS: 1
+      MKL_NUM_THREADS: 1
+      OPENBLAS_NUM_THREADS: 1
+      FLAGS_paddle_num_threads: 1
     volumes:
       - ./api:/app                # 개발 중 핫리로드용
       - ./corpus:/corpus:ro       # 공공데이터 코퍼스 (읽기 전용)
