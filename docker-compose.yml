@@ -57,11 +57,27 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # ★ 리소스 상한 (2026-08-16, #33 4단계).
+    #   전에는 제한이 전혀 없어서 api 가 CPU·메모리를 무제한 점유할 수 있었다.
+    #   같은 호스트에 다른 프로젝트가 함께 도는 상태라 그건 사고 경로다(8/14 감사 지적).
+    #   4 vCPU 중 3개까지만 쓰게 두어 호스트에 여유 1코어를 남긴다.
+    #   메모리: 워커 2개 실측 1.69GiB, 부하 후 상주 상승분을 감안해도 약 2.4GiB → 4g 로 잡는다.
+    cpus: 3.0
+    mem_limit: 4g
     # ★ 프로덕션: --reload 제거(파일 감시 오버헤드·의도치 않은 재시작 방지).
-    #   워커는 1개로 고정한다 - checks 흐름이 프로세스 메모리(_MEMORY_STORE)에 의존해서,
-    #   워커를 늘리면 create 한 워커와 evidence/dialogue 를 받는 워커가 달라져 404 가 난다.
-    #   다중 워커로 늘리려면 그 저장소를 DB/Redis 로 먼저 옮겨야 한다(제출 후 과제).
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
+    #   ★ 2026-08-16: 워커를 1 → 2 로 올렸다.
+    #     그전까지 1개로 묶여 있던 이유는 checks 흐름이 프로세스 메모리(_MEMORY_STORE)에
+    #     의존해서, 워커를 늘리면 create 한 워커와 evidence/dialogue 를 받는 워커가 달라져
+    #     404 가 났기 때문이다. #33 3단계에서 저장소를 Postgres 로 옮겨 그 전제가 사라졌고,
+    #     격리 환경에서 2워커로 POST→evidence→dialogue 전체 흐름을 실측해 404 가 0건임을
+    #     확인한 뒤에 올렸다.
+    #   실측(격리 Postgres, docs/reports/2026-08-16_동시접속_4단계.txt)
+    #     사진 동시 5명 마지막 완료  8.48s -> 5.90s
+    #     텍스트 동시 5명            0.34s -> 0.27s
+    #     메모리                     859MiB -> 1.69GiB
+    #   ★ 워커를 3 이상으로 올리지 말 것. 요청 1건이 이미 CPU 2.5코어를 쓰고, 4 vCPU
+    #     에서는 워커를 늘릴수록 서로 밀어낸다(8/16 실측: 워커4 가 워커1 보다 느렸다).
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
 
   db:
     image: postgres:16-alpine
