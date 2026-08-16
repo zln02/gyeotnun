@@ -91,6 +91,12 @@ if [ "$CODE" = "200" ] && [ "$ASSET_CODE" = "200" ]; then
     say ""
     say "배포 성공. 되돌리려면:"
     say "  cp -a ${BACKUP:-<백업없음>}/. $LIVE/"
+    say ""
+    # ★ 이 스크립트는 프론트만 배포한다. 백엔드를 함께 올린다면 재시작을 직접 치지 말 것 -
+    #   재시작 직후 경합 검사가 배포 절차의 필수 단계다(2026-08-16 라이브 누출 이후).
+    #   자세한 이유: deploy/README.md "백엔드 배포 체크리스트"
+    say "★ 백엔드도 올린다면: deploy/verify_restart_race.sh 로 재시작할 것"
+    say "  (docker compose restart api 를 직접 치지 않는다 - 재시작 직후 경합 검사가 빠진다)"
     exit 0
 fi
 
