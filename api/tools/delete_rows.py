@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as _dt
+import json
 import sys
 from pathlib import Path
 
@@ -51,6 +52,20 @@ from models.db import engine
 BACKUP_DIR = Path("/app/data/deleted_rows") if Path("/app/data").is_dir() else (
     Path(__file__).resolve().parents[1] / "data" / "deleted_rows")
 _ALLOWED = {"events", "error_logs", "checks", "evidence", "taggings"}
+
+
+def _encode(v):
+    """CSV 한 칸으로 쓴다. ★ JSON 컬럼은 반드시 JSON 으로 쓴다.
+
+    파이썬 기본 str() 은 dict/list 를 repr 로 쓴다(작은따옴표). 그 CSV 로는
+    JSON 컬럼을 복원할 수 없다 - 되살릴 수 없는 백업이 된다.
+    2026-08-17 복원 리허설이 checks.history 에서 이걸 실제로 잡아냈다.
+    """
+    if isinstance(v, (dict, list)):
+        return json.dumps(v, ensure_ascii=False)
+    if v is None:
+        return ""
+    return v
 
 
 def _rehearse_restore(table: str, where: str, backup: Path, cols: list[str]) -> tuple[bool, str]:
@@ -143,7 +158,7 @@ def main() -> int:
             w = csv.writer(f)
             w.writerow(cols)
             for r in rows:
-                w.writerow(list(r))
+                w.writerow([_encode(v) for v in r])
     print(f"             백업 {out}")
 
     # ── 복원 리허설. ★ 백업이 만들어진 것과 되살릴 수 있는 것은 다르다.

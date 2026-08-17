@@ -365,3 +365,49 @@ def test_sync_and_async_agree(payloads, monkeypatch):
 
     assert sync_out == async_out, "동기·비동기 결과가 다르다 - 가드레일이 갈라졌다"
     assert sync_stats == async_stats, "재생성 통계가 다르다 - 루프가 갈라졌다"
+
+
+# ==================================================== 6) 폴백 문장의 전제 (2026-08-17)
+#
+# ★★ 왜 이 테스트가 있나 — 라이브 사고 재발 방지 ★★
+#   폴백은 **입력을 모른다는 것이 전제**인 경로다. 그런데 예전 폴백 문장은
+#   "기관 이름이 보이지 않는다면" 을 하드코딩하고 있었다. 받은 글에 기관 이름이
+#   버젓이 있는 사칭 문자에서, 어르신이 이름을 찾으면 "있으니 괜찮다"로 읽힌다.
+#   실측으로 기관명이 있는 입력 + 폴백 조합에서 **100%** 발생했다.
+#
+#   그래서 "입력을 안 보고도 참인가"를 기계로 단정한다.
+from services import question_check as _qc  # noqa: E402
+
+# 서로 성격이 다른 입력들. 폴백은 이 어느 것에 붙어도 참이어야 한다.
+_FALLBACK_INPUTS = [
+    "[국민건강보험공단] 건강보험료 환급금 128,000원이 미수령 상태입니다 https://nhis-refund2026.com",
+    "환급금이 있으니 오늘까지 신청하세요",
+    "기초연금은 만 65세 이상이면서 소득인정액이 선정기준액 이하인 분께 지급됩니다",
+    "엄마 나야. 폰이 고장나서 다른 번호로 연락해. 이 계좌로 보내줘.",
+    "",
+]
+
+
+@pytest.mark.parametrize("source", _FALLBACK_INPUTS)
+def test_fallback_never_presumes_input_facts(source):
+    """★ 폴백 질문·why 는 어떤 입력에 붙어도 입력 사실을 단정하지 않아야 한다."""
+    r = _qc.check_question(pc.FALLBACK_QUESTION, source, pc.FALLBACK_WHY)
+    assert r.ok, f"폴백이 입력 사실을 전제한다: {[f.detail for f in r.findings]}"
+
+
+def test_fallback_options_do_not_presume_input_facts():
+    """★ 보기도 같은 기준이다. 고르는 순간 전제가 굳는다.
+
+    예전 첫 보기 "기관 이름이 적혀 있어요" 가 정확히 그 문제였다.
+    """
+    joined = " ".join(o["label"] for o in pc.FALLBACK_OPTIONS)
+    for source in _FALLBACK_INPUTS:
+        r = _qc.check_question(joined, source)
+        assert r.ok, f"보기가 입력 사실을 전제한다: {[f.detail for f in r.findings]}"
+
+
+def test_fallback_options_ask_for_next_action_not_a_fact():
+    """보기는 '무엇이 적혀 있나'가 아니라 '다음에 무엇을 할까'를 묻는다."""
+    labels = [o["label"] for o in pc.FALLBACK_OPTIONS]
+    for banned in ("기관 이름", "적혀 있어요", "주소가", "금액이"):
+        assert not any(banned in x for x in labels), f"보기에 입력 사실이 들어갔다: {banned}"
