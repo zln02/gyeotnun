@@ -500,9 +500,12 @@ mask_text("연락처 010-1234-5678 계좌 123-456-789012")
   | 키 | `.env.example` | compose | 결과 |
   |---|---|---|---|
   | `APP_ENV` | `local\|dev\|prod` 로 문서화 | `local` 하드코딩 | `.env` 무시 |
-  | `DATABASE_URL` | 문서화 | postgres URL 하드코딩 | `.env` 무시 |
+  | **`DATABASE_URL`** | 문서화 | postgres URL 하드코딩 | **`.env` 무시 — 가장 위험** |
   | `MAX_UPLOAD_MB` | 문서화 | `10` 하드코딩 | `.env` 무시 |
 
+  ★★ **`DATABASE_URL` 이 조용히 바뀌는 경로다.** `.env` 로 다른 DB 를 가리켜도
+  compose 가 덮어써서 **무시된 채 운영 DB 에 붙는다.** 백업·복구·이관 작업에서
+  "다른 DB 를 보게 해 뒀다"고 믿고 운영 DB 를 건드릴 수 있는 구조다.
   ★ **API 키 5종**(`ANTHROPIC_API_KEY` 등)은 compose 가 덮지 않는다 — `.env` 대로
   동작한다. 가장 중요한 값들은 무사하다는 뜻이라, 급한 문제는 아니다.
   ★ 지금 고치지 않는 이유: compose 변경은 재배포(재시작)를 부른다.

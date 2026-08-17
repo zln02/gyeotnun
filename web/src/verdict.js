@@ -165,9 +165,7 @@ function linkBlock(signals) {
 /**
  * ②-보조 '근거 유보 한 줄' - 참고자료는 붙었는데 같은 안내인지 확인하지 못했을 때. (2026-08-16 제안)
  *
- * ★★ 아직 화면에 그리지 않는다 ★★
- *   Judgment.jsx 가 이 값을 렌더하지 않으므로 지금은 아무 변화가 없다.
- *   render_verdict.mjs 전후 대조를 위해 값만 계산해 둔 **제안**이다. 채택은 사람이 정한다.
+ * ★ 2026-08-17 채택 — Judgment.jsx 가 이 값을 화면에 그린다.
  *
  * ★ 왜 필요한가 (실측 2026-08-16)
  *   factBlock 은 한 줄만 고른다. 그래서 의심 신호(similar_scam_case·경보문)가 있으면
@@ -244,7 +242,7 @@ function factBlock(evidence, signals, refs) {
  *   fact / factTitle / factUrl  ② 사실 블록 (항상 있다)
  *   link  ③ 주소 블록 {fact, publicNote} 또는 null (2026-08-15, tier 영향 없음)
  *   org   ③-2 기관 주소 대조 {official, received} 또는 null (2026-08-16, tier 영향 없음)
- *   factNote  ②-보조 근거 유보 한 줄 (2026-08-16 제안 · 아직 화면에 안 그린다)
+ *   factNote  ②-보조 근거 유보 한 줄 (2026-08-17 채택 · 화면에 그린다)
  */
 export function judgmentState(evidence, checkData) {
   const signals = evidence?.signals || []
@@ -267,7 +265,6 @@ export function judgmentState(evidence, checkData) {
 
   // ── ② 사실 블록. 항상 만든다.
   const facts = factBlock(evidence, signals, refs)
-  // ②-보조. 계산만 해 둔다 - Judgment.jsx 가 렌더하지 않으므로 화면 변화는 없다.
   const factNote = factNoteFor(evidence, refs, facts.fact)
 
   // ── ③ 주소 블록. 서버가 펼치기에 성공했을 때만 있다. tier 에 영향을 주지 않는다.

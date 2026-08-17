@@ -1816,6 +1816,13 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   font-size: 16px; font-weight: 600; line-height: 1.55;
 }
 
+/* ②-보조 근거 유보 한 줄 (2026-08-17). 사실 한 줄 바로 아래, 작고 중립적으로.
+   ★ tier 색을 쓰지 않는다 - 판정이 아니라 우리 근거에 대한 유보다. */
+.judgment-fact-note {
+  margin: 8px 0 0; color: #5B5B5B;
+  font-size: 15px; font-weight: 500; line-height: 1.55; text-align: left;
+}
+
 /* 기관 주소 대조 (2026-08-16). 두 줄을 같은 크기·같은 무게로 둔다.
    ★ 한쪽을 빨갛게 하거나 크게 하면 그 순간 '판정'이 된다. 나란히 놓기만 한다.
    ★ 색은 tier 와 무관한 회색 계열이다 - 위 .judgment-link 상자를 그대로 쓴다. */
