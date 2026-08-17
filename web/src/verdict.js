@@ -162,6 +162,32 @@ function linkBlock(signals) {
   }
 }
 
+/**
+ * ②-보조 '근거 유보 한 줄' - 참고자료는 붙었는데 같은 안내인지 확인하지 못했을 때. (2026-08-16 제안)
+ *
+ * ★★ 아직 화면에 그리지 않는다 ★★
+ *   Judgment.jsx 가 이 값을 렌더하지 않으므로 지금은 아무 변화가 없다.
+ *   render_verdict.mjs 전후 대조를 위해 값만 계산해 둔 **제안**이다. 채택은 사람이 정한다.
+ *
+ * ★ 왜 필요한가 (실측 2026-08-16)
+ *   factBlock 은 한 줄만 고른다. 그래서 의심 신호(similar_scam_case·경보문)가 있으면
+ *   그쪽이 이기고 "같은 안내인지는 확인하지 못했어요" 가 **사라진다.**
+ *     S25 (유사도 0.6295) 사실 한 줄 = "같은 안내인지는 확인하지 못했어요…"  ← 붙는다
+ *     S01 (유사도 0.6644) 사실 한 줄 = "이전에 확인된 사례와 비슷한 문장이 있어요"  ← 빠진다
+ *     라이브(0.6539)      같음                                                  ← 빠진다
+ *   ★ 하필 **사칭 건**에서 빠진다. 참고자료 목록에는 다른 제도의 공식 문서가 그대로
+ *     보이는데, 그게 같은 안내인지 확인하지 못했다는 말만 없어진다.
+ *
+ * ★ 조건은 기존 branch 와 **같은 것**을 쓴다(근거 있음 + 확신 매칭 아님).
+ *   임계값을 새로 만들지 않는다 - 서버가 이미 그 판단을 verdict_hint 로 내려보낸다.
+ */
+function factNoteFor(evidence, refs, fact) {
+  if (!refs.length) return ''
+  if (evidence?.verdict_hint === 'needs_check') return ''   // 확신 근거면 유보하지 않는다
+  if ((fact || '').includes('확인하지 못했')) return ''      // 이미 사실 한 줄이 말하고 있다
+  return '아래 참고자료가 같은 안내인지는 확인하지 못했어요'
+}
+
 function factBlock(evidence, signals, refs) {
   const alert = signals.find((s) => s.key === 'official_alert_matched')
   if (alert) {
@@ -218,6 +244,7 @@ function factBlock(evidence, signals, refs) {
  *   fact / factTitle / factUrl  ② 사실 블록 (항상 있다)
  *   link  ③ 주소 블록 {fact, publicNote} 또는 null (2026-08-15, tier 영향 없음)
  *   org   ③-2 기관 주소 대조 {official, received} 또는 null (2026-08-16, tier 영향 없음)
+ *   factNote  ②-보조 근거 유보 한 줄 (2026-08-16 제안 · 아직 화면에 안 그린다)
  */
 export function judgmentState(evidence, checkData) {
   const signals = evidence?.signals || []
@@ -240,6 +267,8 @@ export function judgmentState(evidence, checkData) {
 
   // ── ② 사실 블록. 항상 만든다.
   const facts = factBlock(evidence, signals, refs)
+  // ②-보조. 계산만 해 둔다 - Judgment.jsx 가 렌더하지 않으므로 화면 변화는 없다.
+  const factNote = factNoteFor(evidence, refs, facts.fact)
 
   // ── ③ 주소 블록. 서버가 펼치기에 성공했을 때만 있다. tier 에 영향을 주지 않는다.
   const link = linkBlock(signals)
@@ -257,6 +286,7 @@ export function judgmentState(evidence, checkData) {
       risk,
       link,
       org,
+      factNote,
       ...facts,
       fact: MASKED_LABEL[money.type] || '금융 정보가 적혀 있어요',
       factTitle: '', factUrl: '',
@@ -274,6 +304,7 @@ export function judgmentState(evidence, checkData) {
       risk,
       link,
       org,
+      factNote,
       ...facts,
     }
   }
@@ -284,7 +315,7 @@ export function judgmentState(evidence, checkData) {
   //      info 로 오고, 그때는 단계를 올리지 않는다 - 스위치가 화면까지 관통한다.
   if (risk && riskSig.severity === 'attention') {
     const [lead, accent, tail] = RISK_ACTION_TITLE[risk.detail]
-    return { tier: 'act', lead, accent, tail, risk, link, org, ...facts }
+    return { tier: 'act', lead, accent, tail, risk, link, org, factNote, ...facts }
   }
 
   // ★★ 초록은 '허용 목록' 방식이다 (2026-08-12) ★★
@@ -301,6 +332,7 @@ export function judgmentState(evidence, checkData) {
       risk,
       link,
       org,
+      factNote,
       ...facts,
     }
   }

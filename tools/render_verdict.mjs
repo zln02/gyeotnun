@@ -26,6 +26,8 @@ const out = rows.map((r) => {
     link: s.link ? `${s.link.fact} | ${s.link.publicNote}` : '',
     // ③-2 기관 주소 대조 (2026-08-16). 같은 이유로 여기 넣는다.
     org: s.org ? `${s.org.official} | ${s.org.received}` : '',
+    // ②-보조 근거 유보 한 줄 (2026-08-16 제안). 화면엔 아직 안 그린다 - 값만 대조한다.
+    factNote: s.factNote || '',
   }
 })
 writeFileSync(process.argv[3], JSON.stringify(out, null, 1))
