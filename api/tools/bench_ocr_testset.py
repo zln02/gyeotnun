@@ -28,6 +28,7 @@ from pathlib import Path
 warnings.filterwarnings("ignore")
 sys.path.insert(0, "/app")
 
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 IMG_DIR = Path("/app/tests/fixtures/ocr_testset/images")
 OUT_PATH = Path("/app/data/ocr_testset_bench.json")
 

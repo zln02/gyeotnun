@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, "/app")
 
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 import numpy as np  # noqa: E402
 
 from services import corpus_index as ci  # noqa: E402

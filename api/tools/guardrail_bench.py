@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 from config import settings                                  # noqa: E402
 from services import prompt_chain as pc, search              # noqa: E402
 

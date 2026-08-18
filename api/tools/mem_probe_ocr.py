@@ -26,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, "/app")
 
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 IMG_DIR = Path("/app/tests/fixtures/ocr_eval")
 SENDER = "정부지원금 안내센터"
 

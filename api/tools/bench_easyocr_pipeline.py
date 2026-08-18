@@ -26,6 +26,7 @@ from pathlib import Path
 warnings.filterwarnings("ignore")
 sys.path.insert(0, "/app")
 
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 CSV_PATH = Path("/corpus/곁눈_평가세트_30건.csv")
 CLEAN_DIR = Path("/app/tests/fixtures/ocr_eval")
 HARD_DIR = Path("/app/tests/fixtures/ocr_eval_hard")

@@ -1,5 +1,6 @@
 """경보문 이설 시뮬레이션 — 메모리에서만. 파일·인덱스 무변경."""
 import sys,csv,json,glob,collections,importlib; sys.path.insert(0,'/app')
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 from services import corpus_index as ci
 from services import search, embeddings as emb
 from services.masking import mask_text

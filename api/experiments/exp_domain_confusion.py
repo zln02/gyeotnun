@@ -20,6 +20,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, "/app")
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 from services.ocr import detect_domain  # noqa: E402
 
 EVAL = Path("/corpus/곁눈_평가세트_120건.csv")

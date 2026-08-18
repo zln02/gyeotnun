@@ -27,6 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, "/app")
 
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 from experiments.rule_questions import detect_rule_signals, generate_questions  # noqa: E402
 from services import corpus_index, embeddings, search  # noqa: E402
 

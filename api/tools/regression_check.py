@@ -42,6 +42,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 
 APP = Path(__file__).resolve().parents[1]          # /app
 REPO = APP.parent

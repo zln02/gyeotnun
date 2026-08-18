@@ -187,3 +187,69 @@ def test_all_mock_refs_have_url():
     for ref in fixtures.EVIDENCE["references"]:
         assert ref["url"].startswith("http")
         assert ref["publisher"]
+
+
+# ══════════════════════════════════════════ 문장 세기 보호 (2026-08-17)
+#
+# ★★ 왜 이 묶음이 있나 — 라이브 사고 ★★
+#   count_sentences 가 도메인 안의 점을 문장 끝으로 세어, 사람이 보면 1문장인
+#   "받으신 주소 a.com과 공식 주소 b.or.kr을 비교해 보셨나요?" 를 4문장으로 셌다.
+#   상한이 2라 재생성 3회가 전부 막히고 폴백으로 떨어졌다. 하필 **도메인 2개를
+#   나란히 놓는 질문**(사칭 문자에 가장 좋은 질문)이 구조적으로 통과 불가였다.
+#
+# ★★ 그래서 "통과시키는가"보다 **"막아야 할 것을 여전히 막는가"** 를 먼저 단정한다.
+#   보호가 지나쳐 긴 질문이 통과하면 이 가드레일의 목적 자체가 사라진다.
+import pytest as _pytest  # noqa: E402
+
+from services.prompt_chain import MAX_SENTENCES, _split_sentences  # noqa: E402
+
+
+@_pytest.mark.parametrize("text,expected", [
+    # ★ 반드시 계속 막혀야 하는 것 (상한 2 초과)
+    ("첫째 문장입니다. 둘째 문장입니다. 셋째 문장입니다.", 3),
+    ("기관을 확인하세요. 금액을 확인하세요. 주소를 확인하세요. 그리고 전화도 해보세요.", 4),
+    # ★ 도메인이 들어 있어도 진짜 3문장이면 막힌다 - 보호가 지나치지 않았다는 증거
+    ("문자에 적힌 주소는 nhis-refund24.com입니다. 공식 주소는 nhis.or.kr입니다. 비교해 보시겠어요?", 3),
+])
+def test_real_multi_sentence_is_still_blocked(text, expected):
+    assert count_sentences(text) == expected
+    assert count_sentences(text) > MAX_SENTENCES, "막아야 할 긴 질문이 통과한다"
+
+
+@_pytest.mark.parametrize("text,expected", [
+    # ★ 라이브에서 실제로 죽었던 문장들 - 사람이 세면 1문장이다
+    ("받으신 주소 nhis-refund24.com과 공식 주소 nhis.or.kr을 비교해 보셨나요?", 1),
+    ("문자 속 주소 nhis-refund2026.com과 공식 주소 nhis.or.kr을 한번 비교해 보시겠어요?", 1),
+    # 도메인 1개 + 진짜 2문장
+    ("정부24 공식 주소는 gov.kr 입니다. 받으신 주소와 비교해 보시겠어요?", 2),
+    # 마스킹 패턴
+    ("글에 적힌 계좌번호 ***-***-****** 를 보내기 전에 확인해 보시겠어요?", 1),
+    # 소수점
+    ("할인율 3.5% 가 공식 안내와 같은지 확인해 보시겠어요?", 1),
+    # 약어
+    ("이 안내가 U.S.A. 기관에서 온 것인지 확인해 보시겠어요?", 1),
+    # URL
+    ("https://www.bokjiro.go.kr/ssis-tbu/twataa 에서 같은 안내를 찾아보시겠어요?", 1),
+])
+def test_dots_that_are_not_sentence_ends_are_protected(text, expected):
+    assert count_sentences(text) == expected
+    assert count_sentences(text) <= MAX_SENTENCES
+
+
+def test_protected_parts_are_restored():
+    """★ 보호는 세기 위한 임시 조치다. 조각을 돌려줄 때는 원문이어야 한다."""
+    parts = _split_sentences("정부24 공식 주소는 gov.kr 입니다. 받으신 주소와 비교해 보시겠어요?")
+    assert parts == ["정부24 공식 주소는 gov.kr 입니다", "받으신 주소와 비교해 보시겠어요"]
+    assert "" not in " ".join(parts), "플레이스홀더가 새어 나갔다"
+
+
+def test_two_domain_comparison_question_can_pass_validation():
+    """★★ 이 테스트가 사고의 본체다.
+
+    사칭 문자에 줄 수 있는 가장 좋은 질문 - 두 주소를 나란히 놓고 비교하게 하는 질문 -
+    이 세기 오류 때문에 **절대 통과할 수 없었다.** 이제 통과해야 한다.
+    """
+    from services.prompt_chain import validate_question
+    q = "받으신 주소 nhis-refund24.com과 공식 주소 nhis.or.kr을 비교해 보셨나요?"
+    r = validate_question(q, allowed_refs=[])
+    assert r.sentence_count == 1

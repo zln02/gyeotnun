@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 
 from services.error_codes import ERROR_CODES  # noqa: E402
 

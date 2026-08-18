@@ -1,6 +1,7 @@
 """A안 시뮬레이션 — 경보문이 근거로 매칭되면 attention 신호를 붙인다.
    OFFICIAL_DOCS 는 그대로. data_type 만 본다. 검색 대상 불변 → IDF 문제 없음."""
 import sys,csv,collections; sys.path.insert(0,'/app')
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 from services import corpus_index as ci, embeddings as emb, search
 from services.masking import mask_text
 ALERT_TYPES={'warning_case','press_release'}

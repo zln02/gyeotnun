@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, "/app")
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 
 from services import prompt_chain, search  # noqa: E402
 

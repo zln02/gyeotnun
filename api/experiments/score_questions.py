@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 sys.path.insert(0, "/app")
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 
 from services.prompt_chain import count_sentences as _prod_count_sentences  # noqa: E402
 from services.prompt_chain import find_forbidden  # noqa: E402

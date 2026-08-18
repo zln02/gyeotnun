@@ -1,4 +1,5 @@
 import sys,csv,json,glob,math,collections; sys.path.insert(0,'/app')
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 from services import corpus_index as ci, embeddings as emb
 from services.corpus_index import ScamCase
 recs={}

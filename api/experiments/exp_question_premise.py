@@ -22,17 +22,20 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, "/app")
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 
 from services import prompt_chain, question_check, search  # noqa: E402
 from services.masking import mask_text  # noqa: E402
 
 EVAL = Path("/corpus/곁눈_평가세트_120건.csv")
-OUT = Path("/app/data/question_premise.json")
+OUT = Path(os.getenv("OUT", "/app/data/question_premise.json"))
 LLM_BUDGET = int(os.getenv("LLM_BUDGET", "120"))
-WORKERS = int(os.getenv("WORKERS", "4"))
+WORKERS = int(os.getenv("WORKERS", "1"))  # ★ 계측 때문에 1로 (전역 패치라 병렬 불가)
 
 _used = 0
 _lock = threading.Lock()
+_attempts: dict[str, int] = {}
+_reasons: dict[str, list] = {}
 
 
 def _take() -> bool:
@@ -47,16 +50,42 @@ def _take() -> bool:
 def one(row: dict) -> dict | None:
     if not _take():
         return None
+    cid = row["case_id"]
     text = row["평가용_제시문구"]
     masked = mask_text(text).text
     ev = search.collect_evidence(masked, domain=None)
-    vq = prompt_chain.generate_question(
-        extracted_text=masked, signals=ev.signals, references=ev.references, history=[])
+
+    # ★ 이 케이스에서 몇 번 호출했고 왜 막혔는지 센다(스레드별로 안전하게 키 분리).
+    n = {"i": 0}
+    orig_call, orig_record = prompt_chain._call_claude, prompt_chain._record
+
+    def _spy_call(messages):
+        n["i"] += 1
+        return orig_call(messages)
+
+    def _spy_record(reason, attempt, detail=""):
+        _reasons.setdefault(cid, []).append(reason)
+        return orig_record(reason, attempt, detail)
+
+    with _lock:
+        prompt_chain._call_claude, prompt_chain._record = _spy_call, _spy_record
+    try:
+        vq = prompt_chain.generate_question(
+            extracted_text=masked, signals=ev.signals, references=ev.references, history=[])
+    finally:
+        with _lock:
+            prompt_chain._call_claude, prompt_chain._record = orig_call, orig_record
+    _attempts[cid] = n["i"]
     chk = question_check.check_question(vq.question, masked, vq.why or "")
     return {
         "case_id": row["case_id"], "유형": row["유형"],
         "입력": masked, "질문": vq.question, "why": vq.why,
         "fallback": bool(vq.fallback),
+        # ★ 2026-08-17: 재생성 횟수·사유 분포를 함께 남긴다. 문장 세기 수정 전후를
+        #   비교하려면 "몇 번 만에 통과했나"가 있어야 한다.
+        "attempts": _attempts.get(row["case_id"], 0),
+        "reasons": _reasons.get(row["case_id"], []),
+        "refs": len(ev.references),
         "findings": [{"direction": f.direction, "fact": f.fact,
                       "quote": f.quote, "detail": f.detail} for f in chk.findings],
     }
@@ -75,7 +104,13 @@ def main() -> None:
     ga = [r for r in results if any(f["direction"] == "가" for f in r["findings"])]
     na = [r for r in results if any(f["direction"] == "나" for f in r["findings"])]
 
-    print(f"\n생성 {len(results)}건 (폴백 {fb}건 - 폴백은 고정 문장이라 전제 오류가 없다)")
+    from collections import Counter as _C
+    att = _C(r.get("attempts", 0) for r in results)
+    rs = _C(x for r in results for x in r.get("reasons", []))
+    print(f"\n생성 {len(results)}건")
+    print(f"  ★ 폴백 {fb}건 = {fb / max(1, len(results)) * 100:.1f}%")
+    print(f"  재생성 횟수 분포(호출 수별 케이스): {dict(sorted(att.items()))}")
+    print(f"  차단 사유 분포: {dict(rs)}")
     print(f"  (가) 입력에 없는 것을 전제 : {len(ga)}건")
     print(f"  (나) 입력에 있는 것을 없다고 전제 : {len(na)}건")
 

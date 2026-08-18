@@ -120,6 +120,55 @@ FORBIDDEN_PATTERNS: List[str] = [
 
 MAX_SENTENCES = 2
 _SENTENCE_SPLIT_RE = re.compile(r"[.!?。？！]+")
+
+# ★★ 문장을 나누기 전에 '문장 끝이 아닌 점'을 보호한다 (2026-08-17) ★★
+#
+#   왜: _SENTENCE_SPLIT_RE 는 마침표를 무조건 문장 끝으로 본다. 그래서
+#       "받으신 주소 nhis-refund24.com과 공식 주소 nhis.or.kr을 비교해 보셨나요?"
+#   이 **1문장**이 **4문장**으로 세어졌다. 상한이 2라 재생성 3회가 전부 막히고
+#   폴백으로 떨어졌다. 2026-08-16 라이브에서 실제로 그렇게 나갔다.
+#
+#   ★ 하필 도메인 2개를 나란히 놓는 질문 - 사칭 문자에 줄 수 있는 가장 좋은 질문 -
+#     이 구조적으로 통과 불가였다(점 3개 → 4문장).
+#
+#   ★ 목적은 그대로다: **긴 질문을 시니어에게 주지 않는다.** 진짜 3·4문장은 계속 막는다.
+#     여기서 하는 일은 "문장 끝이 아닌 점을 문장 끝으로 세지 않는" 것뿐이다.
+#
+#   ★ 정규식을 복잡하게 만들지 않는다. 보호할 것만 목록으로 두고
+#     플레이스홀더로 치환 → 기존 분리기로 분리 → 복원한다.
+#     (experiments/score_questions.py 가 2026-08-05 에 같은 문제를 발견하고 그쪽에서만
+#      우회하고 있었다. "프로덕션에도 같은 문제가 있다"고 적어 둔 그 메모를 이제 지운다.)
+_PROTECT_RES = (
+    re.compile(r"https?://\S+"),                                  # URL
+    re.compile(r"(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}"),   # 도메인
+    re.compile(r"\d+(?:\.\d+)+"),                                 # 소수점·버전 숫자
+    re.compile(r"[*]{2,}(?:[-.][*]{2,})*"),                        # 마스킹 (***-***-******)
+    re.compile(r"(?:[A-Za-z]\.){2,}"),                             # 약어 (U.S.A.)
+)
+_PLACEHOLDER = "\uf8ff"   # 사용자 정의 영역. 본문에 나올 일이 없고 분리자도 아니다.
+
+
+def _split_sentences(text: str) -> list[str]:
+    """문장으로 나눈다. 문장 끝이 아닌 점은 보호했다가 되돌린다."""
+    kept: list[str] = []
+
+    def _stash(m: re.Match) -> str:
+        kept.append(m.group(0))
+        return f"{_PLACEHOLDER}{len(kept) - 1}{_PLACEHOLDER}"
+
+    t = text or ""
+    for rx in _PROTECT_RES:
+        t = rx.sub(_stash, t)
+
+    parts = [p.strip() for p in _SENTENCE_SPLIT_RE.split(t) if p.strip()]
+
+    # ★ 복원. 세기만 쓰더라도 되돌려 둔다 - 나중에 조각을 쓰는 곳이 생겨도 안전하다.
+    def _restore(p: str) -> str:
+        for i, original in enumerate(kept):
+            p = p.replace(f"{_PLACEHOLDER}{i}{_PLACEHOLDER}", original)
+        return p
+
+    return [_restore(p) for p in parts]
 _URL_RE = re.compile(r"https?://[^\s\"'<>)\]]+")
 
 
@@ -157,9 +206,12 @@ class ValidatedQuestion:
 
 
 def count_sentences(text: str) -> int:
-    """마침표/물음표 기준 문장 수. 종결부호가 없으면 1문장으로 본다."""
-    parts = [p.strip() for p in _SENTENCE_SPLIT_RE.split(text or "") if p.strip()]
-    return len(parts) if parts else 0
+    """마침표/물음표 기준 문장 수. 종결부호가 없으면 1문장으로 본다.
+
+    ★ URL·도메인·소수점·마스킹·약어 안의 점은 문장 끝으로 세지 않는다
+      (_split_sentences 주석 참고).
+    """
+    return len(_split_sentences(text))
 
 
 def find_forbidden(text: str) -> str | None:

@@ -24,6 +24,7 @@ import re
 import sys
 
 sys.path.insert(0, "/app")
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 
 from services import search  # noqa: E402
 from services.masking import mask_text  # noqa: E402

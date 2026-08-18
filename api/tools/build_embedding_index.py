@@ -24,6 +24,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # api/ 를 import 경로에 추가
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 
 from config import settings  # noqa: E402
 from services import corpus_index, embeddings  # noqa: E402

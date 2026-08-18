@@ -46,6 +46,7 @@ else:                                              # 맥/리눅스 로컬 체크
     CORPUS_DIR = API_DIR.parent / "corpus"
 sys.path.insert(0, str(API_DIR))
 
+import _guard  # noqa: F401  ★ services/models 보다 먼저 (운영 DB 보호)
 CSV_PATH = CORPUS_DIR / "곁눈_평가세트_30건.csv"
 OUT_PATH = API_DIR / "data" / "local_embeddings_bench.json"
 
