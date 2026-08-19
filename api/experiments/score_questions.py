@@ -34,6 +34,15 @@ from services.search import SIGNAL_RULES, detect_signals  # noqa: E402
 #   실측에서 규칙 질문 2건(S03·S08)이 이 이유만으로 3문장 판정을 받았다.
 #   ※ 프로덕션 코드는 건드리지 않고, 채점 시 LLM·규칙 양쪽에 똑같이 적용한다.
 #     프로덕션에도 같은 문제가 있다는 사실은 보고서에 남긴다.
+#
+#   ★★ 2026-08-18 후일담 — 이 우회가 라이브 사고가 됐다 ★★
+#     "보고서에 남긴다"로 끝났고 본체는 12일간 그대로였다. 그 사이 도메인 두 개를
+#     비교하는 질문(사칭 문자에 가장 좋은 질문)이 4문장으로 세어져 전부 차단됐고,
+#     폴백의 거짓 전제가 어르신을 **안심시키는 방향으로** 작동했다.
+#     → 본체는 2026-08-18 에 고쳤다(prompt_chain._split_sentences, 커밋 0a7a543).
+#       아래 우회는 그대로 둬도 무해하다(보호를 두 번 해도 결과가 같다).
+#     ★ 규칙이 생겼다: 실험에서 본체 결함을 우회했으면 **대장에 올린다.**
+#       docs/evaluation/본체결함_발견대장.md · docs/CONTRIBUTING.md "로컬 우회 금지"
 _DOMAIN_DOT = re.compile(r"\b([a-zA-Z][a-zA-Z0-9\-]*)\.((?:go|or|co|ne|re|pe|kr|com|net|org|kr)\b)")
 _DECIMAL_DOT = re.compile(r"(?<=\d)\.(?=\d)")
 
