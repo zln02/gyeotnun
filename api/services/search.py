@@ -101,6 +101,27 @@ URGENCY_REQUIRES_ACTION = True
 #     (임계값 상수·URGENCY_REQUIRES_ACTION 과 같은 방식).
 ALERT_DOC_AS_ATTENTION = True
 
+# ★★ 근거_검증표(EVIDENCE) 경로를 끈다 (2026-08-19 채택) ★★
+#   True 로 되돌리면 2026-08-19 이전 동작으로 즉시 복귀한다. CSV·적재는 그대로 둔다
+#   (corpus/근거_검증표.csv 와 corpus_index.EVIDENCE 는 살아 있다 - 지우지 않았다).
+#
+#   왜 끄나 — 전수 실측(docs/reports/2026-08-19_하한선_전수조사_근거검증표.txt)
+#     이 경로는 `match_evidence(min_score=1)`, 즉 **키워드가 한 개만 겹쳐도** 통계를 붙인다.
+#     실제로 붙은 것들의 겹친 단어가 이렇다:
+#         '20' · '2025' · '이상' · '대한' · '이용' · '정보'
+#     하나카드 캐시백 광고에 "70대 이상 디지털정보화 수준", 말기암 완화의료 안내에
+#     "고령층 인터넷 이용률" 이 근거로 붙었다. 실사용 11건 중 3건 · 확대 112건 중 10건이고,
+#     **10건 중 9건이 순전한 오답**이다. 남는 1건(N11)도 인구 비율일 뿐 확인 근거가 아니다.
+#
+#   ★ 왜 임계값을 올리지 않고 끄는가: min_score=2 로 올리면 매칭이 0이 된다(8/17 실측).
+#     그건 사실상 끄는 것인데, 그러면 끄는 것으로 적는 편이 정직하다.
+#
+#   ★ 이 표는 임베딩(2026-08-01 하이브리드 · 08-05 로컬)이 들어오기 전,
+#     2026-07-28 에 만들어진 **유일한 근거 대조 장치**였다. 새 방식이 들어온 뒤에도
+#     경로가 남아 20일간 조용히 오답을 만들었다.
+#     → docs/evaluation/본체결함_발견대장.md 의 유형 L1 참고.
+EVIDENCE_TABLE_AS_REFERENCE = False
+
 # 경보문으로 볼 data_type. records_merged.jsonl 의 원본 필드를 그대로 쓴다.
 # ★ press_release(24건)는 data_type 으로 넣지 않는다 - "업무협약 체결"·"출범 6개월
 #   성과" 같은 정책·성과 발표가 섞여 있어 통째로 경보문이라 부를 수 없다.
@@ -569,7 +590,7 @@ def collect_evidence(text: str, domain: str | None = None) -> SearchResult:
 
     # ---- 공식 문서를 먼저 검색한다 (임베딩 우선, 실패 시 BM25 폴백)
     matched_official, official_mode, official_top_score = match_official_docs_safe(text)
-    matched_evidence = corpus_index.match_evidence(text)
+    matched_evidence = corpus_index.match_evidence(text) if EVIDENCE_TABLE_AS_REFERENCE else []
     matched_scam = corpus_index.match_scam_cases(text)
     legacy_refs = search_corpus(text, domain=domain)
 
