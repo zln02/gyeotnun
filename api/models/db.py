@@ -1,5 +1,5 @@
 """
-곁눈(Gyeotnun) - SQLAlchemy 테이블 정의 (9테이블)
+곁눈(Gyeotnun) - SQLAlchemy 테이블 정의 (10테이블)
 담당: 박진영 (DB)
 
 ★★ 개인정보 처리 원칙 (보안 배점 대응) ★★
@@ -197,7 +197,63 @@ class Event(Base):
     created_at = Column(DateTime, default=_now, index=True)        # 서버 수신 시각 - 집계는 이 값을 기준으로 한다
 
 
-# ------------------------------------------------------------------ 9. error_logs
+# ---------------------------------------------------------- 9. judgment_logs
+class JudgmentLog(Base):
+    """사용자 '판단 행동' 1세션 (2026-08-20 신설).
+
+    events 는 화면 단위 행동(진입·클릭·이탈)을 낱개로 쌓는다. 이 표는 그와 달리
+    **한 세션에 한 행**으로, "무엇을 확인하고 무엇을 근거로 결정했나"를 담는다.
+    baseline / training / posttest 를 나눠 담을 수 있어 훈련 전후 비교가 된다.
+
+    ★★ 개인정보 원칙 (events 와 동일, 예외 없음) ★★
+      - 자유 텍스트 컬럼이 **하나도 없다.** 입력한 글·답변·URL 을 담지 않는다.
+        (원문은 물론 마스킹본도 담지 않는다 - 그건 checks.masked_text 의 일이다.)
+      - user_ref 는 sha256(device_id) 다. 원문 device_id 를 넣지 않는다.
+        device_id 는 앱이 발급하는 임의 문자열이지 기기 고유번호가 아니다.
+      - 나머지는 전부 bool·정수·실수이거나, 미리 정한 짧은 코드값이다.
+        정제는 services/judgment_log.py 에서 한다 - 허용 목록에 없는 값은 버린다.
+      - tests/test_judgment_log.py 가 "자유 텍스트 컬럼이 없다"를 자동으로 지킨다.
+
+    ★ 세션 하나 = 자극 하나(문자 1건) = 판단 하나.
+      같은 session_id 로 두 번째 확인을 시작해도 **기존 행을 덮어쓰지 않는다**
+      (services/judgment_log.start 참고). 자극마다 새 session_id 를 발급하는 것은
+      클라이언트 책임이고, 안 하면 두 번째 자극이 기록되지 않는다.
+
+    ★ NULL 은 '아니오'가 아니라 '측정하지 않음'이다.
+      checked_* 와 question_opened 는 nullable 이다. 클라이언트가 보고하지 않으면
+      False(=확인 안 함)가 아니라 NULL 로 남는다. 측정하지 않은 것을 측정한 것처럼
+      적지 않기 위해서다 - 집계에서 NULL 을 0으로 세면 그 순간 수치가 거짓이 된다.
+    """
+
+    __tablename__ = "judgment_logs"
+
+    # 세션 1개당 1행. 클라이언트가 보낸 session_id(events.session_id 와 같은 값이면
+    # 두 표를 조인할 수 있다), 안 보내면 "chk:<check_id>" 로 대체한다.
+    session_id = Column(String(64), primary_key=True)
+    user_ref = Column(String(64), nullable=True, index=True)        # sha256(device_id)
+    session_type = Column(String(16), nullable=True, index=True)    # baseline|training|posttest
+    input_type = Column(String(16), nullable=True)                  # photo|link|voice|text
+
+    questions_shown = Column(Integer, default=0, nullable=False)    # 보여준 확인 질문 수
+    question_opened = Column(Boolean, nullable=True)                # ★ 성급 판단 판별용
+
+    checked_source = Column(Boolean, nullable=True)                 # 출처를 확인했나
+    checked_author = Column(Boolean, nullable=True)                 # 보낸 곳을 확인했나
+    checked_date = Column(Boolean, nullable=True)                   # 날짜를 확인했나
+    checked_condition = Column(Boolean, nullable=True)              # 조건을 확인했나
+    check_count = Column(Integer, nullable=True)                    # 위 넷 중 True 개수
+
+    decision = Column(String(16), nullable=True)                    # apply|share|hold|not_apply|ask_family
+    time_to_decision = Column(Float, nullable=True)                 # 세션 시작~판단(초, 서버 기준)
+    misjudge_tag = Column(String(32), nullable=True)                # tagger 의 오판 유형
+
+    card_id = Column(String(40), nullable=True)                     # 훈련 카드 id
+    card_result = Column(String(16), nullable=True)                 # correct|wrong|skipped
+
+    created_at = Column(DateTime, default=_now, index=True)         # 세션 시작 시각(서버 수신)
+
+
+# ----------------------------------------------------------------- 10. error_logs
 class ErrorLog(Base):
     """장애 로그 1건 (2026-08 오류 코드 체계 도입, 8/2 보안 멘토링 지시사항).
 

@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -112,6 +112,12 @@ class DialogueRequest(BaseModel):
     # ★ 소유권 확인용: 이 check_id 를 만든 기기의 device_id 와 일치해야 한다(IDOR 방지).
     #   위조 가능한 값이라는 한계는 문서에 기록돼 있다 - 새 인증 체계는 뒤에 다룬다.
     device_id: Optional[str] = Field(None, description="이 확인 건을 만든 기기 식별자")
+    # ★ 2026-08-20 판단 행동 로그(judgment_logs). 없어도 동작한다 - 없으면 서버가
+    #   "chk:<check_id>" 를 세션 키로 쓴다(services/judgment_log.session_key).
+    session_id: Optional[str] = Field(
+        None, description="판단 세션 id. events.session_id 와 같은 값을 보내면 두 표가 조인된다")
+    question_opened: Optional[bool] = Field(
+        None, description="사용자가 질문을 실제로 펼쳐 읽었는지. 안 보내면 '답을 했는가'로 대체한다")
 
 
 class DialogueOption(BaseModel):
@@ -144,6 +150,14 @@ class VerdictRequest(BaseModel):
     reason_tags: List[str] = Field(default_factory=list, description="사용자가 고른 이유 태그")
     # ★ 소유권 확인용(IDOR 방지) - DialogueRequest.device_id 와 같은 목적.
     device_id: Optional[str] = Field(None, description="이 확인 건을 만든 기기 식별자")
+    # ★ 2026-08-20 판단 행동 로그. 전부 선택이고, 안 보내면 NULL 로 남는다.
+    #   ★ 보내지 않은 것을 False(=확인 안 함)로 저장하지 않는다 - 측정하지 않은 것을
+    #     측정한 것처럼 만들지 않기 위해서다(models/db.py JudgmentLog 머리말 참고).
+    session_id: Optional[str] = Field(None, description="판단 세션 id (DialogueRequest 와 같은 값)")
+    checked_source: Optional[bool] = Field(None, description="출처를 확인했는가")
+    checked_author: Optional[bool] = Field(None, description="보낸 곳을 확인했는가")
+    checked_date: Optional[bool] = Field(None, description="날짜를 확인했는가")
+    checked_condition: Optional[bool] = Field(None, description="조건을 확인했는가")
 
 
 class VerdictResponse(BaseModel):
@@ -176,6 +190,50 @@ class TrainingCardResponse(BaseModel):
     #   Optional 인 이유: 카드에 URL 이 없을 수도 있고, 없다고 훈련이 막히면 안 된다.
     source_url: Optional[str] = Field(
         None, description="이 카드의 근거 원문 URL. 없으면 화면에서 링크를 감춘다")
+
+
+class TrainingResultIn(BaseModel):
+    """POST /api/v1/training/result 요청 (2026-08-20 신설).
+
+    ★ 훈련 카드를 풀고 난 결과를 남긴다. 전에는 GET /training/today 로 카드를 주기만
+      하고 결과를 받는 곳이 없어, card_result 를 남길 자리가 아예 없었다.
+    ★ 자유 텍스트를 받지 않는다. 카드 id 와 정오답만 받는다.
+    """
+    session_id: str = Field(..., description="판단 세션 id. ★ 이 경로는 check_id 대체 키를 쓸 수 없어 필수다")
+    card_id: Optional[str] = Field(None, description="푼 카드 id")
+    result: Literal["correct", "wrong", "skipped"] = Field(..., description="정답/오답/건너뜀")
+    device_id: Optional[str] = Field(None, description="비회원 식별자(해시로만 저장된다)")
+    session_type: Optional[Literal["baseline", "training", "posttest"]] = Field(
+        None, description="세션 성격. 안 보내면 NULL 로 남는다(서버가 임의로 채우지 않는다)")
+
+
+class TrainingResultAck(BaseModel):
+    """POST /api/v1/training/result 응답. events 와 같은 fire-and-forget 계약이다."""
+    accepted: int = Field(..., ge=0, le=1, description="1=기록됨, 0=기록 실패(사용자 조치 불필요)")
+
+
+class JudgmentSummaryResponse(BaseModel):
+    """GET /api/v1/judgments/summary 응답 (운영자 전용).
+
+    ★ 모든 비율에 표본 수(_sample)를 함께 준다. 비율만 보면 "3명 중 1명"과
+      "300명 중 100명"이 똑같이 0.333 으로 보이기 때문이다.
+    ★ NULL(미측정)은 표본에서 뺀 값이다 - 0으로 세지 않는다.
+    """
+    total_sessions: int
+    sessions_by_type: Dict[str, int] = Field(default_factory=dict)
+    question_opened_rate: float = Field(..., description="질문을 실제로 연 세션 비율(성급 판단의 역지표)")
+    question_opened_sample: int = Field(..., description="★ 위 비율의 표본 수. 0이면 아무도 보고하지 않은 것이다")
+    avg_questions_shown: float
+    checked_rates: Dict[str, float] = Field(
+        default_factory=dict, description="checked_* 4종의 비율과 각 표본 수(_sample)")
+    avg_check_count: float
+    avg_check_count_sample: int
+    decisions: Dict[str, int] = Field(default_factory=dict)
+    avg_time_to_decision_sec: float
+    time_to_decision_sample: int
+    misjudge_tags: Dict[str, int] = Field(default_factory=dict)
+    card_correct_rate: float
+    card_sample: int
 
 
 class WeeklyReportResponse(BaseModel):

@@ -164,6 +164,13 @@ HASH=$(python3 -c "import hashlib;print(hashlib.sha256('$DEV'.encode()).hexdiges
 # ★ device_hash 로 정확히 이 검사가 만든 checks 행만 지운다. 다른 행은 건드리지 않는다.
 DEL=$(psql_t "with d as (delete from checks where device_hash='$HASH' returning 1) select count(*) from d;")
 say "      checks ${DEL}행 삭제 (device_hash=${HASH:0:12}…)"
+# ★ 2026-08-20: POST /checks 는 judgment_logs 세션도 연다(services/judgment_log.start).
+#   checks 만 지우면 **배포할 때마다 이 표에 5행씩 쌓인다** - 운영 표에 검사 데이터가
+#   남는 것이고, 첫 배포에서 실제로 5행이 남았다(delete_rows 로 지웠다).
+#   ★ 교훈: 기록 지점을 늘리면 **검사 스크립트의 뒷정리도 같이 늘려야 한다.**
+#     새 표에 쓰기 시작할 때 여기를 함께 고치지 않으면 조용히 오염된다.
+DELJ=$(psql_t "with d as (delete from judgment_logs where user_ref='$HASH' returning 1) select count(*) from d;")
+say "      judgment_logs ${DELJ}행 삭제 (같은 device_hash)"
 say "      ★ EX-003/EX-006 행은 지우지 않는다 — 진짜 사고의 진짜 기록이다."
 
 say ""

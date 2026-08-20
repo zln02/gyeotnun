@@ -1,0 +1,244 @@
+판단 행동 로그(judgment_logs) — 설계 · 마이그레이션 · 기록 지점 연결 · 테스트
+====================================================================
+2026-08-20  (운영 DB 적용 + 배포 완료)
+
+
+0. 한 줄 요약
+=============
+
+  세션 1개당 1행으로 "무엇을 확인하고 무엇을 근거로 결정했나"를 남기는 표를
+  만들고, 네 곳의 기록 지점에 연결하고, 27건의 시험을 붙였습니다.
+  운영 DB 에 표를 만들었고(행 0건) 백엔드를 배포했습니다.
+
+  ★ 지시하신 필드 17개가 **하나도 빠짐없이** 그대로 들어갔습니다.
+    다만 값의 목록 세 군데가 실물과 어긋나서, 실물을 따르고 아래 2절에 적었습니다.
+
+
+1. 만든 것
+==========
+
+  [1-1] 표 — api/models/db.py  JudgmentLog (10번째 표)
+
+    session_id(PK) · user_ref · session_type · input_type
+    questions_shown · question_opened
+    checked_source · checked_author · checked_date · checked_condition · check_count
+    decision · time_to_decision · misjudge_tag
+    card_id · card_result · created_at                    → 17컬럼
+
+  [1-2] 서비스 — api/services/judgment_log.py
+        기록 4지점 + 집계(summarize) + 허용 목록 정제
+
+  [1-3] 기록 지점 연결 (★ 지시하신 "기록 지점 연결")
+
+      POST /checks                    → 세션 시작 (user_ref·input_type·session_type)
+      POST /checks/{id}/dialogue      → questions_shown++ · question_opened
+      POST /checks/{id}/verdict       → decision · misjudge_tag · time_to_decision · checked_*
+      POST /training/result           → card_id · card_result       ★ 신설한 엔드포인트
+
+    ★ 마지막 것은 **원래 없던 자리**입니다. GET /training/today 로 카드를 주기만 하고
+      결과를 받는 곳이 아예 없었습니다. card_result 를 채우려면 만들어야 했습니다.
+      (그래서 weekly_reports.training_completed 도 지금까지 늘 0이었습니다.)
+
+  [1-4] 집계 — GET /api/v1/judgments/summary   ★ 운영자 전용(X-Admin-Token)
+        ?session_type=posttest 로 좁힐 수 있습니다.
+        events/summary · errors/summary 와 같은 게이트를 씁니다.
+
+  [1-5] 마이그레이션 — api/tools/migrate_judgment_logs.py
+
+  [1-6] 딸린 것들 (★ 같은 커밋에서)
+        purge_old_records.py   90일 삭제 대상에 추가
+        delete_rows.py         삭제 허용 표에 추가
+        verify_restart_race.sh 뒷정리에 추가 (아래 4절)
+        README 7장·8장         보관기간·표 목록·개인정보 서술 갱신
+        error_codes.py         ST-003 설명에 판단로그 포함
+
+
+2. ★ 지시서와 실물이 어긋난 세 곳 — 실물을 따랐습니다
+======================================================
+
+  [2-1] input_type: photo / link / **voice**
+
+    실제 입력 경로는 image · link · text 입니다.
+
+      image → photo   이름만 맞춰 저장
+      link  → link
+      text  → ★ 지시서에 없었지만 **넣었습니다.** 붙여넣기는 실제로 가장 많이
+              쓰이는 경로라, 빼면 대부분의 세션이 input_type=NULL 로 남습니다.
+      voice → ★ **지금 API 에 음성 입력 경로가 없습니다.** 값만 열어 뒀고
+              오늘 기준으로 한 건도 쌓이지 않습니다.
+              (평가셋 CSV 의 '입력채널=음성' 은 평가용 라벨이지 API 경로가 아닙니다.)
+
+  [2-2] decision: 신청 / **공유** / 보류 / 안함
+
+    기존 값은 apply · not_apply · hold · ask_family 입니다.
+
+      신청 = apply       보류 = hold       안함 = not_apply      (그대로 대응)
+      공유 = share       ★ 지금 화면에 '공유' 버튼이 없습니다. 값만 열어 뒀습니다.
+
+    ★★ ask_family(가족에게 물어보기)를 '공유'로 접지 않았습니다.
+       가족에게 묻는 것과 남에게 퍼뜨리는 것은 **정반대 행동**입니다.
+       하나로 세면 전파 위험 지표가 통째로 뒤집힙니다.
+
+  [2-3] session_type: baseline / training / posttest
+
+    서비스에 이 구분 자체가 없습니다. **클라이언트가 보내야만** 값이 생깁니다.
+    ★ 서버가 기본값으로 baseline 을 채우지 않았습니다 — 안 보낸 것을 baseline 으로
+      세면 "훈련 후에 좋아졌다"는 방향으로 데이터가 오염됩니다.
+
+
+3. ★★ NULL 은 '아니오'가 아니라 '측정하지 않음'입니다
+======================================================
+
+  checked_* 4종과 question_opened 를 **nullable** 로 만들었습니다.
+  클라이언트가 보고하지 않으면 False(=확인 안 함)가 아니라 NULL 입니다.
+
+  ★ 왜 이게 중요한가: 프론트가 아직 안 붙은 오늘, 보고 없는 것을 False 로 저장하면
+    **"아무도 출처를 확인하지 않았다"** 는 수치가 그럴듯하게 만들어집니다.
+    측정하지 않은 것을 측정한 것처럼 만들지 않는다는 원칙이 그대로 적용되는 자리입니다.
+
+  check_count 도 마찬가지로, 넷 다 미보고면 0이 아니라 NULL 입니다.
+
+  집계는 NULL 을 표본에서 뺍니다. 그리고 **모든 비율에 표본 수를 함께** 돌려줍니다 —
+  "3명 중 1명"과 "300명 중 100명"이 똑같이 0.333 으로 보이지 않도록.
+
+  [3-2] question_opened 를 어떻게 재는가 — 한계를 적습니다
+
+    "화면에 떴다"와 "사람이 열어서 읽었다"는 다릅니다.
+
+      1) 클라이언트가 question_opened 를 보내면 그 값을 씁니다 (가장 정확)
+      2) 없으면 **답을 했는지(user_reply)** 로 대체합니다
+
+    ★ 2번의 한계: **열어서 읽었지만 답하지 않고 바로 결정한 경우를 못 잡습니다.**
+      그 경우 NULL 로 남지 False 가 되지는 않습니다. 정확한 값이 필요하면
+      프론트가 1번을 보내야 합니다.
+
+
+4. ★ 구현 중 잡힌 것 두 건
+==========================
+
+  [4-1] 계측이 서비스를 죽일 수 있었습니다 (테스트가 잡음)
+
+    첫 구현에서 `db = SessionLocal()` 이 try **밖**에 있었습니다.
+    커넥션 풀이 마르거나 엔진이 깨지면 **세션을 만드는 그 줄에서** 예외가 나고,
+    그게 라우터로 올라가 **확인 화면이 500** 이 됩니다.
+    "계측은 절대 흐름을 막지 않는다"는 이 모듈의 약속이 바로 그 자리에서 깨집니다.
+
+    test_recording_failure_never_raises 가 잡았고, 세션 획득까지 감싸는
+    컨텍스트 매니저로 고쳤습니다.
+
+  [4-2] ★ 배포 검증 스크립트가 새 표를 오염시켰습니다
+
+    verify_restart_race.sh 는 POST /checks 를 5~6번 호출합니다. 그 호출이 이제
+    judgment_logs 세션도 엽니다. 그런데 뒷정리는 checks 만 지우고 있었습니다.
+
+      → 첫 배포에서 **운영 표에 5행이 남았습니다.**
+        매 배포마다 5~6행씩 쌓일 뻔했습니다.
+
+    조치
+      - 남은 5행: ★ 규칙대로 delete_rows.py 로 지웠습니다.
+        백업 → 복원 리허설(5행 복원 · 체크섬 dc4372e2 일치 · 롤백) → --expect 5 → 삭제.
+        "행 수와 무관하게 예외 없음"을 그대로 따랐습니다.
+        백업: /app/data/deleted_rows/deleted_judgment_logs_20260820_042656.csv
+      - 스크립트에 judgment_logs 뒷정리를 추가했습니다.
+        재실행 확인: "judgment_logs 6행 삭제" · 배포 후 잔여 행 **0건**
+
+    ★ 대장 L1 에 뒤집은 형태로 올렸습니다 —
+      **새 것을 넣을 때 딸린 것을 같이 안 고치면 조용히 샌다.**
+      새 표를 만들 때 같은 커밋에서 볼 곳: purge 대상 · delete_rows 허용 표 ·
+      배포 검증 뒷정리 · README 보관기간 서술.
+
+
+5. 개인정보
+===========
+
+  ★ **자유 텍스트 컬럼이 하나도 없습니다.** 문자열 컬럼 8개는 전부 해시·UUID·
+    짧은 코드값이고, 각각 최대 길이가 시험으로 고정돼 있습니다.
+
+  ★ 허용 목록 밖의 값은 **잘라 넣지 않고 버립니다.**
+    자르면 자유 텍스트의 앞부분이 그대로 남습니다
+    ("어머니 통장 비밀번호가…" → "어머니 통장 비").
+    events 의 target 은 길이만 잘랐지만, 이 표는 값의 종류가 미리 정해져 있어
+    더 강하게 막을 수 있습니다.
+
+  ★ user_ref = sha256(device_id) 이고 **check_store 와 같은 값**입니다.
+    다른 해시를 쓰면 같은 사람이 표마다 다른 사람으로 세어집니다.
+
+  ★ 보관 90일(purge 대상 추가) · 삭제는 delete_rows.py 로만(허용 표 추가).
+
+  실제로 원문이 새지 않는지 시험으로 확인했습니다 —
+  "어머니께 010-1234-5678 로 전화가 왔는데 통장 비밀번호를 물어봤어요" 를
+  input_type·session_type·decision·card_result 에 넣어 보고, 표 전체를 훑어
+  '어머니'·'010-'·'비밀번호' 조각이 **어디에도 없음**을 확인했습니다.
+
+
+6. 시험 (27건 신규)
+===================
+
+  api/tests/test_judgment_log.py         19건  서비스 계층
+  api/tests/test_judgment_log_routes.py   8건  ★ HTTP 로 배선 확인
+
+  ★ 왜 둘로 나눴나: 서비스만 시험하면 "서비스는 완벽한데 라우터가 호출을 빠뜨린"
+    상태가 그대로 통과합니다. 그래서 뒤쪽은 엔드포인트를 실제로 두드립니다.
+
+  [6-2] ★ 게이트가 실패해야 할 때 실패하는지 확인했습니다
+
+    (가) 개인정보 가드 자기시험
+         Text 컬럼이 있는 가짜 표를 같은 검사 논리에 넣어 잡히는지 확인
+         (test_guard_itself_fails_when_free_text_column_added)
+
+    (나) 배선 시험 자기시험
+         verdict.py 의 judgment_log.decided 호출을 임시로 끊고 실행
+         → test_verdict_records_decision_and_checks 실패 확인 → 원복 → 8건 통과
+
+  [6-3] 전체
+         321 passed · 2 skipped   (기존 293 + 신규 27 + 면제 목록 1)
+
+  ★ tools/migrate_judgment_logs.py 를 실험DB 가드 면제 목록에 넣었습니다
+    (purge·migrate_check_store·delete_rows 와 같은 자리 — 운영 DB 를 쓰는 것이 목적).
+
+
+7. 적용
+=======
+
+  [7-1] 마이그레이션 예행 (임시 sqlite)
+        새로 만듦 → 컬럼 17개 → 두 번째 실행 "이미 있었음" (멱등 확인)
+
+  [7-2] 운영 DB 적용
+        적용 전: 표 9개 · judgment_logs 없음
+        적용 후: 표 10개 · judgment_logs 있음 · **행 0건**
+        인덱스 3개 (user_ref · session_type · created_at)
+        ★ 표만 만들고 데이터는 넣지 않았습니다.
+
+  [7-3] purge 동작 확인
+        events=0 error_logs=0 judgment_logs=0 evidence=0 taggings=0 checks=0
+
+  [7-4] 배포 — deploy/verify_restart_race.sh
+        동시 5건 전부 200 · 판정 5/5 일치 · EX-003 증가 0 · EX-006 증가 0 ·
+        meta tensor 0 · 뒷정리 후 judgment_logs 잔여 0건
+        프론트는 건드리지 않았습니다(백엔드만).
+
+  [7-5] 라이브 확인 (행을 남기지 않는 방법으로)
+        /api/v1/judgments/summary          → 404 (토큰 없이는 닫힘)
+        /api/v1/training/result 빈 본문     → 422 (경로 있음 · 검증이 막음)
+        컨테이너 라우트 표에 두 경로 존재 확인
+
+
+8. ★ 남은 것 — 프론트 연동 없이는 절반이 NULL 입니다
+====================================================
+
+  전부 선택 필드라 **프론트 변경 없이도 오늘부터 기록이 쌓입니다**
+  (session_id 를 안 보내면 "chk:<check_id>" 로 대체합니다).
+
+  다만 그 상태에서 채워지는 것은 서버가 아는 것뿐입니다.
+
+      채워짐   session_id(대체) · user_ref · input_type · questions_shown ·
+               decision · time_to_decision · misjudge_tag · created_at
+      NULL     session_type · checked_* 4종 · check_count · card_id · card_result
+               question_opened (답을 한 경우만 True)
+
+  ★ 즉 **이 표의 핵심 지표 절반이 프론트 연동에 달려 있습니다.**
+    보내야 할 필드는 docs/판단행동로그_설계_2026-08-20.md 8절에 표로 정리했습니다.
+    프론트 세션과 폴더를 공유하므로 web/ 은 건드리지 않았습니다.
+
+  ★ 그리고 아직 **아무 데이터도 없습니다.** 지금 요약을 열면 total_sessions=0 입니다.
+    수치를 말할 수 있게 되는 것은 실사용이 쌓인 뒤입니다.

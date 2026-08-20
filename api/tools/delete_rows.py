@@ -51,7 +51,10 @@ from models.db import engine
 #   (2026-08-17 초판이 /docs 로 잡혀 있었고, 첫 실행에서 바로 드러났다.)
 BACKUP_DIR = Path("/app/data/deleted_rows") if Path("/app/data").is_dir() else (
     Path(__file__).resolve().parents[1] / "data" / "deleted_rows")
-_ALLOWED = {"events", "error_logs", "checks", "evidence", "taggings"}
+# ★ 2026-08-20: judgment_logs 추가. 표를 새로 만들 때 **같은 커밋에서** 여기에도
+#   넣는다 - 나중으로 미루면 "지울 일이 생겼을 때" 규칙 밖에서 지우게 된다.
+#   그게 8/16 사고의 형태였다.
+_ALLOWED = {"events", "error_logs", "checks", "evidence", "taggings", "judgment_logs"}
 
 
 def _encode(v):

@@ -39,6 +39,7 @@ EXEMPT = {
     "tools/purge_old_records.py",      # 보관기간 초과분 삭제 (매일 04:00 cron)
     "tools/migrate_check_store.py",    # 컬럼 추가 마이그레이션
     "tools/delete_rows.py",            # 행 삭제 도구(백업·리허설·--expect 내장)
+    "tools/migrate_judgment_logs.py",  # judgment_logs 테이블 생성 (2026-08-20)
 }
 
 # ★ 정규식으로 소스를 훑지 않는다. 독스트링 안의 예시 명령어("from services import …")를

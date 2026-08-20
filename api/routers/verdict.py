@@ -13,7 +13,7 @@ from mocks import fixtures
 from models.schemas import VerdictRequest, VerdictResponse
 from routers._common import MockFlag, not_implemented, use_mock
 from routers.checks import require_owner
-from services import check_store, search, tagger
+from services import check_store, judgment_log, search, tagger
 
 router = APIRouter(prefix="/checks", tags=["verdict"])
 
@@ -50,6 +50,16 @@ async def record_verdict(check_id: str, body: VerdictRequest, mock: int = MockFl
     check_store.save_tagging(
         check_id, device_id=body.device_id, decision=body.decision,
         error_type=error_type, confidence=confidence,
+    )
+
+    # ★ 판단 행동 로그 마무리: decision·misjudge_tag·time_to_decision·checked_* 를 채운다.
+    #   ★ checked_* 는 클라이언트가 보낸 것만 기록한다. 안 보내면 NULL 이다 -
+    #     "확인 안 함(False)"이 아니다. 측정하지 않은 것을 측정한 것처럼 만들지 않는다.
+    judgment_log.decided(
+        body.session_id, check_id=check_id, decision=body.decision,
+        misjudge_tag=error_type,
+        checked_source=body.checked_source, checked_author=body.checked_author,
+        checked_date=body.checked_date, checked_condition=body.checked_condition,
     )
 
     return VerdictResponse(

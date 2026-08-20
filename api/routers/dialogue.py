@@ -20,7 +20,7 @@ from mocks import fixtures
 from models.schemas import DialogueRequest, DialogueResponse
 from routers._common import MockFlag, not_implemented, use_mock
 from routers.checks import require_owner
-from services import check_store, fallback_watch, prompt_chain, search
+from services import check_store, fallback_watch, judgment_log, prompt_chain, search
 from services.incident_log import log_incident
 
 router = APIRouter(prefix="/checks", tags=["dialogue"])
@@ -121,6 +121,13 @@ async def next_question(check_id: str, body: DialogueRequest, mock: int = MockFl
     _observe_fallback(getattr(vq, "fallback", False))   # 관측만 - 응답은 바꾸지 않는다
     new_lines.append(f"질문{body.turn}: {vq.question}")
     check_store.append_history(check_id, new_lines)
+    # ★ 판단 행동 로그: 질문을 몇 개 보여줬는지 센다.
+    #   question_opened 는 클라이언트가 보내면 그 값을, 없으면 "답을 했는가"로 대체한다
+    #   (services/judgment_log.question_shown 머리말에 한계를 적어 뒀다).
+    judgment_log.question_shown(
+        body.session_id, check_id=check_id,
+        answered=bool(body.user_reply), opened=body.question_opened,
+    )
 
     return DialogueResponse(
         turn=body.turn,

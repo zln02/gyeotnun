@@ -3,6 +3,10 @@
 배경: 이 테이블들은 device_hash(원문 아님)만 남기지만, 지금까지 나이 기준 삭제가
       없어 무기한 축적됐다. settings.RETENTION_DAYS(기본 90일)보다 오래된 행을 지운다.
 
+- ★ 2026-08-20: judgment_logs(판단 행동 로그)를 대상에 추가했다. events 와 같은
+  관측용 표이고 같은 90일 규칙을 따른다. **표를 새로 만들 때 purge 대상에 넣는 것을
+  같은 커밋에서 한다** - 나중에 넣기로 미루면 "90일 삭제" 서술이 그날부터 거짓이 된다.
+  ★ FK 가 없는 독립 표라 순서를 신경 쓸 필요가 없다(자기 created_at 기준).
 - ★ 2026-08-16 (#33 3단계): checks·evidence·taggings 를 대상에 추가했다.
   그전까지는 관측 로그 2종(events/error_logs)만 지웠는데, 확인 기록이 프로세스
   메모리에 있어 애초에 DB 에 없었기 때문이다. 이제 checks 가 DB 로 옮겨졌으므로
@@ -27,7 +31,7 @@ import datetime as _dt
 import logging
 
 from config import settings
-from models.db import Check, ErrorLog, Event, Evidence, SessionLocal, Tagging
+from models.db import Check, ErrorLog, Event, Evidence, JudgmentLog, SessionLocal, Tagging
 
 log = logging.getLogger("gyeotnun.purge")
 
@@ -36,14 +40,15 @@ def purge(retention_days: int | None = None) -> dict[str, int]:
     days = settings.RETENTION_DAYS if retention_days is None else retention_days
     if days <= 0:
         log.info("[purge] RETENTION_DAYS=%s → 삭제 건너뜀", days)
-        return {"events": 0, "error_logs": 0, "evidence": 0,
+        return {"events": 0, "error_logs": 0, "judgment_logs": 0, "evidence": 0,
                 "taggings": 0, "checks": 0, "skipped": 1}
 
     cutoff = _dt.datetime.utcnow() - _dt.timedelta(days=days)
     deleted: dict[str, int] = {}
     db = SessionLocal()
     try:
-        for name, model in (("events", Event), ("error_logs", ErrorLog)):
+        for name, model in (("events", Event), ("error_logs", ErrorLog),
+                            ("judgment_logs", JudgmentLog)):
             n = (
                 db.query(model)
                 .filter(model.created_at < cutoff)
@@ -68,9 +73,10 @@ def purge(retention_days: int | None = None) -> dict[str, int]:
     finally:
         db.close()
 
-    log.info("[purge] cutoff=%s (%d일) 삭제: events=%d error_logs=%d "
+    log.info("[purge] cutoff=%s (%d일) 삭제: events=%d error_logs=%d judgment_logs=%d "
              "evidence=%d taggings=%d checks=%d",
              cutoff.isoformat(), days, deleted.get("events", 0), deleted.get("error_logs", 0),
+             deleted.get("judgment_logs", 0),
              deleted.get("evidence", 0), deleted.get("taggings", 0), deleted.get("checks", 0))
     return deleted
 
@@ -83,5 +89,6 @@ if __name__ == "__main__":
     now = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     print(f"[purge] {now} 보관 {settings.RETENTION_DAYS}일 초과 삭제 완료: "
           f"events={result.get('events', 0)}건, error_logs={result.get('error_logs', 0)}건, "
+          f"judgment_logs={result.get('judgment_logs', 0)}건, "
           f"evidence={result.get('evidence', 0)}건, taggings={result.get('taggings', 0)}건, "
           f"checks={result.get('checks', 0)}건")

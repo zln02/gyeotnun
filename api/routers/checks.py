@@ -17,7 +17,7 @@ from config import settings
 from mocks import fixtures
 from models.schemas import CheckCreateResponse, EvidenceResponse
 from routers._common import MockFlag, not_implemented, use_mock
-from services import check_store, masking, ocr, search
+from services import check_store, judgment_log, masking, ocr, search
 
 router = APIRouter(prefix="/checks", tags=["checks"])
 
@@ -77,6 +77,11 @@ async def create_check(
     image: Optional[UploadFile] = File(None, description="카카오톡 캡처 등 이미지"),
     link: Optional[str] = Form(None, description="유튜브/블로그 URL"),
     text: Optional[str] = Form(None, description="붙여넣은 텍스트"),
+    # ★ 2026-08-20 판단 행동 로그(judgment_logs). 둘 다 선택이다.
+    #   session_id 를 안 보내면 서버가 "chk:<check_id>" 를 세션 키로 쓴다 - 프론트
+    #   변경 없이도 오늘부터 기록이 쌓인다. 다만 events 표와 조인은 안 된다.
+    session_id: Optional[str] = Form(None, description="판단 세션 id (events.session_id 와 같은 값 권장)"),
+    session_type: Optional[str] = Form(None, description="baseline|training|posttest. 안 보내면 NULL"),
 ):
     """이미지·링크·텍스트 중 하나를 받아 텍스트를 추출하고 개인정보를 가린다.
 
@@ -152,6 +157,13 @@ async def create_check(
         detected_domain=extracted.detected_domain,
         status=extracted.status,
         source_url=link,
+    )
+    # ★ 판단 행동 로그 세션을 연다. 실패해도 삼킨다(judgment_log 안에서 처리) -
+    #   계측 때문에 확인 화면이 막히면 본말전도다.
+    judgment_log.start(
+        session_id, check_id=check_id, device_id=device_id,
+        input_type=("text" if text else ("link" if link else "image")),
+        session_type=session_type,
     )
     return CheckCreateResponse(
         check_id=check_id,
