@@ -258,6 +258,12 @@ def _split_pipe(value: str) -> List[str]:
 
 
 def _load_evidence() -> List[EvidenceDoc]:
+    """★ 레거시 · 사용 안 함 · 대체: match_embedding_docs (임베딩 검색)
+
+    적재는 계속 하지만 **판정 경로에서는 쓰이지 않는다**(2026-08-19~).
+    되돌리는 스위치는 services/search.py 의 `EVIDENCE_TABLE_AS_REFERENCE` 하나다.
+    이유는 match_evidence() 머리말 참고.
+    """
     docs: List[EvidenceDoc] = []
     for row in _read_csv(EVIDENCE_TABLE_PATH):
         url = (row.get("원문_URL") or "").strip()
@@ -629,7 +635,32 @@ def summary() -> dict:
 
 # ==================================================== 검색
 def match_evidence(text: str, limit: int = 2, min_score: int = 1) -> List[EvidenceDoc]:
-    """근거_검증표와 대조한다. 통계 근거라 임계값을 낮게 둬도(1건 일치) 큰 위험이 없다."""
+    """★★ 레거시 · 사용 안 함 · 대체: match_embedding_docs (임베딩 검색) ★★
+
+    ■ 무엇이었나
+      2026-07-28, 벡터 검색이 없던 시절의 **유일한 근거 대조 장치**였다.
+      2026-08-01 하이브리드, 08-05 로컬 임베딩이 들어왔는데 이 경로를 끄지 않아
+      **약 20일간 살아 있었다.**
+
+    ■ 왜 껐나 (2026-08-19)
+      점수 = 겹친 키워드 **개수**이고 min_score=1 이다. 즉 **단어 하나만 스쳐도**
+      통계가 근거로 붙는다. 표 11건 중 10건이 같은 NIA URL 이라, 카드 광고와
+      관절염 수술비 안내에 "2025 디지털정보격차 실태조사"가 나갔다.
+      실측: 지금 붙는 것 중 두 단어 이상 겹친 것은 **한 건도 없었다**.
+
+    ■ 껐을 때 영향 (전수 실측)
+      verdict_hint 변화 0건(확대112·홀드30·실사용11) · render_verdict 142건
+      tier 변화 0건 · 사칭 건 변화 0건. 정상 3건만 문구가 바뀐다.
+
+    ■ 되돌리기
+      services/search.py 의 `EVIDENCE_TABLE_AS_REFERENCE = True` 한 줄.
+      CSV(`corpus/근거_검증표.csv`)도 적재도 지우지 않았다.
+
+    ■ 기록
+      docs/reports/2026-08-19_하한선_전수조사_근거검증표.txt (조사)
+      docs/reports/2026-08-20_근거검증표_경로차단_회귀검사_코퍼스감시.txt (조치)
+      docs/evaluation/본체결함_발견대장.md 유형 L1
+    """
     kws = extract_keywords(text)
     if not kws:
         return []

@@ -403,10 +403,22 @@ def _dedup_refs(refs: List[dict]) -> List[dict]:
 
 
 # ==================================================== 하이브리드 검색 (BM25 + 임베딩)
-# ★ 실험/벤치마크용이다. collect_evidence() 는 아직 이 함수들을 쓰지 않는다 - BM25/
-#   임베딩/하이브리드 중 어느 것을 실제로 쓸지는 3방식 벤치마크 결과를 보고 사용자가
-#   결정한다(docs/evaluation/hybrid_search_report.md). 그 전까지 프로덕션 경로는
-#   기존 BM25 단독(corpus_index.match_official_docs)이다.
+# ★★ 레거시 · 사용 안 함 · 대체: match_embedding_docs (임베딩 단독) ★★
+#
+#   ■ 결정은 끝났다 (2026-08). 30건 3방식 벤치마크에서 **하이브리드가 임베딩 단독보다
+#     나은 지점이 하나도 없었고**, 경계(확인불가 기대) 케이스는 오히려 가장 나빴다
+#     (하이브리드 0/10 vs BM25·임베딩 각 1/10). → 임베딩 단독 채택, 하이브리드 기각.
+#     근거: docs/evaluation/hybrid_search_report.md
+#
+#   ■ 지금 운영 경로: 임베딩이 기본, 실패하면 BM25 단독으로 폴백
+#     (match_official_docs_safe). BM25 는 폴백 전용이지 결합 대상이 아니다.
+#
+#   ■ 코드를 남긴 이유: 폴백 전략을 바꾸거나 재검토할 때 재활용하려고.
+#     지금 호출하는 곳은 experiments/exp_query_rewrite.py 뿐이다(운영 경로 0곳).
+#
+#   ★ 이 블록의 이전 주석은 "아직 안 쓴다 · 사용자가 결정한다"였는데, 결정이 난 뒤에도
+#     그대로 남아 있었다. **끝난 결정을 미결로 적어 두면 읽는 사람이 오해한다** -
+#     같은 유형이 근거_검증표 경로를 20일간 살려 뒀다(대장 L1).
 
 def _reciprocal_rank_fusion(
     rankings: List[List[str]],
