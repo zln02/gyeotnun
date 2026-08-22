@@ -4,7 +4,7 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
-python-multipart>=0.0.31        # multipart 업로드(이미지) 처리에 필요 (0.0.31: 보안 수정 반영)
+python-multipart==0.0.32        # multipart 업로드(이미지) 처리에 필요 (0.0.31: 보안 수정 반영)
 SQLAlchemy==2.0.36
 psycopg2-binary==2.9.10         # PostgreSQL 드라이버 (docker-compose 용)
 httpx==0.28.1                   # 외부 API 호출 (네이버/Vision)
