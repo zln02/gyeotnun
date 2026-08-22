@@ -7,7 +7,7 @@
 시니어가 받은 문자·이미지를 스스로 확인하도록 돕는 정보판단 AI 코치
 
 [![라이브](https://img.shields.io/badge/라이브-gyeotnun.duckdns.org-2ea44f?style=flat-square)](https://gyeotnun.duckdns.org)
-![테스트](https://img.shields.io/badge/tests-321%20passed-blue?style=flat-square)
+![테스트](https://img.shields.io/badge/tests-322%20passed-blue?style=flat-square)
 ![파이썬](https://img.shields.io/badge/python-3.11-3776ab?style=flat-square)
 ![수상](https://img.shields.io/badge/K--디지털%20해커톤-아이디어상-f5a623?style=flat-square)
 
@@ -356,7 +356,7 @@ where device_hash = X                             →  262행
 
 ```
 코퍼스        공식 문서 1,059건 · 검색 청크 2,036개 · 사기 사례 51건
-테스트        321 passed, 2 skipped
+테스트        322 passed, 2 skipped  (수집 324)
 동시 3명      텍스트 여정 14.77초 → 5.46초 · 사진 24.14초 → 10.70초 · 실패 0
 ```
 
@@ -406,7 +406,7 @@ web/          React — 시니어 UX (본문 19px · 버튼 60px · 대비 7:1)
 corpus/       공식 문서 수집 · 분류
 docs/         실험 · 결정 · 사고 기록          ← 여기
 deploy/       배포 · 롤백 · 회귀 검사 · 삭제 가드
-api/tests/    321 passed
+api/tests/    322 passed
 ```
 
 레거시 경로는 지우지 않고 **머리말에 표시**해 두었습니다 (`레거시 · 사용 안 함 · 대체: ○○`). 왜 그 방식을 그만뒀는지가 기록의 일부이기 때문입니다.
