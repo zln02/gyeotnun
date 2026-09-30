@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { USE_MOCK, createCheck, CANCELLED_CODE } from './api.js'
+import { STATIC_DEMO } from './staticDemo.js'
 import { downscaleImage } from './imageResize.js'
 import { logScreenEnter, logScreenLeave, logError } from './events.js'
 import { withCode } from './errorCodes.js'
@@ -160,7 +161,7 @@ export default function App() {
       )}
 
       {/* 개발/시연 중 어떤 모드인지 항상 보이게 한다 (팀 내부용 표시) */}
-      {USE_MOCK && <div className="mock-flag">데모 모드 (mock=1) — 고정 응답으로 동작 중</div>}
+      {USE_MOCK && <div className="mock-flag">{STATIC_DEMO ? '포트폴리오 데모 — 합성 사례·고정 응답, 실제 분석 아님' : '데모 모드 (mock=1) — 고정 응답으로 동작 중'}</div>}
 
       {screen === 'home' && (
         <Home

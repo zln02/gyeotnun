@@ -1960,3 +1960,26 @@ p  { font-size: var(--fs-body); margin: 0 0 14px; }
   cursor: pointer;
 }
 .checking2-cancel:focus-visible { outline: 4px solid var(--warn); outline-offset: 3px; }
+/* GitHub Pages 포트폴리오 데모: 입력을 받지 않는 합성 사례 전용 첫 화면. */
+.portfolio-demo-home {
+  min-height: 100dvh;
+  max-width: 540px;
+  margin: 0 auto;
+  padding: 72px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
+  color: #203527;
+}
+.portfolio-demo-logo { width: 92px; height: 92px; object-fit: contain; margin: 0 auto 18px; }
+.portfolio-demo-kicker { margin: 0 0 12px; color: #247552; font-size: 14px; font-weight: 800; }
+.portfolio-demo-home h1 { margin: 0; font-size: clamp(42px, 11vw, 58px); letter-spacing: -0.05em; }
+.portfolio-demo-lead { margin: 8px 0 28px; font-size: 20px; font-weight: 700; }
+.portfolio-demo-notice { padding: 20px; margin-bottom: 24px; border: 1px solid #a7d6ba; border-radius: 18px; background: #f1fbf5; text-align: left; line-height: 1.6; }
+.portfolio-demo-notice strong { display: block; margin-bottom: 6px; font-size: 18px; }
+.portfolio-demo-notice p { margin: 0; font-size: 16px; }
+.portfolio-demo-primary, .portfolio-demo-secondary { min-height: 58px; border-radius: 16px; font-size: 18px; font-weight: 800; cursor: pointer; }
+.portfolio-demo-primary { border: 0; background: #158353; color: white; }
+.portfolio-demo-secondary { margin-top: 10px; border: 2px solid #158353; background: white; color: #176a49; }
+.portfolio-demo-repo { display: inline-block; margin: 24px auto 0; color: #176a49; font-size: 15px; font-weight: 700; }

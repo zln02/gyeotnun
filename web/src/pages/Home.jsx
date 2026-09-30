@@ -29,6 +29,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { getDisplayName, setDisplayName } from '../api.js'
+import { STATIC_DEMO } from '../staticDemo.js'
 import { logClick, logError } from '../events.js'
 import { withCode } from '../errorCodes.js'
 import BottomNav from '../components/BottomNav.jsx'
@@ -199,7 +200,30 @@ function ConfirmCluster({ onPhoto, onLink, onText }) {
  *   (관련 CSS: .point-banner / .point-g-badge / .point-text 도 함께 지웠다.)
  */
 
+function StaticDemoHome({ onSubmit, onTraining }) {
+  return (
+    <main className="portfolio-demo-home">
+      <img className="portfolio-demo-logo" src={envelopeImg} alt="" aria-hidden="true" />
+      <p className="portfolio-demo-kicker">제8회 K-디지털 트레이닝 해커톤 · 장려상</p>
+      <h1>곁눈</h1>
+      <p className="portfolio-demo-lead">판정하지 않습니다. 함께 확인합니다.</p>
+      <div className="portfolio-demo-notice" role="note">
+        <strong>포트폴리오 화면 데모</strong>
+        <p>실제 문자나 사진을 받지 않습니다. 아래 버튼을 누르면 합성 지원금 문자 한 건에 대한 고정 예시가 재생됩니다. OCR·검색·AI 분석은 실행되지 않습니다.</p>
+      </div>
+      <button type="button" className="portfolio-demo-primary" onClick={() => onSubmit({ text: '★긴급★ 65세 이상 어르신 전원 매달 40만원 지급 확정! 신청 안 하면 못 받습니다.' })}>
+        합성 문자 확인 흐름 시작
+      </button>
+      <button type="button" className="portfolio-demo-secondary" onClick={onTraining}>
+        5분 훈련 화면 보기
+      </button>
+      <a className="portfolio-demo-repo" href="https://github.com/zln02/gyeotnun" target="_blank" rel="noreferrer">코드·실측 기록 보기 ↗</a>
+    </main>
+  )
+}
+
 export default function Home({ onSubmit, notice, onTraining }) {
+  if (STATIC_DEMO) return <StaticDemoHome onSubmit={onSubmit} onTraining={onTraining} />
   const fileRef = useRef(null)
   const [busy, setBusy] = useState(false)
   // ★ notice: 업로드가 실패해 '확인 중' 화면에서 홈으로 되돌아온 경우, App 이

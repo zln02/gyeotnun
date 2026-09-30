@@ -12,13 +12,14 @@
  */
 
 import { withCode } from './errorCodes.js'
+import { STATIC_DEMO, staticDemoResponse } from './staticDemo.js'
 
 const params = new URLSearchParams(window.location.search)
 const envDefaultMock = import.meta.env.VITE_USE_MOCK === '1'
 
-export const USE_MOCK = params.has('mock')
+export const USE_MOCK = STATIC_DEMO || (params.has('mock')
   ? params.get('mock') === '1'
-  : envDefaultMock
+  : envDefaultMock)
 
 const BASE = '/api/v1'
 
@@ -63,6 +64,7 @@ export const CANCELLED_CODE = 'EX-canceled'
  *   볼 수 없으므로(요청이 도달하지 않음) 프론트에서만 EX-004 로 판단한다.
  */
 async function safeFetch(input, init = {}) {
+  if (STATIC_DEMO) return staticDemoResponse(input, init)
   const { signal: externalSignal, ...rest } = init
   const controller = new AbortController()
   let timedOut = false

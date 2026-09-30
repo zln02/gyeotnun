@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react'
 // 곁눈 프론트 개발 서버 설정 (담당: 조희진)
 export default defineConfig({
   plugins: [react()],
+  base: process.env.VITE_STATIC_DEMO === '1' ? '/gyeotnun/' : '/',
   server: {
     port: 5173,
     host: true,          // 같은 와이파이의 실제 폰으로 접속해 테스트 (시니어 UX 검증 필수)

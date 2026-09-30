@@ -18,9 +18,16 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 // 끊김 등)가 나도 서버를 다시 부르지 않고 바로 안내 문구를 채울 수 있다.
 loadErrorCodes()
 
+if (import.meta.env.VITE_STATIC_DEMO !== '1') {
+  const manifest = document.createElement('link')
+  manifest.rel = 'manifest'
+  manifest.href = `${import.meta.env.BASE_URL}manifest.json`
+  document.head.appendChild(manifest)
+}
+
 // PWA 설치 요건(manifest + service worker) 충족. HTTPS(또는 localhost)에서만 등록된다 -
 // registration 자체가 실패해도(HTTP 배포 등) 앱 동작에는 영향이 없다.
-if ('serviceWorker' in navigator) {
+if (import.meta.env.VITE_STATIC_DEMO !== '1' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
   })

@@ -12,6 +12,7 @@ let _cache = null
 let _fetchPromise = null
 
 export async function loadErrorCodes() {
+  if (import.meta.env.VITE_STATIC_DEMO === '1') return []
   if (_cache) return _cache
   if (!_fetchPromise) {
     _fetchPromise = fetch('/api/v1/errors/codes')

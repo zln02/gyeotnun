@@ -14,6 +14,7 @@
  * 3) 응답을 기다리지 않으므로 화면 반응 속도에 영향이 없다.
  */
 import { deviceId } from './api.js'
+import { STATIC_DEMO } from './staticDemo.js'
 
 const EVENTS_URL = '/api/v1/events'
 
@@ -26,6 +27,7 @@ const SESSION_ID = (crypto.randomUUID?.() || `${Date.now()}-${Math.random().toSt
 let _currentScreen = null
 
 function send(event) {
+  if (STATIC_DEMO) return
   // ★ 여기서 절대 throw 하지 않는다 - 계측 코드의 예외가 화면을 깨뜨리면 안 된다.
   try {
     const body = JSON.stringify({
@@ -78,6 +80,7 @@ export function logError(screen, target) {
 // 한 번 나가지만, 화면 자체는 안 바뀌므로 App.jsx 의 재진입 로그와 짝이 맞지 않을
 // 수 있다 - 완벽한 정밀도보다 '진짜 이탈'을 놓치지 않는 쪽을 택했다.)
 function flushOnExit() {
+  if (STATIC_DEMO) return
   if (!_currentScreen) return
   try {
     const body = JSON.stringify({
