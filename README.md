@@ -11,7 +11,8 @@
 시니어가 받은 문자·이미지를 스스로 확인하도록 돕는 정보판단 AI 코치
 
 [![브라우저 데모](https://img.shields.io/badge/브라우저_데모-GitHub_Pages-2ea44f?style=flat-square)](https://zln02.github.io/gyeotnun/)
-[43초 시연 영상](docs/portfolio/gyeotnun-screen-walkthrough.mp4) · [박진영 케이스 스터디](docs/portfolio/박진영_케이스스터디.md)
+[![시연 영상](https://img.shields.io/badge/시연_영상-바로_재생-1b3a6b?style=flat-square)](https://zln02.github.io/gyeotnun/watch.html)
+[박진영 케이스 스터디](docs/portfolio/박진영_케이스스터디.md)
 ![파이썬](https://img.shields.io/badge/python-3.11-3776ab?style=flat-square)
 ![수상](https://img.shields.io/badge/K--디지털%20해커톤-장려상-f5a623?style=flat-square)
 
@@ -48,7 +49,7 @@
 | 빠르게 볼 내용 | 위치 |
 |---|---|
 | 동작 화면 | [행동 안내](docs/img/screen-action.png) · [경보문 근거](docs/img/screen-alert.png) · [주소 대조](docs/img/screen-domain.png) · [데모 화면](docs/demo/) |
-| 시연 영상 | [43초 한국어 내레이션 영상](docs/portfolio/gyeotnun-screen-walkthrough.mp4) — 과거 앱 화면 캡처 재구성. 라이브 조작 녹화 아님 ([제작 방식](#시연-영상에-대하여)) |
+| 시연 영상 | **[브라우저에서 바로 재생](https://zln02.github.io/gyeotnun/watch.html)** — 43초 한국어 내레이션. 과거 앱 화면 캡처 재구성이며 라이브 조작 녹화 아님 ([제작 방식](#시연-영상에-대하여)) |
 | 영상 원고·재제작 | [내레이션 원고 · 장면표 · 교체 템플릿](docs/portfolio/영상제작_템플릿.md) |
 | 개인 케이스 스터디 | [박진영: 백엔드·배포, 기술적 선택과 검증 경계](docs/portfolio/박진영_케이스스터디.md) |
 | 박진영 담당 | 백엔드 API·DB·배포·정량 평가 체계. 팀 전체 역할은 [팀](#팀) 참조 |
@@ -59,9 +60,15 @@
 
 ### 시연 영상에 대하여
 
-[`docs/portfolio/gyeotnun-screen-walkthrough.mp4`](docs/portfolio/gyeotnun-screen-walkthrough.mp4) · 42.9초 · 1920×1080 · 한국어 내레이션 + 자막 ([.srt 별도 제공](docs/portfolio/gyeotnun-screen-walkthrough.srt))
+▶ **재생: <https://zln02.github.io/gyeotnun/watch.html>** · 42.9초 · 1920×1080 · 한국어 내레이션 + 자막
 
 `입력 → 위험 신호와 확인 질문 → 공식 근거 → 사용자 판단 → 5분 연습` 순서로 서비스 흐름을 보여줍니다.
+
+> **저장소 링크로는 재생되지 않습니다.** GitHub 파일 뷰어는 이 크기(4.2MB)의 영상을 표시하지 못하고,
+> `raw.githubusercontent.com` 은 재생이 아니라 내려받기로 응답합니다. 그래서 GitHub Pages 에 함께 올려
+> 재생 페이지를 따로 뒀습니다. 파일 자체는 [`docs/portfolio/`](docs/portfolio/) 에 있고
+> ([mp4](docs/portfolio/gyeotnun-screen-walkthrough.mp4) · [srt](docs/portfolio/gyeotnun-screen-walkthrough.srt)),
+> 클릭하면 내려받기가 됩니다.
 
 | | 내용 |
 |---|---|
@@ -75,6 +82,7 @@
 
 | | 시연 영상 | [GitHub Pages 정적 데모](https://zln02.github.io/gyeotnun/) |
 |---|---|---|
+| 주소 | [/watch.html](https://zln02.github.io/gyeotnun/watch.html) | [/](https://zln02.github.io/gyeotnun/) |
 | 성격 | 과거 화면 캡처를 이어 붙인 **영상** | 브라우저에서 눌러 보는 **화면 체험** |
 | 상호작용 | 없음 (재생만) | 있음 (고정 응답) |
 | 서버 호출 | 없음 | 없음 — OCR·검색·LLM 호출 안 함 |

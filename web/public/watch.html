@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>곁눈 시연 영상 — 과거 화면 캡처 기반 재구성</title>
+<meta name="description" content="곁눈(Gyeotnun) 시연 영상. 저장소의 과거 앱 화면 캡처를 재구성한 42.9초 영상이며, 현재 서버는 운영하지 않습니다.">
+<link rel="icon" href="./logo-favicon.png">
+<style>
+  :root {
+    --navy: #1b3a6b;
+    --navy-deep: #102342;
+    --blue: #2c5fa8;
+    --ink: #1f2933;
+    --muted: #6b7684;
+    --line: #dbe4f0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 64px;
+    background: linear-gradient(180deg, #f3f7fc 0%, #dbe6f5 100%);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: "Pretendard", "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.7;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 28px; }
+  .mark { font-size: 34px; font-weight: 800; color: var(--navy); letter-spacing: -0.5px; }
+  .mark span { font-size: 17px; font-weight: 500; color: var(--muted); margin-left: 8px; }
+  .tagline { margin: 10px 0 14px; font-size: 17px; color: var(--ink); }
+  .badge {
+    display: inline-block; padding: 7px 18px; border-radius: 999px;
+    background: rgba(27, 58, 107, 0.1); color: var(--navy);
+    font-size: 14px; font-weight: 600;
+  }
+
+  /* 상시 고지 — 영상 안의 고지 띠와 같은 문구 */
+  .notice {
+    margin: 0 0 18px; padding: 14px 18px; border-radius: 10px;
+    background: var(--navy-deep); color: #d6e2f2;
+    font-size: 14.5px; text-align: center;
+  }
+
+  video {
+    width: 100%; display: block; border-radius: 12px;
+    background: #000; box-shadow: 0 18px 44px rgba(20, 38, 70, 0.28);
+  }
+  .meta { margin-top: 12px; font-size: 14px; color: var(--muted); text-align: center; }
+
+  h2 { font-size: 19px; margin: 34px 0 12px; color: var(--navy); }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+  th, td { padding: 12px 16px; text-align: left; font-size: 14.5px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { width: 132px; color: var(--navy); font-weight: 700; background: #f7fafd; white-space: nowrap; }
+  tr:last-child th, tr:last-child td { border-bottom: none; }
+
+  .links { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .links a {
+    padding: 10px 20px; border-radius: 8px; text-decoration: none;
+    font-size: 14.5px; font-weight: 600; border: 1.5px solid var(--blue); color: var(--blue);
+  }
+  .links a.primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+  footer { margin-top: 40px; text-align: center; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="mark">곁눈<span>Gyeotnun</span></div>
+    <p class="tagline">받은 문자·이미지를 스스로 확인하도록 돕는 시니어 정보판단 코치</p>
+    <span class="badge">제8회 K-디지털 트레이닝 해커톤 장려상 · Second Look 6인 팀 · 2026.07–08</span>
+  </header>
+
+  <p class="notice">
+    과거 화면 캡처 기반 재구성 · 합성 입력 · 현재 서버 미운영 · 정적 데모 별도 제공
+  </p>
+
+  <video controls preload="metadata" playsinline poster="./media/walkthrough-poster.jpg">
+    <source src="./media/gyeotnun-screen-walkthrough.mp4" type="video/mp4">
+    <track kind="subtitles" src="./media/gyeotnun-screen-walkthrough.vtt" srclang="ko" label="한국어" default>
+    이 브라우저는 video 태그를 지원하지 않습니다.
+    <a href="./media/gyeotnun-screen-walkthrough.mp4">영상 파일을 직접 내려받아</a> 보세요.
+  </video>
+
+  <p class="meta">
+    42.9초 · 1920×1080 · 한국어 내레이션 + 자막 ·
+    흐름: 입력 → 위험 신호와 확인 질문 → 공식 근거 → 사용자 판단 → 5분 연습
+  </p>
+
+  <h2>이 영상에 대하여</h2>
+  <table>
+    <tr>
+      <th>영상 구성</th>
+      <td>저장소의 과거 앱 화면 캡처(<code>docs/demo/</code>)를 확대·패닝으로 재구성했습니다.
+          <strong>UI와 글자를 생성하거나 다시 그리지 않았습니다.</strong> 화면 픽셀은 캡처 원본 그대로입니다.
+          실제 조작을 녹화한 영상이 아닙니다.</td>
+    </tr>
+    <tr>
+      <th>입력 사례</th>
+      <td>합성 사례입니다. 실제 이용자의 문자나 개인정보가 아닙니다.</td>
+    </tr>
+    <tr>
+      <th>음성</th>
+      <td>espeak-ng <strong>TTS 합성</strong>입니다. 사람이 녹음한 음성이 아닙니다.</td>
+    </tr>
+    <tr>
+      <th>배경음악</th>
+      <td>없음. 저작권이 확실한 음원이 없어 넣지 않았습니다.</td>
+    </tr>
+    <tr>
+      <th>서버 상태</th>
+      <td>현재 서버는 운영하지 않습니다. 브라우저에서 눌러 보는 정적 데모는 별도로 제공합니다.</td>
+    </tr>
+    <tr>
+      <th>미검증</th>
+      <td>60대 대면 효과 테스트를 실시하지 못했습니다. <strong>판단력 향상은 입증하지 않았습니다.</strong>
+          훈련 화면의 실습은 고정 예시이며 개인화 루프가 완성된 것이 아닙니다.</td>
+    </tr>
+  </table>
+
+  <div class="links">
+    <a class="primary" href="./index.html">정적 데모 열기</a>
+    <a href="https://github.com/zln02/gyeotnun">GitHub 저장소</a>
+    <a href="https://github.com/zln02/gyeotnun/blob/main/docs/portfolio/%EC%98%81%EC%83%81%EC%A0%9C%EC%9E%91_%ED%85%9C%ED%94%8C%EB%A6%BF.md">영상 제작 방식</a>
+    <a href="./media/gyeotnun-screen-walkthrough.mp4" download>영상 내려받기</a>
+  </div>
+
+  <footer>
+    수치는 README에 표기된 평가셋과 날짜 범위(확대 112건 · 홀드아웃 30건 · 2026-08-21 기준)에 한정됩니다.
+  </footer>
+
+</div>
+</body>
+</html>

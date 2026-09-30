@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'web/**'
+      - 'docs/portfolio/gyeotnun-screen-walkthrough.mp4'
+      - 'docs/portfolio/gyeotnun-screen-walkthrough.srt'
       - '.github/workflows/pages-demo.yml'
   workflow_dispatch:
 
@@ -38,6 +40,30 @@ jobs:
         working-directory: web
         env:
           VITE_STATIC_DEMO: '1'
+
+      # 시연 영상을 Pages 에 함께 올린다.
+      # GitHub 저장소 뷰어는 4MB 영상을 재생하지 못하고(blob 뷰 "too big"),
+      # raw.githubusercontent.com 은 attachment 로 내려받게 한다.
+      # Pages 는 video/mp4 로 스트리밍하므로 watch.html 에서 바로 재생된다.
+      - name: 시연 영상·자막을 Pages 산출물로 복사
+        run: |
+          set -euo pipefail
+          SRC=docs/portfolio
+          DST=web/dist/media
+          mkdir -p "$DST"
+          cp "$SRC/gyeotnun-screen-walkthrough.mp4" "$DST/"
+          python3 "$SRC/scripts/srt_to_vtt.py" \
+            "$SRC/gyeotnun-screen-walkthrough.srt" \
+            "$DST/gyeotnun-screen-walkthrough.vtt"
+          ffmpeg -v error -ss 2 -i "$SRC/gyeotnun-screen-walkthrough.mp4" \
+            -frames:v 1 -q:v 3 -y "$DST/walkthrough-poster.jpg"
+          # 빈 파일을 배포하지 않는다 (deploy/publish.sh 와 같은 원칙)
+          for f in gyeotnun-screen-walkthrough.mp4 gyeotnun-screen-walkthrough.vtt walkthrough-poster.jpg; do
+            test -s "$DST/$f" || { echo "비었거나 없음: $DST/$f"; exit 1; }
+          done
+          test -s web/dist/watch.html || { echo "watch.html 이 dist 에 없다"; exit 1; }
+          ls -la "$DST"
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
