@@ -11,6 +11,7 @@
 시니어가 받은 문자·이미지를 스스로 확인하도록 돕는 정보판단 AI 코치
 
 [![브라우저 데모](https://img.shields.io/badge/브라우저_데모-GitHub_Pages-2ea44f?style=flat-square)](https://zln02.github.io/gyeotnun/)
+[43초 시연 영상](docs/portfolio/gyeotnun-screen-walkthrough.mp4) · [박진영 케이스 스터디](docs/portfolio/박진영_케이스스터디.md)
 ![파이썬](https://img.shields.io/badge/python-3.11-3776ab?style=flat-square)
 ![수상](https://img.shields.io/badge/K--디지털%20해커톤-장려상-f5a623?style=flat-square)
 
@@ -47,11 +48,44 @@
 | 빠르게 볼 내용 | 위치 |
 |---|---|
 | 동작 화면 | [행동 안내](docs/img/screen-action.png) · [경보문 근거](docs/img/screen-alert.png) · [주소 대조](docs/img/screen-domain.png) · [데모 화면](docs/demo/) |
+| 시연 영상 | [43초 한국어 내레이션 영상](docs/portfolio/gyeotnun-screen-walkthrough.mp4) — 과거 앱 화면 캡처 재구성. 라이브 조작 녹화 아님 ([제작 방식](#시연-영상에-대하여)) |
+| 영상 원고·재제작 | [내레이션 원고 · 장면표 · 교체 템플릿](docs/portfolio/영상제작_템플릿.md) |
+| 개인 케이스 스터디 | [박진영: 백엔드·배포, 기술적 선택과 검증 경계](docs/portfolio/박진영_케이스스터디.md) |
 | 박진영 담당 | 백엔드 API·DB·배포·정량 평가 체계. 팀 전체 역할은 [팀](#팀) 참조 |
 | 기술 의사결정과 재현 가능한 수치 | [측정 결과](#측정-결과) · [실험/결정 문서 색인](docs/README.md) |
 | 기획 대비 실제 구현과 미검증 항목 | [구현 범위와 검증 경계](#구현-범위와-검증-경계) |
 
 > **아카이브 읽는 법:** 수치는 표기된 평가셋·날짜에 한정됩니다. 아래 스크린샷은 합성 입력의 실제 화면이고, 60대 사용자를 대상으로 한 효과 검증 결과는 아닙니다. GitHub Pages는 VM을 대체한 **화면 체험용 정적 데모**로, OCR·검색·LLM 호출이나 실제 문자 판별을 하지 않습니다.
+
+### 시연 영상에 대하여
+
+[`docs/portfolio/gyeotnun-screen-walkthrough.mp4`](docs/portfolio/gyeotnun-screen-walkthrough.mp4) · 42.9초 · 1920×1080 · 한국어 내레이션 + 자막 ([.srt 별도 제공](docs/portfolio/gyeotnun-screen-walkthrough.srt))
+
+`입력 → 위험 신호와 확인 질문 → 공식 근거 → 사용자 판단 → 5분 연습` 순서로 서비스 흐름을 보여줍니다.
+
+| | 내용 |
+|---|---|
+| **만든 방식** | 저장소의 과거 앱 화면 캡처([`docs/demo/`](docs/demo/))를 확대·패닝·전환으로 재구성했습니다. **UI와 글자를 AI로 생성하거나 다시 그리지 않았습니다.** 화면 픽셀은 캡처 원본 그대로입니다 |
+| **음성** | espeak-ng **TTS 합성**입니다. 사람이 녹음한 음성이 아닙니다 |
+| **입력 사례** | 합성 사례입니다. 실제 이용자의 문자나 개인정보가 아닙니다 |
+| **배경음악** | 없음 (저작권이 확실한 음원이 없어 넣지 않았습니다) |
+| **재생성** | [영상 제작 템플릿](docs/portfolio/영상제작_템플릿.md)에 원고·장면표·명령어가 있습니다 |
+
+**정적 데모와의 차이**
+
+| | 시연 영상 | [GitHub Pages 정적 데모](https://zln02.github.io/gyeotnun/) |
+|---|---|---|
+| 성격 | 과거 화면 캡처를 이어 붙인 **영상** | 브라우저에서 눌러 보는 **화면 체험** |
+| 상호작용 | 없음 (재생만) | 있음 (고정 응답) |
+| 서버 호출 | 없음 | 없음 — OCR·검색·LLM 호출 안 함 |
+| 보여주는 것 | 5단계 흐름 전체를 순서대로 | 합성 사례에 대한 고정 응답 |
+
+둘 다 **현재 운영 중인 서버를 호출하지 않습니다.** 서버 VM은 종료했습니다.
+
+**아직 없는 자료** — 없는 파일이나 링크를 만들어 두지 않았습니다.
+
+- **상장 원본**: 미보유. 받는 대로 `docs/portfolio/award/` 에 추가하고 영상 장면을 덧붙입니다 ([절차](docs/portfolio/영상제작_템플릿.md#4-1-상장-원본-현재-없음))
+- **실제 조작 화면 녹화본**: 저장소·원격 브랜치·릴리스에서 찾지 못했습니다. 확보하면 이 재구성본을 덮어쓰지 않고 `gyeotnun-live-recording.mp4` 로 **따로** 추가합니다 ([절차](docs/portfolio/영상제작_템플릿.md#4-2-실제-화면-녹화-현재-없음))
 
 ---
 
