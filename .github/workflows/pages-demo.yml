@@ -7,6 +7,8 @@ on:
       - 'web/**'
       - 'docs/portfolio/gyeotnun-screen-walkthrough.mp4'
       - 'docs/portfolio/gyeotnun-screen-walkthrough.srt'
+      - 'docs/portfolio/walkthrough-poster.jpg'
+      - 'docs/portfolio/scripts/srt_to_vtt.py'
       - '.github/workflows/pages-demo.yml'
   workflow_dispatch:
 
@@ -45,18 +47,21 @@ jobs:
       # GitHub 저장소 뷰어는 4MB 영상을 재생하지 못하고(blob 뷰 "too big"),
       # raw.githubusercontent.com 은 attachment 로 내려받게 한다.
       # Pages 는 video/mp4 로 스트리밍하므로 watch.html 에서 바로 재생된다.
+      # ffmpeg 는 쓰지 않는다. ubuntu-latest 러너에 없어서 2026-09-30 배포가
+      # exit 127 로 실패했다. 포스터는 로컬에서 만들어 저장소에 넣고 여기서는
+      # 복사만 한다. 포스터 재생성 명령은 docs/portfolio/영상제작_템플릿.md 참조.
       - name: 시연 영상·자막을 Pages 산출물로 복사
         run: |
           set -euo pipefail
+          echo "python3: $(command -v python3 || echo '(없음)')"
           SRC=docs/portfolio
           DST=web/dist/media
           mkdir -p "$DST"
           cp "$SRC/gyeotnun-screen-walkthrough.mp4" "$DST/"
+          cp "$SRC/walkthrough-poster.jpg"          "$DST/"
           python3 "$SRC/scripts/srt_to_vtt.py" \
             "$SRC/gyeotnun-screen-walkthrough.srt" \
             "$DST/gyeotnun-screen-walkthrough.vtt"
-          ffmpeg -v error -ss 2 -i "$SRC/gyeotnun-screen-walkthrough.mp4" \
-            -frames:v 1 -q:v 3 -y "$DST/walkthrough-poster.jpg"
           # 빈 파일을 배포하지 않는다 (deploy/publish.sh 와 같은 원칙)
           for f in gyeotnun-screen-walkthrough.mp4 gyeotnun-screen-walkthrough.vtt walkthrough-poster.jpg; do
             test -s "$DST/$f" || { echo "비었거나 없음: $DST/$f"; exit 1; }
