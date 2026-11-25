@@ -261,7 +261,7 @@ def draw_title(img, narration, progress):
         fill=INK,
         anchor="mm",
     )
-    badge = "제8회 K-디지털 트레이닝 해커톤 장려상 · Second Look 6인 팀 · 2026.07–08"
+    badge = "제8회 K-디지털 트레이닝 해커톤 아이디어상 · Second Look 6인 팀 · 2026.07–08"
     bw = int(d.textlength(badge, font=font(False, 27))) + 64
     soft_rect(img, (cx - bw // 2, 596 + slide, cx + bw // 2, 654 + slide), 29, (27, 58, 107, 30))
     d.text((cx, 625 + slide), badge, font=font(False, 27), fill=NAVY, anchor="mm")
