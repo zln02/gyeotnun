@@ -4,7 +4,7 @@
 
 **판정하지 않습니다. 함께 확인합니다.**
 
-### 🏅 제8회 K-디지털 트레이닝 해커톤 **장려상**
+### 🏅 제8회 K-디지털 트레이닝 해커톤 **아이디어상**
 
 <sub>Second Look · 6인 팀 프로젝트 · 2026</sub>
 
@@ -14,7 +14,7 @@
 [![시연 영상](https://img.shields.io/badge/시연_영상-바로_재생-1b3a6b?style=flat-square)](https://zln02.github.io/gyeotnun/watch.html)
 [박진영 케이스 스터디](docs/portfolio/박진영_케이스스터디.md)
 ![파이썬](https://img.shields.io/badge/python-3.11-3776ab?style=flat-square)
-![수상](https://img.shields.io/badge/K--디지털%20해커톤-장려상-f5a623?style=flat-square)
+![수상](https://img.shields.io/badge/K--디지털%20해커톤-아이디어상-f5a623?style=flat-square)
 
 | 행동 안내 | 경보문 매칭 | 주소 대조 |
 |:---:|:---:|:---:|
@@ -37,7 +37,7 @@
 | **왜 판정 안 하나** | 진위를 확정하지 않고 위험 신호·공식 근거·확인 질문을 보여 줍니다. 최종 판단은 사용자에게 남깁니다 |
 | **맡은 일** | 백엔드·AI (6인 팀) — 근거 검색 · 질문 생성 API · 배포 · 정량 평가 체계 |
 | **기간** | 2026년 7~8월 개발 · 포트폴리오 기록 |
-| **결과** | 제8회 K-디지털 트레이닝 해커톤 **장려상** |
+| **결과** | 제8회 K-디지털 트레이닝 해커톤 **아이디어상** |
 | **체험** | [GitHub Pages 포트폴리오 데모](https://zln02.github.io/gyeotnun/) — 합성 사례의 고정 응답, 실제 분석 아님 |
 
 <br>
