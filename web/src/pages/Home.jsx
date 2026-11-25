@@ -204,7 +204,7 @@ function StaticDemoHome({ onSubmit, onTraining }) {
   return (
     <main className="portfolio-demo-home">
       <img className="portfolio-demo-logo" src={envelopeImg} alt="" aria-hidden="true" />
-      <p className="portfolio-demo-kicker">제8회 K-디지털 트레이닝 해커톤 · 장려상</p>
+      <p className="portfolio-demo-kicker">제8회 K-디지털 트레이닝 해커톤 · 아이디어상</p>
       <h1>곁눈</h1>
       <p className="portfolio-demo-lead">판정하지 않습니다. 함께 확인합니다.</p>
       <div className="portfolio-demo-notice" role="note">
